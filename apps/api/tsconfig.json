@@ -1,0 +1,3 @@
+{
+  "extends": "@workspace/typescript-config/nest.json"
+}
