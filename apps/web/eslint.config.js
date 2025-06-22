@@ -1,4 +1,4 @@
-import { nextJsConfig } from "@workspace/eslint-config/next-js"
+// @ts-check
+import { initNextJsEslint } from '@workspace/eslint-config/next'
 
-/** @type {import("eslint").Linter.Config} */
-export default nextJsConfig
+export default initNextJsEslint()

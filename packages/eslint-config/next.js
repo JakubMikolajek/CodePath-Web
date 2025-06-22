@@ -1,51 +1,90 @@
-import js from "@eslint/js"
-import pluginNext from "@next/eslint-plugin-next"
-import eslintConfigPrettier from "eslint-config-prettier"
-import pluginReact from "eslint-plugin-react"
-import pluginReactHooks from "eslint-plugin-react-hooks"
-import globals from "globals"
-import tseslint from "typescript-eslint"
+// @ts-check
+import eslint from '@eslint/js'
+import nextPlugin from '@next/eslint-plugin-next'
+import pluginReact from 'eslint-plugin-react'
+import pluginReactHooks from 'eslint-plugin-react-hooks'
+import importPlugin from 'eslint-plugin-import'
+import { config as baseConfig } from './base.js'
+import stylistic from '@stylistic/eslint-plugin'
 
-import { config as baseConfig } from "./base.js"
+export const initNextJsEslint = () => {
+  return [
+    eslint.configs.recommended,
+    ...baseConfig,
 
-/**
- * A custom ESLint configuration for libraries that use Next.js.
- *
- * @type {import("eslint").Linter.Config}
- * */
-export const nextJsConfig = [
-  ...baseConfig,
-  js.configs.recommended,
-  eslintConfigPrettier,
-  ...tseslint.configs.recommended,
-  {
-    ...pluginReact.configs.flat.recommended,
-    languageOptions: {
-      ...pluginReact.configs.flat.recommended.languageOptions,
-      globals: {
-        ...globals.serviceworker,
+    {
+      plugins: { stylistic },
+      rules: {
+        'stylistic/semi': ['error', 'never'],
+        'stylistic/quotes': ['error', 'single'],
+        'stylistic/comma-dangle': ['error', 'always-multiline'],
+        'stylistic/indent': ['error', 2],
+        'stylistic/no-trailing-spaces': 'error',
+        'stylistic/eol-last': ['error', 'always'],
+        'stylistic/max-len': ['error', { code: 160, ignoreUrls: true }],
+        'stylistic/arrow-parens': ['error', 'always'],
+        'stylistic/object-curly-spacing': ['error', 'always'],
+        'stylistic/array-bracket-spacing': ['error', 'never'],
+      }
+    },
+
+    {
+      plugins: {
+        react: pluginReact,
+        'react-hooks': pluginReactHooks,
+        '@next/next': nextPlugin,
+      },
+      rules: {
+        ...nextPlugin.configs.recommended.rules,
+        ...nextPlugin.configs['core-web-vitals'].rules,
+        '@next/next/no-html-link-for-pages': 'off',
       },
     },
-  },
-  {
-    plugins: {
-      "@next/next": pluginNext,
+
+    {
+      plugins: {
+        import: importPlugin,
+      },
+      rules: {
+        'import/order': [
+          'error',
+          {
+            groups: [
+              'builtin',
+              'external',
+              'internal',
+              'parent',
+              'sibling',
+              'index',
+            ],
+            'newlines-between': 'always',
+            alphabetize: {
+              order: 'asc',
+              caseInsensitive: true,
+            },
+          },
+        ],
+        'import/no-duplicates': 'error',
+      },
     },
-    rules: {
-      ...pluginNext.configs.recommended.rules,
-      ...pluginNext.configs["core-web-vitals"].rules,
+
+    {
+      ignores: ['.next/', 'src/components/ui/**'],
     },
-  },
-  {
-    plugins: {
-      "react-hooks": pluginReactHooks,
+
+    {
+      files: ['next.config.js', 'postcss.config.mjs', 'tailwind.config.js'],
+      languageOptions: {
+        parser: '@typescript-eslint/parser',
+        parserOptions: {
+          project: './tsconfig.json',
+          sourceType: 'module',
+        },
+        globals: {
+          module: true,
+          require: true,
+        },
+      },
     },
-    settings: { react: { version: "detect" } },
-    rules: {
-      ...pluginReactHooks.configs.recommended.rules,
-      // React scope no longer necessary with new JSX transform.
-      "react/react-in-jsx-scope": "off",
-      "react/prop-types": "off",
-    },
-  },
-]
+  ]
+}
