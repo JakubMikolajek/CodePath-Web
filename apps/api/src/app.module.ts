@@ -4,10 +4,9 @@ import { LoggerModule } from 'nestjs-pino'
 
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
-import { Chat } from './modules/chat/chat.entity'
 import { ChatModule } from './modules/chat/chat.module'
-import { Embedding } from './modules/embedding/embedding.entity'
 import { EmbeddingModule } from './modules/embedding/embedding.module'
+import { RepoModule } from './modules/repos/repo.module'
 
 @Module({
   imports: [
@@ -32,11 +31,12 @@ import { EmbeddingModule } from './modules/embedding/embedding.module'
       username: 'postgres',
       password: 'postgres',
       database: 'codepath',
-      entities: [Embedding, Chat],
+      autoLoadEntities: true,
       synchronize: false,
     }),
     ChatModule,
     EmbeddingModule,
+    RepoModule,
   ],
   controllers: [AppController],
   providers: [AppService],
