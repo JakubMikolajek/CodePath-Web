@@ -1,7 +1,9 @@
+
 import { Button } from '@workspace/ui/components/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@workspace/ui/components/card'
 import { Input } from '@workspace/ui/components/input'
 import { Label } from '@workspace/ui/components/label'
+import axios from 'axios'
 import { useState } from 'react'
 
 interface RegisterFormProps {
@@ -22,9 +24,31 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
 
   const handleInputChange = (field: keyof RegisterFormState, value: string) => {
     setFormData({ ...formData, [field]: value })
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError(null)
+    setSuccess(false)
+
+    try {
+      await axios.post('/api/auth/register', {
+        email: formData.email,
+        login: formData.login,
+        password: formData.password,
+      })
+      setSuccess(true)
+      handleShowRegisterForm(false)
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Registration failed.')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -35,11 +59,17 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
           <CardDescription>Enter your details to register</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={() => {}}>
+          <form onSubmit={handleSubmit}>
             <div className="flex flex-col gap-6">
               {error && (
                 <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
                   {error}
+                </div>
+              )}
+
+              {success && (
+                <div className="p-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md">
+                  Registration successful!
                 </div>
               )}
 

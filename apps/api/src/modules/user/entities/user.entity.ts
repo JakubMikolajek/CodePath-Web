@@ -17,6 +17,9 @@ export class User {
   @Column({ unique: true })
   email: string
 
+  @Column({ unique: true })
+  login: string
+
   @Column({ name: 'password_hash' })
   passwordHash: string
 
@@ -27,5 +30,5 @@ export class User {
   repos: Repo[]
 
   @OneToMany(() => Chat, chat => chat.user)
-  chatHistory: Chat[]
+  chats: Chat[]
 }

@@ -7,9 +7,9 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm'
 
-import { User } from '../../users/entities/user.entity'
+import { User } from '../../user/entities/user.entity'
 
-@Entity()
+@Entity('chat_history')
 export class Chat {
   @PrimaryGeneratedColumn()
   id: number
@@ -29,7 +29,7 @@ export class Chat {
   @Column({ name: 'user_id' })
   userId: number
 
-  @ManyToOne(() => User, user => user.chatHistory, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, user => user.chats, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User
 }

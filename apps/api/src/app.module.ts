@@ -4,9 +4,16 @@ import { LoggerModule } from 'nestjs-pino'
 
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
+import { AuthModule } from './modules/auth/auth.module'
 import { ChatModule } from './modules/chat/chat.module'
+import { Chat } from './modules/chat/entities/chat.entity'
 import { EmbeddingModule } from './modules/embedding/embedding.module'
+import { Embedding } from './modules/embedding/entities/embedding.entity'
+import { File } from './modules/repos/entities/file.entity'
+import { Repo } from './modules/repos/entities/repo.entity'
 import { RepoModule } from './modules/repos/repo.module'
+import { User } from './modules/user/entities/user.entity'
+import { UserModule } from './modules/user/user.module'
 
 @Module({
   imports: [
@@ -31,12 +38,14 @@ import { RepoModule } from './modules/repos/repo.module'
       username: 'postgres',
       password: 'postgres',
       database: 'codepath',
-      autoLoadEntities: true,
+      entities: [Chat, User, Repo, Embedding, File],
       synchronize: false,
     }),
     ChatModule,
     EmbeddingModule,
     RepoModule,
+    UserModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
