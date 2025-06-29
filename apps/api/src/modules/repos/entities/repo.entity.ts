@@ -1,4 +1,14 @@
-import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm'
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm'
+
+import { User } from '../../users/entities/user.entity'
 
 import { File } from './file.entity'
 
@@ -15,6 +25,10 @@ export class Repo {
 
   @CreateDateColumn({ name: 'indexed_at' })
   indexedAt: Date
+
+  @ManyToOne(() => User, user => user.repos, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
+  user: User
 
   @OneToMany(() => File, file => file.repo)
   files: File[]

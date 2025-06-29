@@ -1,4 +1,13 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm'
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm'
+
+import { User } from '../../users/entities/user.entity'
 
 @Entity()
 export class Chat {
@@ -16,4 +25,11 @@ export class Chat {
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date
+
+  @Column({ name: 'user_id' })
+  userId: number
+
+  @ManyToOne(() => User, user => user.chatHistory, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
+  user: User
 }
