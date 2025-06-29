@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common'
+import { Body, Controller, Param, ParseIntPipe, Post } from '@nestjs/common'
 
 import { EmbeddingService } from './embedding.service'
 
@@ -9,5 +9,10 @@ export class EmbeddingController {
   @Post('')
   async embedding(@Body() body: { text: string }) {
     return this.embeddingService.getEmbedding(body.text)
+  }
+
+  @Post('generate/:repoId')
+  async generate(@Param('repoId', ParseIntPipe) repoId: number) {
+    return this.embeddingService.generateForRepo(repoId)
   }
 }

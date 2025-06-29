@@ -1,10 +1,23 @@
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+
 import { HttpService } from '@nestjs/axios'
 import { Injectable } from '@nestjs/common'
+import { InjectRepository } from '@nestjs/typeorm'
+import pgvector from 'pgvector'
 import { firstValueFrom } from 'rxjs'
+import { Repository } from 'typeorm'
+
+import { File } from '../repos/entities/file.entity'
+
+import { Embedding } from './entities/embedding.entity'
 
 @Injectable()
 export class EmbeddingService {
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    @InjectRepository(File) private fileRepo: Repository<File>,
+    @InjectRepository(Embedding) private embeddingRepo: Repository<Embedding>,
+    private readonly httpService: HttpService) {}
 
   async getEmbedding(text: string) {
     const response = await firstValueFrom(
@@ -12,5 +25,39 @@ export class EmbeddingService {
     )
 
     return response.data
+  }
+
+  async generateForRepo(repoId: number) {
+    const files = await this.fileRepo.find({
+      where: { repoId },
+      relations: ['repo'],
+    })
+
+    for (const file of files) {
+      const absPath = path.join(file.repo.path, file.path)
+      if (!fs.existsSync(absPath)) continue
+
+      const content = fs.readFileSync(absPath, 'utf-8')
+      const fragments = this.splitContent(content)
+
+      for (const fragment of fragments) {
+        if (!fragment.trim()) continue
+
+        const vector = await this.getEmbedding(fragment)
+
+        await this.embeddingRepo.save({
+          fileId: file.id,
+          type: 'line',
+          content: fragment,
+          embedding: pgvector.toSql(vector),
+        })
+      }
+    }
+
+    return { message: `Embedding generated for repo ${repoId}` }
+  }
+
+  private splitContent(content: string): string[] {
+    return content.split('\n').filter(line => line.trim().length > 0)
   }
 }
