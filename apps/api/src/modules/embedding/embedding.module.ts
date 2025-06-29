@@ -15,5 +15,6 @@ import { Embedding } from './entities/embedding.entity'
   ],
   controllers: [EmbeddingController],
   providers: [EmbeddingService],
+  exports: [EmbeddingService],
 })
 export class EmbeddingModule {}

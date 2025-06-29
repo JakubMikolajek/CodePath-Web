@@ -17,7 +17,8 @@ export class EmbeddingService {
   constructor(
     @InjectRepository(File) private fileRepo: Repository<File>,
     @InjectRepository(Embedding) private embeddingRepo: Repository<Embedding>,
-    private readonly httpService: HttpService) {}
+    private readonly httpService: HttpService
+  ) {}
 
   async getEmbedding(text: string) {
     const response = await firstValueFrom(

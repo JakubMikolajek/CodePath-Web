@@ -1,4 +1,13 @@
-import { Column, Entity, ManyToOne, JoinColumn, PrimaryGeneratedColumn } from 'typeorm'
+import {
+  Column,
+  Entity,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm'
+
+import { Embedding } from '../../embedding/entities/embedding.entity'
 
 import { Repo } from './repo.entity'
 
@@ -13,6 +22,9 @@ export class File {
   @ManyToOne(() => Repo, repo => repo.files, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'repo_id' })
   repo: Repo
+
+  @OneToMany(() => Embedding, embedding => embedding.file)
+  embeddings: Embedding[]
 
   @Column()
   path: string
