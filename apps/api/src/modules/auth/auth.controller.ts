@@ -1,4 +1,12 @@
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common'
+import { AuthGuard } from '@nestjs/passport'
 
 import { User } from '../user/entities/user.entity'
 
@@ -18,5 +26,12 @@ export class AuthController {
   @Post('login')
   login(@Req() req: { user: User }) {
     return this.authService.login(req.user)
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('me')
+  getMe(@Req() req: { user: User }) {
+    const { id, email, login } = req.user
+    return { id, email, login }
   }
 }

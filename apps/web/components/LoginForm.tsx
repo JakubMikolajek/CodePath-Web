@@ -8,7 +8,7 @@ import { useState } from 'react'
 
 interface LoginFormProps {
   handleShowRegisterForm: (value: boolean) => void
-  onLoginSuccess?: (token: string) => void // opcjonalny callback np. do zapisania tokenu
+  onLoginSuccess?: (token: string) => void
 }
 
 interface LoginFormState {
@@ -41,13 +41,14 @@ export default function LoginForm({ handleShowRegisterForm, onLoginSuccess }: Lo
 
       const token = response.data.access_token
       if (token) {
-        localStorage.setItem('access_token', token) // 🔐 lub useCookies / Zustand itd.
+        localStorage.setItem('access_token', token)
         onLoginSuccess?.(token)
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed.')
     } finally {
       setIsLoading(false)
+      window.location.href = '/dashboard'
     }
   }
 

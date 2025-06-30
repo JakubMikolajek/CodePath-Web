@@ -48,6 +48,7 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
       setError(err.response?.data?.message || 'Registration failed.')
     } finally {
       setIsLoading(false)
+      window.location.href = '/dashboard'
     }
   }
 
