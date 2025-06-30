@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer'
-import { IsArray, IsString, ValidateNested } from 'class-validator'
+import { IsArray, IsNumber, IsString, ValidateNested } from 'class-validator'
 
 export class FileDto {
   @IsString() path: string
@@ -10,6 +10,7 @@ export class FileDto {
 export class CreateRepoDto {
   @IsString() name: string
   @IsString() path: string
+  @IsNumber() userId: number
 
   @IsArray()
   @ValidateNested({ each: true })

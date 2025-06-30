@@ -14,9 +14,13 @@ export class RepoService {
   ) {}
 
   async createRepo(createRepoDto: CreateRepoDto) {
-    const { name, path, files } = createRepoDto
+    const { name, path, files, userId } = createRepoDto
 
-    const repo = this.repoRepo.create({ name, path })
+    const repo = this.repoRepo.create({
+      name,
+      path,
+      user: { id: userId },
+    })
     const savedRepo = await this.repoRepo.save(repo)
 
     const fileEntities = files.map(file => this.fileRepo.create({
