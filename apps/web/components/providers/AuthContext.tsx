@@ -1,8 +1,10 @@
 'use client'
 
 import axios from 'axios'
+import { useRouter } from 'next/navigation'
 import {
   createContext,
+  ReactNode,
   useContext,
   useEffect,
   useState,
@@ -30,7 +32,8 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext)
 
-export default function AuthProvider({ children }: { children: React.ReactNode }) {
+export default function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -54,7 +57,6 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       setUser(null)
     } finally {
       setLoading(false)
-      window.location.href = '/'
     }
   }
 
@@ -72,7 +74,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const logout = () => {
     localStorage.removeItem('access_token')
     setUser(null)
-    window.location.href = '/'
+    router.push('/')
   }
 
   useEffect(() => {
