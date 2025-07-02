@@ -50,13 +50,14 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       const res = await axios.get('/api/auth/me', {
         headers: { Authorization: `Bearer ${token}` },
       })
-      console.log(res.data)
+
       setUser(res.data)
     } catch {
       localStorage.removeItem('access_token')
       setUser(null)
     } finally {
       setLoading(false)
+      router.push('/dashboard')
     }
   }
 
