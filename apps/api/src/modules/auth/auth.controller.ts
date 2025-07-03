@@ -3,10 +3,11 @@ import {
   Controller,
   Get,
   Post,
-  Req,
+  Req, Res,
   UseGuards,
 } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
+import { Response } from 'express'
 
 import { User } from '../user/entities/user.entity'
 
@@ -24,8 +25,21 @@ export class AuthController {
 
   @UseGuards(LocalAuthGuard)
   @Post('login')
-  login(@Req() req: { user: User }) {
-    return this.authService.login(req.user)
+  login(
+    @Req() req: { user: User },
+    @Res({ passthrough: true }) res: Response
+  ) {
+    const { access_token } = this.authService.login(req.user)
+
+    res.cookie('access_token', access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dni
+      path: '/',
+    })
+
+    return { message: 'logged_in' }
   }
 
   @UseGuards(AuthGuard('jwt'))

@@ -38,18 +38,8 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const fetchUser = async () => {
-    const token = localStorage.getItem('access_token')
-
-    if (!token) {
-      setUser(null)
-      setLoading(false)
-      return
-    }
-
     try {
-      const res = await axios.get('/api/auth/me', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await axios.get('/api/auth/me')
 
       setUser(res.data)
     } catch {
@@ -62,18 +52,11 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const login = async (identifier: string, password: string) => {
-    const res = await axios.post('/api/auth/login', {
-      identifier,
-      password,
-    })
-
-    const token = res.data.access_token
-    localStorage.setItem('access_token', token)
+    await axios.post('/api/auth/login', { identifier, password })
     await fetchUser()
   }
 
   const logout = () => {
-    localStorage.removeItem('access_token')
     setUser(null)
     router.push('/')
   }
