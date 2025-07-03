@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 
@@ -12,6 +12,8 @@ export class RepoService {
     @InjectRepository(Repo) private repoRepo: Repository<Repo>,
     @InjectRepository(File) private fileRepo: Repository<File>,
   ) {}
+
+  private logger: Logger = new Logger('Repo')
 
   async createRepo(createRepoDto: CreateRepoDto) {
     const { name, path, files, userId } = createRepoDto
@@ -33,5 +35,16 @@ export class RepoService {
     await this.fileRepo.save(fileEntities)
 
     return { repo: savedRepo, files: fileEntities }
+  }
+
+  async getUserRepos(userId: number) {
+    const repos = await this.repoRepo.find({
+      where: { user: { id: userId } },
+      select: ['name', 'cloneStatus', 'id'],
+    })
+
+    this.logger.warn(repos)
+
+    return repos
   }
 }

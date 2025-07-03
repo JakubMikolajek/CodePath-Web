@@ -4,6 +4,7 @@ import { ThemeProvider as NextThemesProvider } from 'next-themes'
 import { ReactNode } from 'react'
 
 import AuthProvider from '@/components/providers/AuthContext'
+import RQProvider from '@/components/providers/RQProvider'
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
@@ -15,7 +16,9 @@ export function Providers({ children }: { children: ReactNode }) {
       enableColorScheme
     >
       <AuthProvider>
-        {children}
+        <RQProvider>
+          {children}
+        </RQProvider>
       </AuthProvider>
     </NextThemesProvider>
   )
