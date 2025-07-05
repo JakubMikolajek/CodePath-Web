@@ -3,12 +3,13 @@ import { Button } from '@workspace/ui/components/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@workspace/ui/components/card'
 import { Input } from '@workspace/ui/components/input'
 import { Label } from '@workspace/ui/components/label'
-import axios from 'axios'
-import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { FormEvent, useState } from 'react'
+
+import { useAuthStore } from '@/store'
 
 interface LoginFormProps {
   handleShowRegisterForm: (value: boolean) => void
-  onLoginSuccess?: (token: string) => void
 }
 
 interface LoginFormState {
@@ -16,40 +17,27 @@ interface LoginFormState {
   password: string
 }
 
-export default function LoginForm({ handleShowRegisterForm, onLoginSuccess }: LoginFormProps) {
+export default function LoginForm({ handleShowRegisterForm }: LoginFormProps) {
+  const { login, loading } = useAuthStore()
+  const router = useRouter()
+
   const [formData, setFormData] = useState<LoginFormState>({
     identifier: '',
     password: '',
   })
-  const [isLoading, setIsLoading] = useState(false)
+
   const [error, setError] = useState<string | null>(null)
 
   const handleInputChange = (field: keyof LoginFormState, value: string) => {
     setFormData({ ...formData, [field]: value })
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
     setError(null)
 
-    try {
-      const response = await axios.post('/api/auth/login', {
-        identifier: formData.identifier,
-        password: formData.password,
-      })
-
-      const token = response.data.access_token
-      if (token) {
-        localStorage.setItem('access_token', token)
-        onLoginSuccess?.(token)
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed.')
-    } finally {
-      setIsLoading(false)
-      window.location.href = '/dashboard'
-    }
+    await login(formData.identifier, formData.password)
+    router.push('/dashboard')
   }
 
   return (
@@ -77,7 +65,7 @@ export default function LoginForm({ handleShowRegisterForm, onLoginSuccess }: Lo
                   required
                   value={formData.identifier}
                   onChange={(e) => handleInputChange('identifier', e.target.value)}
-                  disabled={isLoading}
+                  disabled={loading}
                 />
               </div>
 
@@ -90,7 +78,7 @@ export default function LoginForm({ handleShowRegisterForm, onLoginSuccess }: Lo
                   required
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
-                  disabled={isLoading}
+                  disabled={loading}
                 />
               </div>
 
@@ -98,9 +86,9 @@ export default function LoginForm({ handleShowRegisterForm, onLoginSuccess }: Lo
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={isLoading || !formData.identifier || !formData.password}
+                  disabled={loading || !formData.identifier || !formData.password}
                 >
-                  {isLoading ? 'Signing in...' : 'Login'}
+                  {loading ? 'Signing in...' : 'Login'}
                 </Button>
               </div>
             </div>

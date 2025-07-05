@@ -4,7 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@work
 import { Input } from '@workspace/ui/components/input'
 import { Label } from '@workspace/ui/components/label'
 import axios from 'axios'
-import { useState } from 'react'
+import { FormEvent, useState } from 'react'
+
+import { useAuthStore } from '@/store'
 
 interface RegisterFormProps {
   handleShowRegisterForm: (value: boolean) => void
@@ -17,12 +19,13 @@ interface RegisterFormState {
 }
 
 export default function RegisterForm({ handleShowRegisterForm }: RegisterFormProps) {
+  const { register, loading } = useAuthStore()
   const [formData, setFormData] = useState<RegisterFormState>({
     email: '',
     login: '',
     password: '',
   })
-  const [isLoading, setIsLoading] = useState(false)
+
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
@@ -30,25 +33,16 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
     setFormData({ ...formData, [field]: value })
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
     setError(null)
     setSuccess(false)
 
     try {
-      await axios.post('/api/auth/register', {
-        email: formData.email,
-        login: formData.login,
-        password: formData.password,
-      })
-      setSuccess(true)
+      await register(formData.email, formData.login, formData.password)
       handleShowRegisterForm(false)
     } catch (err: any) {
       setError(err.response?.data?.message || 'Registration failed.')
-    } finally {
-      setIsLoading(false)
-      window.location.href = '/dashboard'
     }
   }
 
@@ -83,7 +77,7 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
                   required
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
-                  disabled={isLoading}
+                  disabled={loading}
                 />
               </div>
 
@@ -96,7 +90,7 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
                   required
                   value={formData.login}
                   onChange={(e) => handleInputChange('login', e.target.value)}
-                  disabled={isLoading}
+                  disabled={loading}
                 />
               </div>
 
@@ -109,7 +103,7 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
                   required
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
-                  disabled={isLoading}
+                  disabled={loading}
                 />
               </div>
 
@@ -117,9 +111,9 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={isLoading || !formData.email || !formData.login || !formData.password}
+                  disabled={loading || !formData.email || !formData.login || !formData.password}
                 >
-                  {isLoading ? 'Registering...' : 'Register'}
+                  {loading ? 'Registering...' : 'Register'}
                 </Button>
               </div>
             </div>
