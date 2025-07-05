@@ -15,6 +15,7 @@ export const createAxiosServer = (cookie: string) => {
       if (err.response?.status === 401) {
         redirect('/')
       }
+      return Promise.reject(err)
     },
   )
 

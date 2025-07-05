@@ -3,6 +3,7 @@ import '@workspace/ui/globals.css'
 import { ReactNode } from 'react'
 
 import { Providers } from '@/components/providers'
+import AuthChecker from '@/components/providers/AuthChecker'
 
 const fontSans = Geist({
   subsets: ['latin'],
@@ -24,6 +25,7 @@ export default function RootLayout({
       <body className={`${fontSans.variable} ${fontMono.variable} font-sans antialiased `}>
         <Providers>
           {children}
+          <AuthChecker />
         </Providers>
       </body>
     </html>

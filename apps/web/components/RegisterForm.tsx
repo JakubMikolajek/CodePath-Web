@@ -3,7 +3,6 @@ import { Button } from '@workspace/ui/components/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@workspace/ui/components/card'
 import { Input } from '@workspace/ui/components/input'
 import { Label } from '@workspace/ui/components/label'
-import axios from 'axios'
 import { FormEvent, useState } from 'react'
 
 import { useAuthStore } from '@/store'
@@ -19,31 +18,28 @@ interface RegisterFormState {
 }
 
 export default function RegisterForm({ handleShowRegisterForm }: RegisterFormProps) {
-  const { register, loading } = useAuthStore()
+  const { register, loading, error, clearError } = useAuthStore()
   const [formData, setFormData] = useState<RegisterFormState>({
     email: '',
     login: '',
     password: '',
   })
-
-  const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
   const handleInputChange = (field: keyof RegisterFormState, value: string) => {
+    if (error) clearError()
     setFormData({ ...formData, [field]: value })
   }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setError(null)
     setSuccess(false)
 
-    try {
-      await register(formData.email, formData.login, formData.password)
+    await register(formData.email, formData.login, formData.password)
+    setSuccess(true)
+    setTimeout(() => {
       handleShowRegisterForm(false)
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed.')
-    }
+    }, 1500)
   }
 
   return (
@@ -57,17 +53,13 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
           <form onSubmit={handleSubmit}>
             <div className="flex flex-col gap-6">
               {error && (
-                <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
-                  {error}
-                </div>
+                <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">{error}</div>
               )}
-
               {success && (
                 <div className="p-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md">
-                  Registration successful!
+                  Registration successful! Redirecting to login...
                 </div>
               )}
-
               <div className="grid gap-3">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -80,7 +72,6 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
                   disabled={loading}
                 />
               </div>
-
               <div className="grid gap-3">
                 <Label htmlFor="login">Login</Label>
                 <Input
@@ -93,7 +84,6 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
                   disabled={loading}
                 />
               </div>
-
               <div className="grid gap-3">
                 <Label htmlFor="password">Password</Label>
                 <Input
@@ -106,7 +96,6 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
                   disabled={loading}
                 />
               </div>
-
               <div className="flex flex-col gap-3">
                 <Button
                   type="submit"
@@ -117,12 +106,11 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
                 </Button>
               </div>
             </div>
-
             <div className="mt-4 text-center text-sm">
               Already have an account?{' '}
               <span
                 onClick={() => handleShowRegisterForm(false)}
-                className="underline underline-offset-4 cursor-pointer"
+                className="underline underline-offset-4 cursor-pointer hover:text-primary"
               >
                 Sign in
               </span>

@@ -8,21 +8,18 @@ import {
 } from '@workspace/ui/components/dropdown-menu'
 import { SidebarMenuButton } from '@workspace/ui/components/sidebar'
 import { LogOut, Moon, Sun } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
-import * as React from 'react'
+import React from 'react'
+
+import { useAuthStore } from '@/store'
 
 
 export default function UserDropdownMenu() {
-  const router = useRouter()
   const { setTheme } = useTheme()
+  const { logout } = useAuthStore()
 
   const handleLogout = async () => {
-    try {
-      router.push('/')
-    } catch (error) {
-      console.error('Error signing out:', error)
-    }
+    await logout()
   }
 
   return (
