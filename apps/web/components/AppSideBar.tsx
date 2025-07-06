@@ -1,11 +1,6 @@
 'use client'
 
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@workspace/ui/components/collapsible'
-import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
@@ -15,20 +10,16 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarRail,
 } from '@workspace/ui/components/sidebar'
 import {
-  ChevronRight,
   FolderGit2,
 } from 'lucide-react'
-import Link from 'next/link'
 import React, { ComponentProps, useEffect } from 'react'
 
 
-import CreateRepoDialog from '@/components/CreateRepoDialog'
+import CreateRepoDialog from '@/components/repo/CreateRepoDialog'
+import RepoItem from '@/components/repo/RepoItem'
 import UserDropdownMenu from '@/components/UserDropdownMenu'
 import { useReposStore } from '@/store'
 
@@ -64,49 +55,7 @@ export default function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>)
         <SidebarGroup>
           <SidebarGroupLabel>Repositories</SidebarGroupLabel>
           <SidebarMenu>
-            {repos.map((item) => (
-              <Collapsible
-                key={item.id}
-                asChild
-                className="group/collapsible"
-              >
-                <SidebarMenuItem>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton tooltip={item.name}>
-                      <span>{item.name}</span>
-                      <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <SidebarMenuSub>
-                      <SidebarMenuSubItem>
-                        <SidebarMenuSubButton asChild>
-                          <Link href={`/${item.id}/chat`}>
-                            <span>Chat</span>
-                          </Link>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-
-                      <SidebarMenuSubItem>
-                        <SidebarMenuSubButton asChild>
-                          <Link href={`/${item.id}/api`}>
-                            <span>Api</span>
-                          </Link>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-
-                      <SidebarMenuSubItem>
-                        <SidebarMenuSubButton asChild>
-                          <Link href={`/${item.id}/docs`}>
-                            <span>Docs</span>
-                          </Link>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    </SidebarMenuSub>
-                  </CollapsibleContent>
-                </SidebarMenuItem>
-              </Collapsible>
-            ))}
+            {repos.map((item) => <RepoItem key={item.id} item={item} />)}
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>

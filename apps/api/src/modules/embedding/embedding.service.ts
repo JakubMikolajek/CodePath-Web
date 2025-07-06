@@ -20,15 +20,7 @@ export class EmbeddingService {
     private readonly httpService: HttpService
   ) {}
 
-  async getEmbedding(text: string) {
-    const response = await firstValueFrom(
-      this.httpService.post('http://localhost:8000/embedding', { text }),
-    )
-
-    return response.data
-  }
-
-  async generateForRepo(repoId: number) {
+  async embedRepo(repoId: number) {
     const files = await this.fileRepo.find({
       where: { repoId },
       relations: ['repo'],
@@ -55,7 +47,34 @@ export class EmbeddingService {
       }
     }
 
-    return { message: `Embedding generated for repo ${repoId}` }
+    return { message: `Embedding generated for repo ${repoId}`, files }
+  }
+
+  async shouldBeEmbedded(repoId: number) {
+    const files = await this.fileRepo.find({
+      where: { repoId },
+      relations: ['repo'],
+    })
+
+    for (const file of files) {
+      const count = await this.embeddingRepo.count({
+        where: { fileId: file.id },
+      })
+
+      if (count > 0) {
+        return false
+      }
+    }
+
+    return true
+  }
+
+  async getEmbedding(text: string) {
+    const response = await firstValueFrom(
+      this.httpService.post('http://localhost:8000/embedding', { text }),
+    )
+
+    return response.data
   }
 
   private splitContent(content: string): string[] {

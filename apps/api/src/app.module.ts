@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common'
+import { ScheduleModule } from '@nestjs/schedule'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { LoggerModule } from 'nestjs-pino'
 
@@ -41,6 +42,7 @@ import { UserModule } from './modules/user/user.module'
       entities: [Chat, User, Repo, Embedding, File],
       synchronize: false,
     }),
+    ScheduleModule.forRoot(),
     ChatModule,
     EmbeddingModule,
     RepoModule,

@@ -26,6 +26,7 @@
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/schedule": "^6.0.0",
     "@nestjs/swagger": "^11.2.0",
     "@nestjs/typeorm": "^11.0.0",
     "axios": "^1.10.0",
@@ -36,6 +37,7 @@
     "cookie-parser": "^1.4.7",
     "lodash": "^4.17.21",
     "nestjs-pino": "^4.4.0",
+    "node-rsa": "^1.1.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
@@ -44,6 +46,7 @@
     "pino-pretty": "^13.0.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "simple-git": "^3.28.0",
     "typeorm": "^0.3.25"
   },
   "devDependencies": {
@@ -61,6 +64,7 @@
     "@types/jest": "^29.5.14",
     "@types/lodash": "^4.17.20",
     "@types/node": "^22.10.7",
+    "@types/node-rsa": "^1.1.4",
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38",
     "@types/supertest": "^6.0.2",
