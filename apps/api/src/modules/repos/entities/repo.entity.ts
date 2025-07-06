@@ -20,7 +20,7 @@ export class Repo {
   @Column()
   name: string
 
-  @Column()
+  @Column({ default: '' })
   path: string
 
   @Column({ name: 'git_url' })

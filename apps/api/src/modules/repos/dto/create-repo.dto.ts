@@ -1,19 +1,12 @@
-import { Type } from 'class-transformer'
-import { IsArray, IsNumber, IsString, ValidateNested } from 'class-validator'
-
-export class FileDto {
-  @IsString() path: string
-  @IsString() lastModified: string
-  @IsString() hash: string
-}
+import { IsString } from 'class-validator'
 
 export class CreateRepoDto {
-  @IsString() name: string
-  @IsString() path: string
-  @IsNumber() userId: number
+  @IsString()
+  name: string
 
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => FileDto)
-  files: FileDto[]
+  @IsString()
+  gitUrl: string
+
+  @IsString()
+  accessKey: string
 }

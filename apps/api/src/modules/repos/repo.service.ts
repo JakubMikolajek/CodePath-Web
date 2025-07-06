@@ -1,50 +1,35 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import { pick } from 'lodash'
 import { Repository } from 'typeorm'
 
 import { CreateRepoDto } from './dto/create-repo.dto'
-import { File } from './entities/file.entity'
 import { Repo } from './entities/repo.entity'
 
 @Injectable()
 export class RepoService {
   constructor(
     @InjectRepository(Repo) private repoRepo: Repository<Repo>,
-    @InjectRepository(File) private fileRepo: Repository<File>,
   ) {}
 
-  private logger: Logger = new Logger('Repo')
-
-  async createRepo(createRepoDto: CreateRepoDto) {
-    const { name, path, files, userId } = createRepoDto
+  async createRepo(userId: number, createRepoDto: CreateRepoDto) {
+    const { name, gitUrl, accessKey } = createRepoDto
 
     const repo = this.repoRepo.create({
       name,
-      path,
+      gitUrl,
+      accessKey,
       user: { id: userId },
     })
     const savedRepo = await this.repoRepo.save(repo)
 
-    const fileEntities = files.map(file => this.fileRepo.create({
-      repoId: savedRepo.id,
-      path: file.path,
-      hash: file.hash,
-      lastModified: new Date(file.lastModified),
-    }))
-
-    await this.fileRepo.save(fileEntities)
-
-    return { repo: savedRepo, files: fileEntities }
+    return { newRepo: pick(savedRepo, ['id', 'name', 'cloneStatus']) }
   }
 
   async getUserRepos(userId: number) {
-    const repos = await this.repoRepo.find({
+    return await this.repoRepo.find({
       where: { user: { id: userId } },
       select: ['name', 'cloneStatus', 'id'],
     })
-
-    this.logger.warn(repos)
-
-    return repos
   }
 }

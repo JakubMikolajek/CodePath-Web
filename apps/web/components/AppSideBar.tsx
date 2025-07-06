@@ -22,84 +22,15 @@ import {
 } from '@workspace/ui/components/sidebar'
 import {
   ChevronRight,
-  BookOpen,
-  Bot,
-  Settings2,
+  FolderGit2,
 } from 'lucide-react'
 import Link from 'next/link'
 import React, { ComponentProps, useEffect } from 'react'
 
 
+import CreateRepoDialog from '@/components/CreateRepoDialog'
 import UserDropdownMenu from '@/components/UserDropdownMenu'
 import { useReposStore } from '@/store'
-
-
-const items =    [{
-  title: 'Models',
-  url: '#',
-  icon: Bot,
-  items: [
-    {
-      title: 'Genesis',
-      url: '#',
-    },
-    {
-      title: 'Explorer',
-      url: '#',
-    },
-    {
-      title: 'Quantum',
-      url: '#',
-    },
-  ],
-},
-{
-  title: 'Documentation',
-  url: '#',
-  icon: BookOpen,
-  items: [
-    {
-      title: 'Introduction',
-      url: '#',
-    },
-    {
-      title: 'Get Started',
-      url: '#',
-    },
-    {
-      title: 'Tutorials',
-      url: '#',
-    },
-    {
-      title: 'Changelog',
-      url: '#',
-    },
-  ],
-},
-{
-  title: 'Settings',
-  url: '#',
-  icon: Settings2,
-  items: [
-    {
-      title: 'General',
-      url: '#',
-    },
-    {
-      title: 'Team',
-      url: '#',
-    },
-    {
-      title: 'Billing',
-      url: '#',
-    },
-    {
-      title: 'Limits',
-      url: '#',
-    },
-  ],
-},
-]
 
 export default function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const { repos, getRepos, loading } = useReposStore()
@@ -122,6 +53,14 @@ export default function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>)
         </div>
       </SidebarHeader>
       <SidebarContent>
+        <SidebarGroup>
+          <CreateRepoDialog>
+            <SidebarMenuButton>
+              <span>Add repo</span>
+              <FolderGit2 className="ml-auto h-4 w-4" />
+            </SidebarMenuButton>
+          </CreateRepoDialog>
+        </SidebarGroup>
         <SidebarGroup>
           <SidebarGroupLabel>Repositories</SidebarGroupLabel>
           <SidebarMenu>

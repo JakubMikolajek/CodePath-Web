@@ -16,8 +16,12 @@ export class RepoController {
     return await this.repoService.getUserRepos(req.user.id)
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Post()
-  create(@Body() body: CreateRepoDto) {
-    return this.repoService.createRepo(body)
+  create(
+    @Req() req: { user: User },
+    @Body() body: CreateRepoDto
+  ) {
+    return this.repoService.createRepo(req.user.id, body)
   }
 }
