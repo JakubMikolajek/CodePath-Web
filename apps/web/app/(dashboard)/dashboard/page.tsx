@@ -1,12 +1,7 @@
 'use server'
 
-
-import { fetchRepos } from '@/lib/repos'
-
 export default async function Page() {
-  const repo = await fetchRepos()
 
-  console.log(repo)
   return (
     <>
       <div className="flex items-center justify-between">

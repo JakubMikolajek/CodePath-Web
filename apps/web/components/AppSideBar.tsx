@@ -1,6 +1,10 @@
 'use client'
 
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@workspace/ui/components/collapsible'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@workspace/ui/components/collapsible'
 import {
   Sidebar,
   SidebarContent,
@@ -17,14 +21,16 @@ import {
   SidebarRail,
 } from '@workspace/ui/components/sidebar'
 import {
-  ChevronRight, BookOpen,
-  Bot, Settings2,
+  ChevronRight,
+  BookOpen,
+  Bot,
+  Settings2,
 } from 'lucide-react'
-import type * as React from 'react'
-import { ComponentProps } from 'react'
+import React, { ComponentProps, useEffect } from 'react'
 
 
 import UserDropdownMenu from '@/components/UserDropdownMenu'
+import { useReposStore } from '@/store'
 
 
 const items =    [{
@@ -95,6 +101,15 @@ const items =    [{
 ]
 
 export default function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
+  const { repos, getRepos, loading } = useReposStore()
+
+  useEffect(() => {
+    getRepos()
+  }, [])
+
+  useEffect(() => {
+    console.log(repos)
+  }, [repos])
 
   return (
     <Sidebar variant="sidebar" {...props}>
@@ -109,31 +124,44 @@ export default function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>)
         <SidebarGroup>
           <SidebarGroupLabel>Repositories</SidebarGroupLabel>
           <SidebarMenu>
-            {items.map((item) => (
+            {repos.map((item) => (
               <Collapsible
-                key={item.title}
+                key={item.id}
                 asChild
                 className="group/collapsible"
               >
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
-                    <SidebarMenuButton tooltip={item.title}>
-                      {item.icon && <item.icon />}
-                      <span>{item.title}</span>
+                    <SidebarMenuButton tooltip={item.name}>
+                      <span>{item.name}</span>
                       <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <SidebarMenuSub>
-                      {item.items?.map((subItem) => (
-                        <SidebarMenuSubItem key={subItem.title}>
-                          <SidebarMenuSubButton asChild>
-                            <a href={subItem.url}>
-                              <span>{subItem.title}</span>
-                            </a>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton asChild>
+                          <a>
+                            <span>Chat</span>
+                          </a>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton asChild>
+                          <a>
+                            <span>Api</span>
+                          </a>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton asChild>
+                          <a>
+                            <span>Docs</span>
+                          </a>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
                     </SidebarMenuSub>
                   </CollapsibleContent>
                 </SidebarMenuItem>
