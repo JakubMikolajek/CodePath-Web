@@ -15,10 +15,10 @@ interface Store {
   logout: () => Promise<void>
   getMe: () => Promise<void>
   clearError: () => void
-  error: string | null
+  error: GenericNullable<string>
 }
 
-export const useAuthStore = create<Store>((setState, getState) => ({
+export const useAuthStore = create<Store>((setState) => ({
   user: null,
   loading: false,
   error: null,
@@ -59,9 +59,7 @@ export const useAuthStore = create<Store>((setState, getState) => ({
   logout: async () => {
     setState({ loading: true })
     try {
-      // Clear state first
       setState({ user: null, loading: false, error: null })
-      // Call server action - it will handle cookie deletion and redirect
       await logoutAction()
     } catch (error) {
       console.error('Logout error:', error)

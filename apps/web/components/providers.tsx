@@ -3,8 +3,6 @@
 import { ThemeProvider as NextThemesProvider } from 'next-themes'
 import { ReactNode } from 'react'
 
-import RQProvider from '@/components/providers/RQProvider'
-
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <NextThemesProvider
@@ -14,9 +12,7 @@ export function Providers({ children }: { children: ReactNode }) {
       disableTransitionOnChange
       enableColorScheme
     >
-      <RQProvider>
-        {children}
-      </RQProvider>
+      {children}
     </NextThemesProvider>
   )
 }
