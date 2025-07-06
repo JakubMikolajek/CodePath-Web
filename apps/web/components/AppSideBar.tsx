@@ -26,6 +26,7 @@ import {
   Bot,
   Settings2,
 } from 'lucide-react'
+import Link from 'next/link'
 import React, { ComponentProps, useEffect } from 'react'
 
 
@@ -141,25 +142,25 @@ export default function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>)
                     <SidebarMenuSub>
                       <SidebarMenuSubItem>
                         <SidebarMenuSubButton asChild>
-                          <a>
+                          <Link href={`/${item.id}/chat`}>
                             <span>Chat</span>
-                          </a>
+                          </Link>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
 
                       <SidebarMenuSubItem>
                         <SidebarMenuSubButton asChild>
-                          <a>
+                          <Link href={`/${item.id}/api`}>
                             <span>Api</span>
-                          </a>
+                          </Link>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
 
                       <SidebarMenuSubItem>
                         <SidebarMenuSubButton asChild>
-                          <a>
+                          <Link href={`/${item.id}/docs`}>
                             <span>Docs</span>
-                          </a>
+                          </Link>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
                     </SidebarMenuSub>
