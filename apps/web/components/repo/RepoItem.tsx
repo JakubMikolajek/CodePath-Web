@@ -25,7 +25,7 @@ export default function RepoItem({ item }: RepoItemProps) {
   const [toEmbedding, setToEmbedding] = useState<boolean>(false)
   const { shouldBeEmbedded, runEmbedding } = useEmbeddingStore()
   const { getChatSessions, chatSessions } = useChatStore()
-  const { isRepoOpen, setOpenRepoId } = useCollapsibleStore()
+  const { isRepoOpen, setOpenRepoId, openRepoId } = useCollapsibleStore()
 
   const checkEmbedding = async () => setToEmbedding(await shouldBeEmbedded(item.id))
   const handleEmbedding = async () => await runEmbedding(item.id)
@@ -37,8 +37,13 @@ export default function RepoItem({ item }: RepoItemProps) {
 
   useEffect(() => {
     checkEmbedding()
-    handleGetChatSessions()
   }, [])
+
+  useEffect(() => {
+    if (isRepoOpen(item.id)) {
+      handleGetChatSessions()
+    }
+  }, [openRepoId])
 
   return (
     <Collapsible

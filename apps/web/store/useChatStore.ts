@@ -13,6 +13,7 @@ export const useChatStore = create<Store>((setState) => ({
   chatSessions: [],
 
   getChatSessions: async (repoId) => {
+    setState(() => ({ chatSessions: [] }))
     const chatSessions = await getChatSessions(repoId)
     setState(() => ({ chatSessions }))
   },
