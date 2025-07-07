@@ -70,4 +70,17 @@ export class ChatService {
 
     return response.data
   }
+
+  async getRepoChats(userId: number, repoId: number) {
+    const sessions = await this.sessionRepo.find({
+      where: { user_id: userId, repo_id: repoId },
+      order: { created_at: 'DESC' },
+    })
+
+    return sessions.map(s => ({
+      sessionId: s.id,
+      sessionName: s.name,
+      createdAt: s.created_at,
+    }))
+  }
 }

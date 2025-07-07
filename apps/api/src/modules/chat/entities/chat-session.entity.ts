@@ -8,6 +8,9 @@ export class ChatSession {
   @Column()
   user_id: number
 
+  @Column()
+  repo_id: number
+
   @Column({ nullable: true })
   name: string
 

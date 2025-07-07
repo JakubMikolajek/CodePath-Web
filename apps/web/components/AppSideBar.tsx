@@ -30,10 +30,6 @@ export default function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>)
     getRepos()
   }, [])
 
-  useEffect(() => {
-    console.log(repos)
-  }, [repos])
-
   return (
     <Sidebar variant="sidebar" {...props}>
       <SidebarHeader className="h-16 border-b border-sidebar-border">
