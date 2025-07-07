@@ -28,7 +28,7 @@ export default function ChatPage() {
     if (!inputValue.trim()) return
 
     const response = await sendMessage(parseFloat(params.repoId as string), inputValue)
-    setRes(response.response)
+    setRes(response)
   }
 
   return (

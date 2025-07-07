@@ -7,6 +7,8 @@ import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { AuthModule } from './modules/auth/auth.module'
 import { ChatModule } from './modules/chat/chat.module'
+import { ChatHistory } from './modules/chat/entities/chat-history.entity'
+import { ChatSession } from './modules/chat/entities/chat-session.entity'
 import { Chat } from './modules/chat/entities/chat.entity'
 import { EmbeddingModule } from './modules/embedding/embedding.module'
 import { Embedding } from './modules/embedding/entities/embedding.entity'
@@ -39,7 +41,15 @@ import { UserModule } from './modules/user/user.module'
       username: 'postgres',
       password: 'postgres',
       database: 'codepath',
-      entities: [Chat, User, Repo, Embedding, File],
+      entities: [
+        Chat,
+        User,
+        Repo,
+        Embedding,
+        File,
+        ChatHistory,
+        ChatSession,
+      ],
       synchronize: false,
     }),
     ScheduleModule.forRoot(),

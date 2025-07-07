@@ -7,12 +7,14 @@ import { Embedding } from '../embedding/entities/embedding.entity'
 
 import { ChatController } from './chat.controller'
 import { ChatService } from './chat.service'
+import { ChatHistory } from './entities/chat-history.entity'
+import { ChatSession } from './entities/chat-session.entity'
 
 @Module({
   imports: [
     HttpModule,
     EmbeddingModule,
-    TypeOrmModule.forFeature([Embedding]),
+    TypeOrmModule.forFeature([Embedding, ChatSession, ChatHistory]),
   ],
   controllers: [ChatController],
   providers: [ChatService],
