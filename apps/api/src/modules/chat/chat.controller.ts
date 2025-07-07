@@ -6,11 +6,6 @@ import { ChatService } from './chat.service'
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
-  @Post('')
-  async chat(@Body() body: { prompt: string, context?: string[] }) {
-    return this.chatService.getChat(body.prompt, body.context || [])
-  }
-
   @Post(':repoId')
   async ask(
     @Param('repoId', ParseIntPipe) repoId: number,

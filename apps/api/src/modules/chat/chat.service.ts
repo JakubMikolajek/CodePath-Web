@@ -16,16 +16,10 @@ export class ChatService {
     private readonly httpService: HttpService
   ) {}
 
-  private logger: Logger = new Logger('Chat')
-
-  async getChat(prompt: string, context: string[]) {
-    const response = await firstValueFrom(
-      this.httpService.post('http://localhost:8000/chat', { prompt, context }),
-    )
-    return response.data
-  }
+  private logger: Logger = new Logger(ChatService.name)
 
   async askAboutRepo(repoId: number, question: string) {
+    this.logger.log(repoId, question)
     const questionVec = await this.embeddingService.getEmbedding(question)
 
     const matches = await this.embeddingRepo
