@@ -16,7 +16,6 @@ import { File } from './modules/repos/entities/file.entity'
 import { Repo } from './modules/repos/entities/repo.entity'
 import { RepoModule } from './modules/repos/repo.module'
 import { User } from './modules/user/entities/user.entity'
-import { UserModule } from './modules/user/user.module'
 
 @Module({
   imports: [
@@ -56,7 +55,6 @@ import { UserModule } from './modules/user/user.module'
     ChatModule,
     EmbeddingModule,
     RepoModule,
-    UserModule,
     AuthModule,
   ],
   controllers: [AppController],
