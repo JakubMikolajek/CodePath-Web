@@ -1,6 +1,10 @@
 import { ChatSession, SessionDetail } from '@/interfaces/chat'
 import { apiClient } from '@/lib/api/api'
 
+export async function createSession (repoId: number) {
+  return await apiClient.get(`/chat/${repoId}/createSession`)
+}
+
 export async function sendMessage (repoId: number, body: object) {
   return await apiClient.post(`/chat/${repoId}`, body)
 }

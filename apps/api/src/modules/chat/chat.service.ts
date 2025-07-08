@@ -25,20 +25,19 @@ export class ChatService {
 
   private logger: Logger = new Logger(ChatService.name)
 
+  async createSession(userId: number, repoId: number) {
+    await this.sessionRepo.save({
+      id: uuidv4(),
+      name: `Session for repo ${repoId}`,
+      user_id: userId,
+      repo_id: repoId,
+    })
+  }
+
   async askAboutRepo(userId: number, repoId: number, body: AskDto) {
-    let sessionId = body.sessionId
+    const sessionId = body.sessionId
     const question = body.question
     this.logger.log(`Repo: ${repoId}, Q: ${question}`)
-
-    if (!sessionId) {
-      sessionId = uuidv4()
-
-      await this.sessionRepo.save({
-        id: sessionId,
-        name: `Session for repo ${repoId}`,
-        user_id: userId,
-      })
-    }
 
     const questionVec = await this.embeddingService.getEmbedding(question)
 

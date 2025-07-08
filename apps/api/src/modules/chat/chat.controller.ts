@@ -11,6 +11,15 @@ export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
   @UseGuards(AuthGuard('jwt'))
+  @Get(':repoId/createSession')
+  async createSession(
+    @Req() req: { user: User },
+    @Param('repoId', ParseIntPipe) repoId: number,
+  ) {
+    return this.chatService.createSession(req.user.id, repoId)
+  }
+
+  @UseGuards(AuthGuard('jwt'))
   @Post(':repoId')
   async ask(
     @Req() req: { user: User },

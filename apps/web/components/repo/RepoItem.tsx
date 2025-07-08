@@ -9,9 +9,9 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from '@workspace/ui/components/sidebar'
-import { ChevronRight, TriangleAlert } from 'lucide-react'
+import { ChevronRight, FolderGit2, TriangleAlert, LucideMessagesSquare } from 'lucide-react'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 
 import PopoverWrapper from '@/components/PopoverWrapper'
 import type { Repo } from '@/interfaces/repo'
@@ -24,7 +24,7 @@ interface RepoItemProps {
 export default function RepoItem({ item }: RepoItemProps) {
   const [toEmbedding, setToEmbedding] = useState<boolean>(false)
   const { shouldBeEmbedded, runEmbedding } = useEmbeddingStore()
-  const { getChatSessions, chatSessions } = useChatStore()
+  const { getChatSessions, chatSessions, createSession } = useChatStore()
   const { isRepoOpen, setOpenRepoId, openRepoId } = useCollapsibleStore()
 
   const checkEmbedding = async () => setToEmbedding(await shouldBeEmbedded(item.id))
@@ -84,6 +84,10 @@ export default function RepoItem({ item }: RepoItemProps) {
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <SidebarMenuSub>
+                    <SidebarMenuButton asChild onClick={() => createSession(item.id)}>
+                      <span>New chat</span>
+                      {/*<LucideMessagesSquare className="ml-auto h-4 w-4" />*/}
+                    </SidebarMenuButton>
                     {chatSessions.map((session) => (
                       <SidebarMenuSubItem key={session.sessionId}>
                         <SidebarMenuSubButton asChild>
