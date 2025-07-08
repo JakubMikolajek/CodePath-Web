@@ -26,7 +26,7 @@ export default function ChatPage() {
 
     setIsLoading(true)
     try {
-      const response = await sendMessage(Number.parseFloat(params.repoId as string), inputValue)
+      const response = await sendMessage(Number.parseFloat(params.repoId as string), inputValue, params.sessionId as string)
       setInputValue('')
     } catch (error) {
       console.error('Error sending message:', error)
@@ -55,10 +55,9 @@ export default function ChatPage() {
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           {sessionDetails.map((detail) => (
             <div key={detail.id} className="space-y-4">
-
               <div className="flex justify-end">
                 <div className="flex items-start space-x-3 max-w-[70%]">
-                  <Card className="bg-primary text-primary-foreground">
+                  <Card className="bg-muted/50 border-r-4 border-r-blue-500 py-0">
                     <CardContent className="p-4">
                       <div className="flex items-center space-x-2 mb-2">
                         <User className="w-4 h-4" />
@@ -72,7 +71,7 @@ export default function ChatPage() {
 
               <div className="flex justify-start">
                 <div className="flex items-start space-x-3 max-w-[85%]">
-                  <Card className="bg-muted/50 border-l-4 border-l-blue-500">
+                  <Card className="bg-muted/50 border-l-4 border-l-blue-500 py-0">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center space-x-2">

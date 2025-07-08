@@ -8,7 +8,7 @@ interface Store {
   sessionDetails: SessionDetail[]
   getChatSessions: (repoId: number) => Promise<void>
   getSessionDetails: (repoId: number, sessionId: string) => Promise<void>
-  sendMessage: (repoId: number, question: string) => Promise<string>
+  sendMessage: (repoId: number, question: string, sessionId: string) => Promise<string>
 }
 
 export const useChatStore = create<Store>((setState) => ({
@@ -27,7 +27,7 @@ export const useChatStore = create<Store>((setState) => ({
     setState(() => ({ sessionDetails }))
   },
 
-  sendMessage: async (repoId, question) => {
-    return await sendMessage(repoId, question) as string
+  sendMessage: async (repoId, question, sessionId) => {
+    return await sendMessage(repoId, { question, sessionId }) as string
   },
 }))
