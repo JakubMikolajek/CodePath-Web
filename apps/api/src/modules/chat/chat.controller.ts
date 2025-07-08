@@ -28,4 +28,12 @@ export class ChatController {
   ) {
     return this.chatService.getRepoChats(req.user.id, repoId)
   }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get(':repoId/:sessionId')
+  async getChatSessionDetails(
+    @Req() req: { user: User },
+    @Param('sessionId') sessionId: string) {
+    return this.chatService.getChatSessionDetails(req.user.id, sessionId)
+  }
 }

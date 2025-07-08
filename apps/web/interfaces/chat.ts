@@ -3,3 +3,9 @@ export interface ChatSession {
   sessionName: string,
   createdAt: Date,
 }
+
+export interface SessionDetail {
+  id: string
+  question: string
+  response: string
+}

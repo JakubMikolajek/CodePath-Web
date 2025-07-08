@@ -83,4 +83,17 @@ export class ChatService {
       createdAt: s.created_at,
     }))
   }
+
+  async getChatSessionDetails(userId: number, sessionId: string) {
+    const sessionDetails = await this.historyRepo.find({
+      where: { user_id: userId, session_id: sessionId },
+      order: { created_at: 'ASC' },
+    })
+
+    return sessionDetails.map(detail => ({
+      id: detail.id,
+      question: detail.question,
+      response: detail.response,
+    }))
+  }
 }

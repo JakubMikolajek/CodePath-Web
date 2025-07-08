@@ -1,98 +1,214 @@
 'use client'
-
 import 'highlight.js/styles/github-dark-dimmed.css'
 import { Button } from '@workspace/ui/components/button'
 import { Card, CardContent } from '@workspace/ui/components/card'
 import { Input } from '@workspace/ui/components/input'
-import { Send } from 'lucide-react'
+import { Send, User, Bot, Copy, Check } from 'lucide-react'
 import { useParams } from 'next/navigation'
 import type React from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Markdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
+import remarkGfm from 'remark-gfm'
 
 import { useChatStore } from '@/store'
 
 export default function ChatPage() {
   const params = useParams()
-  const { sendMessage } = useChatStore()
-
+  const { sendMessage, getSessionDetails, sessionDetails } = useChatStore()
   const [inputValue, setInputValue] = useState('')
-  const [res, setRes] = useState<string>('')
-
   const [isLoading, setIsLoading] = useState(false)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
     if (!inputValue.trim()) return
 
-    const response = await sendMessage(parseFloat(params.repoId as string), inputValue)
-    setRes(response)
+    setIsLoading(true)
+    try {
+      const response = await sendMessage(Number.parseFloat(params.repoId as string), inputValue)
+      setInputValue('')
+    } catch (error) {
+      console.error('Error sending message:', error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
+  const copyToClipboard = async (text: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedId(id)
+      setTimeout(() => setCopiedId(null), 2000)
+    } catch (error) {
+      console.error('Failed to copy:', error)
+    }
+  }
+
+  useEffect(() => {
+    getSessionDetails(Number.parseFloat(params.repoId as string), params.sessionId as string)
+  }, [params.sessionId])
+
   return (
-    <div className="w-full relative">
-      <div className="flex flex-col h-screen max-w-4xl mx-auto p-4">
-        <div className="flex-1 overflow-y-auto space-y-4 mb-4">
-          <article className="prose prose-invert max-w-none">
-            <Markdown rehypePlugins={[rehypeHighlight]}>
-              {res}
-            </Markdown>
-          </article>
-          {/*{messages.map((message) => (*/}
-          {/*  <div key={message.id} className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}>*/}
-          {/*    <Card className={`max-w-[70%] ${message.isUser ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>*/}
-          {/*      <CardContent className="p-3">*/}
-          {/*        <p className="text-sm">{message.content}</p>*/}
-          {/*        <p className={'text-xs mt-1 opacity-70'}>*/}
-          {/*          {message.timestamp.toLocaleTimeString('pl-PL', {*/}
-          {/*            hour: '2-digit',*/}
-          {/*            minute: '2-digit',*/}
-          {/*          })}*/}
-          {/*        </p>*/}
-          {/*      </CardContent>*/}
-          {/*    </Card>*/}
-          {/*  </div>*/}
-          {/*))}*/}
+    <div className="w-full relative bg-background">
+      <div className="flex flex-col h-screen max-w-6xl mx-auto">
+        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+          {sessionDetails.map((detail) => (
+            <div key={detail.id} className="space-y-4">
+
+              <div className="flex justify-end">
+                <div className="flex items-start space-x-3 max-w-[70%]">
+                  <Card className="bg-primary text-primary-foreground">
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <User className="w-4 h-4" />
+                        <span className="text-sm font-medium">Ty</span>
+                      </div>
+                      <p className="text-sm leading-relaxed">{detail.question}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              <div className="flex justify-start">
+                <div className="flex items-start space-x-3 max-w-[85%]">
+                  <Card className="bg-muted/50 border-l-4 border-l-blue-500">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center space-x-2">
+                          <Bot className="w-4 h-4 text-blue-500" />
+                          <span className="text-sm font-medium">Asystent AI</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => copyToClipboard(detail.response, detail.id)}
+                          className="h-8 w-8 p-0"
+                        >
+                          {copiedId === detail.id ? (
+                            <Check className="w-3 h-3 text-green-500" />
+                          ) : (
+                            <Copy className="w-3 h-3" />
+                          )}
+                        </Button>
+                      </div>
+                      <article className="prose prose-sm dark:prose-invert max-w-none prose-pre:bg-gray-900 prose-pre:text-gray-100">
+                        <Markdown
+                          rehypePlugins={[rehypeHighlight]}
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            code: ({ node, className, children, ...props }) => {
+                              const match = /language-(\w+)/.exec(className || '')
+                              return match ? (
+                                <div className="relative">
+                                  <div className="absolute top-2 right-2 text-xs text-gray-400 bg-gray-800 px-2 py-1 rounded">
+                                    {match[1]}
+                                  </div>
+                                  <code className={className} {...props}>
+                                    {children}
+                                  </code>
+                                </div>
+                              ) : (
+                                <code className="bg-gray-200 dark:bg-gray-800 px-1 py-0.5 rounded text-sm" {...props}>
+                                  {children}
+                                </code>
+                              )
+                            },
+                            blockquote: ({ children }) => (
+                              <blockquote className="border-l-4 border-blue-500 pl-4 italic bg-blue-50 dark:bg-blue-950/20 py-2 my-4">
+                                {children}
+                              </blockquote>
+                            ),
+                            table: ({ children }) => (
+                              <div className="overflow-x-auto">
+                                <table className="min-w-full border-collapse border border-gray-300 dark:border-gray-600">
+                                  {children}
+                                </table>
+                              </div>
+                            ),
+                            th: ({ children }) => (
+                              <th className="border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 px-4 py-2 text-left font-semibold">
+                                {children}
+                              </th>
+                            ),
+                            td: ({ children }) => (
+                              <td className="border border-gray-300 dark:border-gray-600 px-4 py-2">{children}</td>
+                            ),
+                          }}
+                        >
+                          {detail.response}
+                        </Markdown>
+                      </article>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </div>
+          ))}
 
           {isLoading && (
             <div className="flex justify-start">
-              <Card className="bg-muted">
-                <CardContent className="p-3">
-                  <div className="flex items-center space-x-2">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                      <div
-                        className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"
-                        style={{ animationDelay: '0.1s' }}
-                      ></div>
-                      <div
-                        className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"
-                        style={{ animationDelay: '0.2s' }}
-                      ></div>
+              <div className="flex items-start space-x-3 max-w-[85%]">
+                <Card className="bg-muted/50 border-l-4 border-l-blue-500">
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Bot className="w-4 h-4 text-blue-500" />
+                      <span className="text-sm font-medium">Asystent AI</span>
                     </div>
-                    <span className="text-sm text-muted-foreground">Serwer pisze...</span>
-                  </div>
-                </CardContent>
-              </Card>
+                    <div className="flex items-center space-x-2">
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                        <div
+                          className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
+                          style={{ animationDelay: '0.1s' }}
+                        ></div>
+                        <div
+                          className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
+                          style={{ animationDelay: '0.2s' }}
+                        ></div>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Pisze odpowiedź...</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="flex items-center space-x-2">
-          <Input
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Wpisz swoją wiadomość..."
-            className="flex-1"
-            disabled={isLoading}
-          />
-          <Button type="submit" size="icon" disabled={isLoading || !inputValue.trim()}>
-            <Send className="w-4 h-4" />
-            <span className="sr-only">Wyślij wiadomość</span>
-          </Button>
-        </form>
+        <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="p-4">
+            <form onSubmit={handleSubmit} className="flex items-end space-x-2">
+              <div className="flex-1">
+                <Input
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  placeholder="Zadaj pytanie..."
+                  className="min-h-[44px] resize-none"
+                  disabled={isLoading}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      handleSubmit(e)
+                    }
+                  }}
+                />
+              </div>
+              <Button
+                type="submit"
+                size="icon"
+                disabled={isLoading || !inputValue.trim()}
+                className="h-[44px] w-[44px]"
+              >
+                <Send className="w-4 h-4" />
+                <span className="sr-only">Wyślij wiadomość</span>
+              </Button>
+            </form>
+            <p className="text-xs text-muted-foreground mt-2 text-center">
+              Naciśnij Enter aby wysłać, Shift+Enter dla nowej linii
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   )
