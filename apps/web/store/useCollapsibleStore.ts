@@ -3,10 +3,10 @@ import { create } from 'zustand'
 import { GenericNullable } from '@/interfaces/globals'
 
 interface Store {
-  openRepoId: GenericNullable<string>
-  setOpenRepoId: (id: GenericNullable<string>) => void
-  isRepoOpen: (id: string) => boolean
-  toggleRepo: (id: string) => void
+  openRepoId: GenericNullable<number>
+  setOpenRepoId: (id: GenericNullable<number>) => void
+  isRepoOpen: (id: number) => boolean
+  toggleRepo: (id: number) => void
 }
 
 export const useCollapsibleStore = create<Store>((set, get) => ({
