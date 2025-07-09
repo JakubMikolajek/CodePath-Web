@@ -51,6 +51,16 @@ export function parseSegments(src: string, ext: string): Segment[] {
       Lang = Lang.default
       console.log(`[parser] using default export`)
     }
+
+    if (lang === 'typescript' && ext === '.ts') {
+      Lang = Lang.typescript
+      console.log(`[parser] using Lang.typescript`)
+    }
+
+    if (lang === 'typescript' && ext === '.tsx') {
+      Lang = Lang.tsx
+      console.log(`[parser] using Lang.tsx`)
+    }
   }
   catch (err) {
     console.error(`[parser] failed to load tree-sitter-${lang}:`, err)
