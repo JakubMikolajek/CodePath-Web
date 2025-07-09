@@ -41,20 +41,39 @@ export class ChatService {
 
     const questionVec = await this.embeddingService.getEmbedding(question)
 
+    const LIMIT = 20
+
     const matches = await this.embeddingRepo
       .createQueryBuilder('e')
-      .innerJoinAndSelect('e.file', 'file')
+      .innerJoin('e.file', 'file')
       .where('file.repo_id = :repoId', { repoId })
+      .andWhere('e.symbolKind IN (:...kinds)', {
+        kinds: ['function', 'class', 'file'],
+      })
       .orderBy('e.embedding <-> :embedding', 'ASC')
       .setParameters({ embedding: pgvector.toSql(questionVec) })
+      .limit(LIMIT)
       .getMany()
 
     const context = matches.map(m => m.content)
 
+    function cutContext(chunks: string[], maxChars = 16000) {
+      const out: string[] = []
+      let used = 0
+      for (const txt of chunks) {
+        if (used + txt.length > maxChars) break
+        out.push(txt)
+        used += txt.length
+      }
+      return out
+    }
+
+    const safeContext = cutContext(context)
+
     const response = await firstValueFrom(
       this.httpService.post('http://localhost:8000/chat', {
         prompt: question,
-        context,
+        context: safeContext,
       })
     )
 

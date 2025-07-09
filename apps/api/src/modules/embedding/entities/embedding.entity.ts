@@ -20,8 +20,11 @@ export class Embedding {
   @JoinColumn({ name: 'file_id' })
   file: File
 
-  @Column()
-  type: string
+  @Column({ name: 'symbol_kind' })
+  symbolKind: string
+
+  @Column({ name: 'symbol_name', nullable: true })
+  symbolName?: string
 
   @Column()
   content: string
