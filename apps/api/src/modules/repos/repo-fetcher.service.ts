@@ -39,6 +39,12 @@ export class RepoFetcherService {
     '.pdf', '.mp4', '.mp3', '.mov', '.wasm',
   ])
 
+  private readonly IGNORED_FILES = new Set([
+    'package.json', 'package-lock.json', 'yarn.lock',
+    'pnpm-lock.yaml', 'bun.lockb', '.env', '.DS_Store',
+    'README.md', 'LICENSE', 'LICENSE.md', 'CHANGELOG.md',
+  ])
+
   @Cron(CronExpression.EVERY_10_SECONDS)
   async pollForPending() {
     const repo = await this.repoRepo.findOne({
@@ -129,6 +135,7 @@ export class RepoFetcherService {
 
     for (const entry of entries) {
       const entryPath = path.resolve(dir, entry.name)
+
       if (entry.isDirectory()) {
         if (!this.IGNORED_DIRS.has(entry.name)) {
           const subFiles = await this.getAllFiles(entryPath)
@@ -137,11 +144,15 @@ export class RepoFetcherService {
       }
       else {
         const ext = path.extname(entry.name).toLowerCase()
-        if (!this.IGNORED_EXTENSIONS.has(ext)) {
+        if (
+          !this.IGNORED_EXTENSIONS.has(ext)
+          && !this.IGNORED_FILES.has(entry.name)
+        ) {
           files.push(entryPath)
         }
       }
     }
+
     return files
   }
 
