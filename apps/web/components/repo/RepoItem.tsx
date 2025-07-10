@@ -9,7 +9,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from '@workspace/ui/components/sidebar'
-import { ChevronRight, FolderGit2, TriangleAlert, LucideMessagesSquare } from 'lucide-react'
+import { ChevronRight, TriangleAlert } from 'lucide-react'
 import Link from 'next/link'
 import React, { useEffect, useState } from 'react'
 
