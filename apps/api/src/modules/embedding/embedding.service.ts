@@ -43,9 +43,12 @@ export class EmbeddingService {
     symbolName?: string
     content: string
   }[]): Promise<void> {
-    this.channel.sendToQueue(this.queue, Buffer.from(JSON.stringify({ segments })), {
-      persistent: true,
-    })
+    this.channel.sendToQueue(
+      this.queue,
+      Buffer.from(
+        JSON.stringify({ segments })
+      ), { persistent: true }
+    )
   }
 
   async embedRepo(repoId: number) {
@@ -58,7 +61,10 @@ export class EmbeddingService {
 
     for (const file of files) {
       const abs = path.join(file.repo.path, file.path)
-      if (!fs.existsSync(abs)) continue
+
+      if (!fs.existsSync(abs)) {
+        continue
+      }
 
       const src = await fsp.readFile(abs, 'utf8')
       const segs = parseSegments(src, path.extname(file.path))
@@ -88,7 +94,10 @@ export class EmbeddingService {
 
     for (const file of files) {
       const count = await this.embeddingRepo.count({ where: { fileId: file.id } })
-      if (count > 0) return false
+
+      if (count > 0) {
+        return false
+      }
     }
 
     return true

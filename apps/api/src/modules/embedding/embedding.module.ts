@@ -11,7 +11,10 @@ import { Embedding } from './entities/embedding.entity'
 @Module({
   imports: [
     HttpModule,
-    TypeOrmModule.forFeature([File, Embedding]),
+    TypeOrmModule.forFeature([
+      File,
+      Embedding,
+    ]),
   ],
   controllers: [EmbeddingController],
   providers: [EmbeddingService],

@@ -14,7 +14,11 @@ import { ChatSession } from './entities/chat-session.entity'
   imports: [
     HttpModule,
     EmbeddingModule,
-    TypeOrmModule.forFeature([Embedding, ChatSession, ChatHistory]),
+    TypeOrmModule.forFeature([
+      Embedding,
+      ChatSession,
+      ChatHistory,
+    ]),
   ],
   controllers: [ChatController],
   providers: [ChatService],

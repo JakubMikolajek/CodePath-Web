@@ -10,6 +10,9 @@ import NodeRSA from 'node-rsa'
 import simpleGit from 'simple-git'
 import { Repository } from 'typeorm'
 
+import { GenericNullable } from '../../interfaces/globals'
+import { IGNORED_DIRS, IGNORED_EXTENSIONS, IGNORED_FILES } from '../../utils/ignores'
+
 import { File } from './entities/file.entity'
 import { Repo } from './entities/repo.entity'
 
@@ -28,23 +31,6 @@ export class RepoFetcherService {
   private logger: Logger = new Logger(RepoFetcherService.name)
   private readonly REPOS_PATH = defaultReposPath
 
-  private readonly IGNORED_DIRS = new Set([
-    'node_modules', '.git', '.idea', '.vscode', 'dist', 'build', '.next', 'out',
-    '.venv', '__pycache__', '.pytest_cache',
-  ])
-
-  private readonly IGNORED_EXTENSIONS = new Set([
-    '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico',
-    '.zip', '.tar', '.gz', '.7z', '.exe', '.dll',
-    '.pdf', '.mp4', '.mp3', '.mov', '.wasm',
-  ])
-
-  private readonly IGNORED_FILES = new Set([
-    'package.json', 'package-lock.json', 'yarn.lock',
-    'pnpm-lock.yaml', 'bun.lockb', '.env', '.DS_Store',
-    'README.md', 'LICENSE', 'LICENSE.md', 'CHANGELOG.md',
-  ])
-
   @Cron(CronExpression.EVERY_10_SECONDS)
   async pollForPending() {
     const repo = await this.repoRepo.findOne({
@@ -59,7 +45,6 @@ export class RepoFetcherService {
   private async cloneRepo(repo: Repo) {
     const git = simpleGit()
     const sanitizedName = repo.name.replace(/[^a-zA-Z0-9_-]/g, '_')
-    this.logger.log(this.REPOS_PATH)
     const targetPath = path.join(this.REPOS_PATH, sanitizedName)
 
     this.logger.log(`Cloning: ${repo.gitUrl} -> ${targetPath}`)
@@ -80,7 +65,7 @@ export class RepoFetcherService {
         }
       }
 
-      let tmpKeyPath: string | null = null
+      let tmpKeyPath: GenericNullable<string> = null
       const gitEnvBackup = process.env.GIT_SSH_COMMAND
 
       if (repo.accessKey) {
@@ -137,7 +122,7 @@ export class RepoFetcherService {
       const entryPath = path.resolve(dir, entry.name)
 
       if (entry.isDirectory()) {
-        if (!this.IGNORED_DIRS.has(entry.name)) {
+        if (!IGNORED_DIRS.has(entry.name)) {
           const subFiles = await this.getAllFiles(entryPath)
           files.push(...subFiles)
         }
@@ -145,8 +130,8 @@ export class RepoFetcherService {
       else {
         const ext = path.extname(entry.name).toLowerCase()
         if (
-          !this.IGNORED_EXTENSIONS.has(ext)
-          && !this.IGNORED_FILES.has(entry.name)
+          !IGNORED_EXTENSIONS.has(ext)
+          && !IGNORED_FILES.has(entry.name)
         ) {
           files.push(entryPath)
         }

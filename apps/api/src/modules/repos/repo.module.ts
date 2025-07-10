@@ -10,7 +10,13 @@ import { RepoService } from './repo.service'
 @Module({
   imports: [TypeOrmModule.forFeature([Repo, File])],
   controllers: [RepoController],
-  providers: [RepoService, RepoFetcherService],
-  exports: [RepoService, RepoFetcherService],
+  providers: [
+    RepoService,
+    RepoFetcherService,
+  ],
+  exports: [
+    RepoService,
+    RepoFetcherService,
+  ],
 })
 export class RepoModule {}
