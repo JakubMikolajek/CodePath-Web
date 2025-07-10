@@ -6,6 +6,8 @@ import { Repository } from 'typeorm'
 
 import { User } from '../user/entities/user.entity'
 
+import { RegisterDto } from './dto/register.dto'
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -30,15 +32,22 @@ export class AuthService {
     }
   }
 
-  async register(email: string, login: string, password: string) {
+  async register(body: RegisterDto) {
+    const { email, login, password } = body
+
     const existing = await this.userRepo.findOne({
       where: [{ email }, { login }],
     })
-    if (existing) throw new UnauthorizedException('Email or login already in use')
+
+    if (existing) {
+      throw new UnauthorizedException('Email or login already in use')
+    }
 
     const passwordHash = await bcrypt.hash(password, 10)
     const user = this.userRepo.create({ email, login, passwordHash })
+
     await this.userRepo.save(user)
+
     return { message: 'User registered' }
   }
 }

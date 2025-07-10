@@ -12,6 +12,7 @@ import { Response } from 'express'
 import { User } from '../user/entities/user.entity'
 
 import { AuthService } from './auth.service'
+import { RegisterDto } from './dto/register.dto'
 import { LocalAuthGuard } from './local-auth.guard'
 
 @Controller('auth')
@@ -19,8 +20,8 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
-  register(@Body() body: { email: string, login: string, password: string }) {
-    return this.authService.register(body.email, body.login, body.password)
+  register(@Body() body: RegisterDto) {
+    return this.authService.register(body)
   }
 
   @UseGuards(LocalAuthGuard)

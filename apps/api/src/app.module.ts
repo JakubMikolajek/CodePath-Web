@@ -3,8 +3,6 @@ import { ScheduleModule } from '@nestjs/schedule'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { LoggerModule } from 'nestjs-pino'
 
-import { AppController } from './app.controller'
-import { AppService } from './app.service'
 import { AuthModule } from './modules/auth/auth.module'
 import { ChatModule } from './modules/chat/chat.module'
 import { ChatHistory } from './modules/chat/entities/chat-history.entity'
@@ -57,7 +55,5 @@ import { User } from './modules/user/entities/user.entity'
     RepoModule,
     AuthModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}

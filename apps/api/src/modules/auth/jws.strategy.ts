@@ -6,6 +6,11 @@ import { Repository } from 'typeorm'
 
 import { User } from '../user/entities/user.entity'
 
+interface JWTPayload {
+  sub: number
+  email: string
+}
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
@@ -16,9 +21,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromExtractors([
         (req) => {
           let token = null
+
           if (req && req.cookies) {
             token = req.cookies['access_token']
           }
+
           return token
         },
       ]),
@@ -27,9 +34,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     })
   }
 
-  async validate(payload: { sub: number, email: string }) {
+  async validate(payload: JWTPayload) {
     const user = await this.userRepo.findOneBy({ id: payload.sub })
-    if (!user) return null
+
+    if (!user) {
+      return null
+    }
+
     return user
   }
 }
