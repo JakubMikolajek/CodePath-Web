@@ -105,7 +105,7 @@ export class EmbeddingService {
 
   async getEmbedding(text: string) {
     const response = await firstValueFrom(
-      this.httpService.post('http://localhost:8000/embed', { text }),
+      this.httpService.post<number[]>('http://localhost:8000/embed-question', { text }),
     )
 
     return response.data

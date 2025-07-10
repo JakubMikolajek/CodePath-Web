@@ -71,7 +71,7 @@ export class ChatService {
     const safeContext = cutContext(context)
 
     const response = await firstValueFrom(
-      this.httpService.post('http://localhost:8000/chat', {
+      this.httpService.post<string>('http://localhost:8000/chat', {
         prompt: question,
         context: safeContext,
       })
