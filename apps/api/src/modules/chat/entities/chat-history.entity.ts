@@ -12,10 +12,10 @@ export class ChatHistory {
   session_id: string
 
   @Column()
-  question: string
+  role: 'user' | 'assistant'
 
   @Column()
-  response: string
+  content: string
 
   @Column({ type: 'timestamp', default: () => 'now()' })
   created_at: Date

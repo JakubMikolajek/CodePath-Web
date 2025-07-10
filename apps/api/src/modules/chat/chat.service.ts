@@ -39,6 +39,13 @@ export class ChatService {
     const question = body.question
     this.logger.log(`Repo: ${repoId}, Q: ${question}`)
 
+    await this.historyRepo.save({
+      user_id: userId,
+      session_id: sessionId,
+      role: 'user',
+      content: question,
+    })
+
     const questionVec = await this.embeddingService.getEmbedding(question)
 
     const LIMIT = 20
@@ -82,11 +89,11 @@ export class ChatService {
     await this.historyRepo.save({
       user_id: userId,
       session_id: sessionId,
-      question,
-      response: answer,
+      role: 'assistant',
+      content: answer,
     })
 
-    return response.data
+    return answer
   }
 
   async getRepoChats(userId: number, repoId: number) {
@@ -110,8 +117,8 @@ export class ChatService {
 
     return sessionDetails.map(detail => ({
       id: detail.id,
-      question: detail.question,
-      response: detail.response,
+      role: detail.role,
+      content: detail.content,
     }))
   }
 }

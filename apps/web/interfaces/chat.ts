@@ -6,6 +6,6 @@ export interface ChatSession {
 
 export interface SessionDetail {
   id: string
-  question: string
-  response: string
+  role: string
+  content: string
 }
