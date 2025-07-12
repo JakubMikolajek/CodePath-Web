@@ -10,6 +10,8 @@ import { ChatSession } from './modules/chat/entities/chat-session.entity'
 import { Chat } from './modules/chat/entities/chat.entity'
 import { EmbeddingModule } from './modules/embedding/embedding.module'
 import { Embedding } from './modules/embedding/entities/embedding.entity'
+import { DependenciesModule } from './modules/graphs/dependencies.module'
+import { Dependencies } from './modules/graphs/entity/dependencies.entity'
 import { File } from './modules/repos/entities/file.entity'
 import { Repo } from './modules/repos/entities/repo.entity'
 import { RepoModule } from './modules/repos/repo.module'
@@ -46,6 +48,7 @@ import { User } from './modules/user/entities/user.entity'
         File,
         ChatHistory,
         ChatSession,
+        Dependencies,
       ],
       synchronize: false,
     }),
@@ -54,6 +57,7 @@ import { User } from './modules/user/entities/user.entity'
     EmbeddingModule,
     RepoModule,
     AuthModule,
+    DependenciesModule,
   ],
 })
 export class AppModule {}

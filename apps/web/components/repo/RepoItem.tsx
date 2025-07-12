@@ -115,6 +115,13 @@ export default function RepoItem({ item }: RepoItemProps) {
                 </Link>
               </SidebarMenuSubButton>
             </SidebarMenuSubItem>
+            <SidebarMenuSubItem>
+              <SidebarMenuSubButton asChild>
+                <Link href={`/${item.id}/graph`}>
+                  <span>Graph</span>
+                </Link>
+              </SidebarMenuSubButton>
+            </SidebarMenuSubItem>
           </SidebarMenuSub>
         </CollapsibleContent>
       </SidebarMenuItem>

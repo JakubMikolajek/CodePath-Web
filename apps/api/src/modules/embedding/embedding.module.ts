@@ -2,6 +2,7 @@ import { HttpModule } from '@nestjs/axios'
 import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 
+import { Dependencies } from '../graphs/entity/dependencies.entity'
 import { File } from '../repos/entities/file.entity'
 
 import { EmbeddingController } from './embedding.controller'
@@ -14,6 +15,7 @@ import { Embedding } from './entities/embedding.entity'
     TypeOrmModule.forFeature([
       File,
       Embedding,
+      Dependencies,
     ]),
   ],
   controllers: [EmbeddingController],

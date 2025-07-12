@@ -10,6 +10,7 @@ import { firstValueFrom } from 'rxjs'
 import { Repository } from 'typeorm'
 
 import { parseSegments } from '../../utils/parser'
+import { Dependencies } from '../graphs/entity/dependencies.entity'
 import { File } from '../repos/entities/file.entity'
 
 import { Embedding } from './entities/embedding.entity'
@@ -23,6 +24,7 @@ export class EmbeddingService {
   constructor(
     @InjectRepository(File) private fileRepo: Repository<File>,
     @InjectRepository(Embedding) private embeddingRepo: Repository<Embedding>,
+    @InjectRepository(Dependencies) private dependenciesRepo: Repository<Dependencies>,
     private readonly httpService: HttpService
   ) {}
 
@@ -67,10 +69,20 @@ export class EmbeddingService {
       }
 
       const src = await fsp.readFile(abs, 'utf8')
-      const segs = parseSegments(src, path.extname(file.path))
+      const { segments, dependencies } = parseSegments(src, path.extname(file.path), file.path)
 
-      for (let i = 0; i < segs.length; i += BATCH) {
-        const batch = segs.slice(i, i + BATCH)
+      await this.dependenciesRepo.save(
+        dependencies.map(dep => ({
+          repoId: repoId,
+          fileId: file.id,
+          fromSymbol: dep.from,
+          toSymbol: dep.to,
+          type: dep.type,
+        }))
+      )
+
+      for (let i = 0; i < segments.length; i += BATCH) {
+        const batch = segments.slice(i, i + BATCH)
 
         const batchPayload = batch.map(s => ({
           fileId: file.id,
