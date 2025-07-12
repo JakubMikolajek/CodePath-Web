@@ -1,6 +1,25 @@
 import { Logger } from '@nestjs/common'
-import Parser from 'tree-sitter'
+import { forEach, has } from 'lodash'
+import Parser, { SyntaxNode } from 'tree-sitter'
 import { Project, SyntaxKind } from 'ts-morph'
+
+interface Segment {
+  kind: 'import' | 'function' | 'class' | 'file'
+  name?: string
+  code: string
+}
+
+export interface DepEdge {
+  from: string
+  to: string
+  type: 'import' | 'extends' | 'calls'
+  importedFrom?: string
+}
+
+interface ParsedFile {
+  segments: Segment[]
+  dependencies: DepEdge[]
+}
 
 const logger = new Logger('Parser')
 
@@ -15,28 +34,10 @@ const unsupportedExts = new Set([
   '.json', '.md', '.cjs', '', '.lock', '.env',
 ])
 
-type Segment = {
-  kind: 'import' | 'function' | 'class' | 'file'
-  name?: string
-  code: string
-}
-
-export type DepEdge = {
-  from: string
-  to: string
-  type: 'import' | 'extends' | 'calls'
-  importedFrom?: string
-}
-
-type ParsedFile = {
-  segments: Segment[]
-  dependencies: DepEdge[]
-}
-
 export function parseSegments(src: string, ext: string, filePath: string): ParsedFile {
   logger.log(`[parser] parsing file: ${filePath} ext: "${ext}"`)
 
-  if (unsupportedExts.has(ext)) {
+  if (has(unsupportedExts, ext)) {
     logger.log(`[parser] unsupported extension "${ext}", returning full file as-is`)
     return { segments: [{ kind: 'file', code: src }], dependencies: [] }
   }
@@ -49,23 +50,29 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
     const { parse: parseSFC } = require('@vue/compiler-sfc')
     const { descriptor } = parseSFC(src)
     const scriptBlock = descriptor.script ?? descriptor.scriptSetup
+
     src = scriptBlock?.content ?? ''
     ext = scriptBlock?.lang === 'ts' ? '.ts' : '.js'
+
     logger.log(`[parser] detected .vue, switching to script block with extension: "${ext}"`)
   }
 
   const lang = extToLang[ext as keyof typeof extToLang]
+
   if (!lang) {
     logger.log(`[parser] no mapping found for extension "${ext}", returning full file as-is`)
+
     return { segments: [{ kind: 'file', code: src }], dependencies: [] }
   }
 
   let Lang
+
   try {
     Lang = require(`tree-sitter-${lang}`)
   }
   catch (err) {
     logger.error(`[parser] failed to load tree-sitter-${lang}:`, err)
+
     return { segments: [{ kind: 'file', code: src }], dependencies: [] }
   }
 
@@ -76,7 +83,7 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
   const segments: Segment[] = []
   const dependencies: DepEdge[] = []
 
-  function visit(node: Parser.SyntaxNode) {
+  function visit(node: SyntaxNode) {
     switch (node.type) {
       case 'import_statement':
       case 'import_from_statement':
@@ -98,9 +105,11 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
       case 'class_definition':
         const className = getName(node)
         const superClass = node.childForFieldName?.('superclass')?.text
+
         if (className && superClass) {
           dependencies.push({ from: className, to: superClass, type: 'extends' })
         }
+
         push(node, 'class', className)
         break
     }
@@ -108,12 +117,12 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
     node.namedChildren.forEach(visit)
   }
 
-  function getName(node: Parser.SyntaxNode) {
+  function getName(node: SyntaxNode) {
     return node.childForFieldName?.('name')?.text
       ?? node.namedChildren[0]?.text
   }
 
-  function push(n: Parser.SyntaxNode, kind: Segment['kind'], name?: string) {
+  function push(n: SyntaxNode, kind: Segment['kind'], name?: string) {
     segments.push({ kind, name, code: src.slice(n.startIndex, n.endIndex) })
   }
 
@@ -121,10 +130,12 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
 
   if (!segments.length) {
     logger.log(`[parser] no segments detected, returning full file`)
+
     return { segments: [{ kind: 'file', code: src }], dependencies }
   }
 
   logger.log(`[parser] extracted ${segments.length} segments`)
+
   return { segments, dependencies }
 }
 
@@ -137,14 +148,13 @@ function parseWithTsMorph(src: string, filePath: string): ParsedFile {
 
   const importMap = new Map<string, string>()
 
-  sourceFile.getImportDeclarations().forEach((imp) => {
+  forEach(sourceFile.getImportDeclarations(), (imp) => {
     const module = imp.getModuleSpecifierValue()
 
-    imp.getNamedImports().forEach((named) => {
-      importMap.set(named.getName(), module)
-    })
+    forEach(imp.getNamedImports(), named => importMap.set(named.getName(), module))
 
     const def = imp.getDefaultImport()
+
     if (def) {
       importMap.set(def.getText(), module)
     }
@@ -153,19 +163,21 @@ function parseWithTsMorph(src: string, filePath: string): ParsedFile {
     segments.push({ kind: 'import', code: imp.getText() })
   })
 
-  sourceFile.getClasses().forEach((cls) => {
+  forEach(sourceFile.getClasses(), (cls) => {
     segments.push({ kind: 'class', name: cls.getName(), code: cls.getText() })
+
     const ext = cls.getExtends()
+
     if (ext) {
       dependencies.push({ from: cls.getName()!, to: ext.getText(), type: 'extends' })
     }
   })
 
-  sourceFile.getFunctions().forEach((fn) => {
+  forEach(sourceFile.getFunctions(), (fn) => {
     segments.push({ kind: 'function', name: fn.getName(), code: fn.getText() })
   })
 
-  sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression).forEach((call) => {
+  forEach(sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression), (call) => {
     const fromFn = call.getFirstAncestorByKind(SyntaxKind.FunctionDeclaration)
     const fnName = call.getExpression().getText()
 

@@ -1,34 +1,33 @@
+import { join, isEmpty } from 'lodash'
+
 import { GenericNullable } from '../interfaces/globals'
 
+import { sanitizeString } from './helpers'
 import { DepEdge } from './parser'
 
 export function buildMermaidGraph(deps: DepEdge[]): GenericNullable<string> {
-  if (deps.length === 0) {
+  if (isEmpty(deps)) {
     return null
   }
 
   const lines = ['flowchart TD']
+
   for (const { from, to, type, importedFrom } of deps) {
-    const safeFrom = sanitize(from)
-    const safeTo = sanitize(to)
-    const safeType = sanitize(type)
+    const safeFrom = sanitizeString(from)
+    const safeTo = sanitizeString(to)
+    const safeType = sanitizeString(type)
 
     const labelParts = [safeType]
+
     if (importedFrom) {
       labelParts.push(`from ${importedFrom}`)
     }
 
-    const label = labelParts.join(' ')
+    const label = join(labelParts, ' ')
 
     lines.push(
       `  ${safeFrom}["${from}"] -->|${label}| ${safeTo}["${to}"]`,
     )
   }
-  return lines.join('\n')
-}
-
-function sanitize(id: string): string {
-  return id
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '_')
+  return join(lines, '\n')
 }
