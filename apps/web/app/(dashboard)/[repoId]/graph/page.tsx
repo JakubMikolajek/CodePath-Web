@@ -9,7 +9,7 @@ import { useDependenciesStore } from '@/store'
 export default function Page() {
   const params = useParams()
 
-  const { getDependencies, graph } = useDependenciesStore()
+  const { getDependencies, graphs } = useDependenciesStore()
 
   useEffect(() => {
     getDependencies(Number(params.repoId as string))
@@ -18,10 +18,10 @@ export default function Page() {
 
 
   return (
-    <div className="flex items-center justify-between">
-      <div>
+    <div className="w-full relative bg-background">
+      <div className="flex flex-col">
         <h1 className="text-2xl font-semibold text-foreground">Graph</h1>
-        <MermaidGraph graph={graph} />
+        {graphs.map((graph) => <MermaidGraph key={graph.fileId} graph={graph.graph} />)}
       </div>
     </div>
   )

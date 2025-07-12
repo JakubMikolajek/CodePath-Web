@@ -166,11 +166,3 @@ function parseWithTsMorph(src: string, filePath: string): ParsedFile {
 
   return { segments, dependencies }
 }
-
-export function toMermaid(deps: DepEdge[]): string {
-  const lines = ['graph TD']
-  for (const { from, to, type } of deps) {
-    lines.push(`  "${from}" -->|${type}| "${to}"`)
-  }
-  return lines.join('\n')
-}

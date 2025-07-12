@@ -3,10 +3,37 @@ import { create } from 'zustand'
 import { DependencyEdge } from '@/interfaces/dependencies'
 import { getRepoDependencies } from '@/lib/dependencies'
 
+type FileGraph = {
+  fileId: number
+  graph: string
+}
+
 interface Store {
   dependencies: DependencyEdge[]
   getDependencies: (repoId: number) => Promise<void>
-  graph: string
+  graphs: FileGraph[]
+}
+
+export function toMermaidPerFile(deps: DependencyEdge[]): FileGraph[] {
+  const grouped = new Map<number, DependencyEdge[]>()
+
+  for (const dep of deps) {
+    if (!grouped.has(dep.fileId)) {
+      grouped.set(dep.fileId, [])
+    }
+    grouped.get(dep.fileId)!.push(dep)
+  }
+
+  const result: FileGraph[] = []
+
+  for (const [fileId, edges] of grouped.entries()) {
+    result.push({
+      fileId,
+      graph: toMermaid(edges),
+    })
+  }
+
+  return result
 }
 
 function toMermaid(deps: DependencyEdge[]): string {
@@ -26,14 +53,13 @@ function sanitize(id: string): string {
     .replace(/[^a-z0-9]/g, '_')
 }
 
-
 export const useDependenciesStore = create<Store>((setState) => ({
   dependencies: [],
-  graph: '',
+  graphs: [],
 
   getDependencies: async (repoId) => {
     setState(() => ({ dependencies: [] }))
     const deps = await getRepoDependencies(repoId)
-    setState(() => ({ dependencies: deps, graph: toMermaid(deps) }))
+    setState(() => ({ dependencies: deps, graphs: toMermaidPerFile(deps) }))
   },
 }))
