@@ -2,8 +2,6 @@ import { Logger } from '@nestjs/common'
 import Parser from 'tree-sitter'
 import { Project, SyntaxKind } from 'ts-morph'
 
-import { GenericNullable } from '../interfaces/globals'
-
 const logger = new Logger('Parser')
 
 const extToLang = {
@@ -23,7 +21,7 @@ type Segment = {
   code: string
 }
 
-type DepEdge = {
+export type DepEdge = {
   from: string
   to: string
   type: 'import' | 'extends' | 'calls'

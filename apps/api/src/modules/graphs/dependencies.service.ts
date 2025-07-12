@@ -19,11 +19,10 @@ export class DependenciesService {
     })
 
     return dependencies.map(dep => ({
-      from: dep.fromSymbol,
-      to: dep.toSymbol,
-      type: dep.type,
+      id: dep.id,
       fileId: dep.fileId,
-      importedFrom: dep.importedFrom,
+      fileName: dep.fileName,
+      graph: dep.graph,
     }))
   }
 }

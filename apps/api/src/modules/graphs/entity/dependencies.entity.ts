@@ -11,17 +11,11 @@ export class Dependencies {
   @Column({ name: 'repo_id' })
   repoId: number
 
-  @Column({ name: 'from_symbol' })
-  fromSymbol: string
-
-  @Column({ name: 'to_symbol' })
-  toSymbol: string
+  @Column({ name: 'file_name' })
+  fileName: string
 
   @Column()
-  type: string
-
-  @Column({ name: 'imported_from', nullable: true })
-  importedFrom: string
+  graph: string
 
   @Column({ type: 'timestamp', default: () => 'now()' })
   created_at: Date

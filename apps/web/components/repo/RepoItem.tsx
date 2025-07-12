@@ -15,7 +15,7 @@ import React, { useEffect, useState } from 'react'
 
 import PopoverWrapper from '@/components/PopoverWrapper'
 import type { Repo } from '@/interfaces/repo'
-import { useChatStore, useEmbeddingStore, useCollapsibleStore } from '@/store'
+import { useChatStore, useEmbeddingStore, useCollapsibleStore, useDependenciesStore } from '@/store'
 
 interface RepoItemProps {
   item: Repo
@@ -26,6 +26,7 @@ export default function RepoItem({ item }: RepoItemProps) {
   const { shouldBeEmbedded, runEmbedding } = useEmbeddingStore()
   const { getChatSessions, chatSessions, createSession } = useChatStore()
   const { isRepoOpen, setOpenRepoId, openRepoId } = useCollapsibleStore()
+  const { graphs, getGraphs } = useDependenciesStore()
 
   const checkEmbedding = async () => setToEmbedding(await shouldBeEmbedded(item.id))
   const handleEmbedding = async () => await runEmbedding(item.id)
@@ -42,6 +43,7 @@ export default function RepoItem({ item }: RepoItemProps) {
   useEffect(() => {
     if (isRepoOpen(item.id)) {
       handleGetChatSessions()
+      getGraphs(item.id)
     }
   }, [openRepoId])
 
@@ -115,13 +117,29 @@ export default function RepoItem({ item }: RepoItemProps) {
                 </Link>
               </SidebarMenuSubButton>
             </SidebarMenuSubItem>
-            <SidebarMenuSubItem>
-              <SidebarMenuSubButton asChild>
-                <Link href={`/${item.id}/graph`}>
-                  <span>Graph</span>
-                </Link>
-              </SidebarMenuSubButton>
-            </SidebarMenuSubItem>
+            <Collapsible asChild className="group/collapsible-graphs">
+              <SidebarMenuSubItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuSubButton>
+                    <span>Graphs</span>
+                    <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/graphs:rotate-90" />
+                  </SidebarMenuSubButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    {graphs.map((graph) => (
+                      <SidebarMenuSubItem key={graph.fileId}>
+                        <SidebarMenuSubButton asChild>
+                          <Link href={`/${item.id}/graphs/${graph.id}`}>
+                            <span>{graph.fileName}</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    ))}
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuSubItem>
+            </Collapsible>
           </SidebarMenuSub>
         </CollapsibleContent>
       </SidebarMenuItem>

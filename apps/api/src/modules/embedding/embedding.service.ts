@@ -9,6 +9,7 @@ import * as amqp from 'amqplib'
 import { firstValueFrom } from 'rxjs'
 import { Repository } from 'typeorm'
 
+import { buildMermaidGraph } from '../../utils/mermaidBuilder'
 import { parseSegments } from '../../utils/parser'
 import { Dependencies } from '../graphs/entity/dependencies.entity'
 import { File } from '../repos/entities/file.entity'
@@ -71,16 +72,12 @@ export class EmbeddingService {
       const src = await fsp.readFile(abs, 'utf8')
       const { segments, dependencies } = parseSegments(src, path.extname(file.path), file.path)
 
-      await this.dependenciesRepo.save(
-        dependencies.map(dep => ({
-          repoId: repoId,
-          fileId: file.id,
-          fromSymbol: dep.from,
-          toSymbol: dep.to,
-          type: dep.type,
-          importedFrom: dep.importedFrom,
-        }))
-      )
+      await this.dependenciesRepo.save({
+        repoId: repoId,
+        fileId: file.id,
+        fileName: path.basename(file.path),
+        graph: buildMermaidGraph(dependencies),
+      })
 
       for (let i = 0; i < segments.length; i += BATCH) {
         const batch = segments.slice(i, i + BATCH)
