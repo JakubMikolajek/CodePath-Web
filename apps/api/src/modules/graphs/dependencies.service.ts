@@ -23,6 +23,7 @@ export class DependenciesService {
       to: dep.toSymbol,
       type: dep.type,
       fileId: dep.fileId,
+      importedFrom: dep.importedFrom,
     }))
   }
 }

@@ -20,6 +20,9 @@ export class Dependencies {
   @Column()
   type: string
 
+  @Column({ name: 'imported_from', nullable: true })
+  importedFrom: string
+
   @Column({ type: 'timestamp', default: () => 'now()' })
   created_at: Date
 }

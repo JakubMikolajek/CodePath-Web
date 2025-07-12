@@ -9,7 +9,7 @@ interface MermaidGraphProps {
 
 mermaid.initialize({
   startOnLoad: true,
-  theme: 'default',
+  theme: 'dark',
   securityLevel: 'loose',
   flowchart: {
     useMaxWidth: true,

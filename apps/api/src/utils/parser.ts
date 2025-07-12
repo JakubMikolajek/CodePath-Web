@@ -2,6 +2,8 @@ import { Logger } from '@nestjs/common'
 import Parser from 'tree-sitter'
 import { Project, SyntaxKind } from 'ts-morph'
 
+import { GenericNullable } from '../interfaces/globals'
+
 const logger = new Logger('Parser')
 
 const extToLang = {
@@ -25,6 +27,7 @@ type DepEdge = {
   from: string
   to: string
   type: 'import' | 'extends' | 'calls'
+  importedFrom?: string
 }
 
 type ParsedFile = {
@@ -134,8 +137,20 @@ function parseWithTsMorph(src: string, filePath: string): ParsedFile {
   const segments: Segment[] = []
   const dependencies: DepEdge[] = []
 
+  const importMap = new Map<string, string>()
+
   sourceFile.getImportDeclarations().forEach((imp) => {
     const module = imp.getModuleSpecifierValue()
+
+    imp.getNamedImports().forEach((named) => {
+      importMap.set(named.getName(), module)
+    })
+
+    const def = imp.getDefaultImport()
+    if (def) {
+      importMap.set(def.getText(), module)
+    }
+
     dependencies.push({ from: filePath, to: module, type: 'import' })
     segments.push({ kind: 'import', code: imp.getText() })
   })
@@ -155,11 +170,15 @@ function parseWithTsMorph(src: string, filePath: string): ParsedFile {
   sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression).forEach((call) => {
     const fromFn = call.getFirstAncestorByKind(SyntaxKind.FunctionDeclaration)
     const fnName = call.getExpression().getText()
+
     if (fromFn && fromFn.getName()) {
+      const importedFrom = importMap.get(fnName)
+
       dependencies.push({
         from: fromFn.getName() ?? '<anonymous>',
         to: fnName,
         type: 'calls',
+        importedFrom,
       })
     }
   })

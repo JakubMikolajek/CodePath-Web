@@ -38,11 +38,21 @@ export function toMermaidPerFile(deps: DependencyEdge[]): FileGraph[] {
 
 function toMermaid(deps: DependencyEdge[]): string {
   const lines = ['flowchart TD']
-  for (const { from, to, type } of deps) {
+  for (const { from, to, type, importedFrom } of deps) {
     const safeFrom = sanitize(from)
     const safeTo = sanitize(to)
     const safeType = sanitize(type)
-    lines.push(`  ${safeFrom}["${from}"] -->|${safeType}| ${safeTo}["${to}"]`)
+
+    const labelParts = [safeType]
+    if (importedFrom) {
+      labelParts.push(`from ${importedFrom}`)
+    }
+
+    const label = labelParts.join(' ')
+
+    lines.push(
+      `  ${safeFrom}["${from}"] -->|${label}| ${safeTo}["${to}"]`,
+    )
   }
   return lines.join('\n')
 }
@@ -52,6 +62,7 @@ function sanitize(id: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '_')
 }
+
 
 export const useDependenciesStore = create<Store>((setState) => ({
   dependencies: [],

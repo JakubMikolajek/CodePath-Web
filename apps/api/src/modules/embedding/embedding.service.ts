@@ -78,6 +78,7 @@ export class EmbeddingService {
           fromSymbol: dep.from,
           toSymbol: dep.to,
           type: dep.type,
+          importedFrom: dep.importedFrom,
         }))
       )
 
