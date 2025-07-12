@@ -1,11 +1,13 @@
 import { HttpService } from '@nestjs/axios'
 import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import { map } from 'lodash'
 import pgvector from 'pgvector'
 import { firstValueFrom } from 'rxjs'
 import { Repository } from 'typeorm'
 import { v4 as uuidv4 } from 'uuid'
 
+import { cutContext } from '../../utils/helpers'
 import { EmbeddingService } from '../embedding/embedding.service'
 import { Embedding } from '../embedding/entities/embedding.entity'
 
@@ -62,18 +64,7 @@ export class ChatService {
       .limit(LIMIT)
       .getMany()
 
-    const context = matches.map(m => m.content)
-
-    function cutContext(chunks: string[], maxChars = 16000) {
-      const out: string[] = []
-      let used = 0
-      for (const txt of chunks) {
-        if (used + txt.length > maxChars) break
-        out.push(txt)
-        used += txt.length
-      }
-      return out
-    }
+    const context = map(matches, match => match.content)
 
     const safeContext = cutContext(context)
 
@@ -102,10 +93,10 @@ export class ChatService {
       order: { created_at: 'DESC' },
     })
 
-    return sessions.map(s => ({
-      sessionId: s.id,
-      sessionName: s.name,
-      createdAt: s.created_at,
+    return map(sessions, session => ({
+      sessionId: session.id,
+      sessionName: session.name,
+      createdAt: session.created_at,
     }))
   }
 
@@ -115,7 +106,7 @@ export class ChatService {
       order: { created_at: 'ASC' },
     })
 
-    return sessionDetails.map(detail => ({
+    return map(sessionDetails, detail => ({
       id: detail.id,
       role: detail.role,
       content: detail.content,

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import { map } from 'lodash'
 import { Repository } from 'typeorm'
 
 import { Dependencies } from './entity/dependencies.entity'
@@ -18,11 +19,11 @@ export class DependenciesService {
       order: { created_at: 'DESC' },
     })
 
-    return dependencies.map(dep => ({
-      id: dep.id,
-      fileId: dep.fileId,
-      fileName: dep.fileName,
-      graph: dep.graph,
+    return map(dependencies, dependency => ({
+      id: dependency.id,
+      fileId: dependency.fileId,
+      fileName: dependency.fileName,
+      graph: dependency.graph,
     }))
   }
 }

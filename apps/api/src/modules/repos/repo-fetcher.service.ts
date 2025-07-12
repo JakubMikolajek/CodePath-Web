@@ -6,6 +6,7 @@ import path from 'path'
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { InjectRepository } from '@nestjs/typeorm'
+import { has, map, replace } from 'lodash'
 import NodeRSA from 'node-rsa'
 import simpleGit from 'simple-git'
 import { Repository } from 'typeorm'
@@ -44,7 +45,7 @@ export class RepoFetcherService {
 
   private async cloneRepo(repo: Repo) {
     const git = simpleGit()
-    const sanitizedName = repo.name.replace(/[^a-zA-Z0-9_-]/g, '_')
+    const sanitizedName = replace(repo.name, /[^a-zA-Z0-9_-]/g, '_')
     const targetPath = path.join(this.REPOS_PATH, sanitizedName)
 
     this.logger.log(`Cloning: ${repo.gitUrl} -> ${targetPath}`)
@@ -75,15 +76,17 @@ export class RepoFetcherService {
         process.env.GIT_SSH_COMMAND = `ssh -i ${tmpKeyPath} -o StrictHostKeyChecking=no`
       }
 
-      await git.clone(repo.gitUrl, targetPath, ['--branch', 'develop', '--single-branch'])
+      // await git.clone(repo.gitUrl, targetPath, ['--branch', 'develop', '--single-branch'])
+      await git.clone(repo.gitUrl, targetPath)
 
       repo.cloneStatus = 'cloned'
       repo.path = targetPath
+
       await this.repoRepo.save(repo)
 
       const filePaths = await this.getAllFiles(targetPath)
       const filesData = await Promise.all(
-        filePaths.map(async (filePath) => {
+        map(filePaths, async (filePath) => {
           const relPath = path.relative(targetPath, filePath)
           const stats = await stat(filePath)
           const hash = await this.hashFile(filePath)
@@ -108,6 +111,7 @@ export class RepoFetcherService {
     }
     catch (error: any) {
       this.logger.error(`✗ Error cloning ${repo.name}: ${error.message}`)
+
       repo.cloneStatus = 'failed'
       await this.repoRepo.save(repo)
       throw error
@@ -122,7 +126,7 @@ export class RepoFetcherService {
       const entryPath = path.resolve(dir, entry.name)
 
       if (entry.isDirectory()) {
-        if (!IGNORED_DIRS.has(entry.name)) {
+        if (!has(IGNORED_DIRS, entry.name)) {
           const subFiles = await this.getAllFiles(entryPath)
           files.push(...subFiles)
         }
@@ -130,8 +134,8 @@ export class RepoFetcherService {
       else {
         const ext = path.extname(entry.name).toLowerCase()
         if (
-          !IGNORED_EXTENSIONS.has(ext)
-          && !IGNORED_FILES.has(entry.name)
+          !has(IGNORED_EXTENSIONS, ext)
+          && !has(IGNORED_FILES, entry.name)
         ) {
           files.push(entryPath)
         }

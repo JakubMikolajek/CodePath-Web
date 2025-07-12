@@ -6,6 +6,7 @@ import { HttpService } from '@nestjs/axios'
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import * as amqp from 'amqplib'
+import { slice } from 'lodash'
 import { firstValueFrom } from 'rxjs'
 import { Repository } from 'typeorm'
 
@@ -84,7 +85,7 @@ export class EmbeddingService {
       }
 
       for (let i = 0; i < segments.length; i += BATCH) {
-        const batch = segments.slice(i, i + BATCH)
+        const batch = slice(segments, i, i + BATCH)
 
         const batchPayload = batch.map(s => ({
           fileId: file.id,
