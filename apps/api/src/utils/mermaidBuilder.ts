@@ -1,6 +1,12 @@
+import { GenericNullable } from '../interfaces/globals'
+
 import { DepEdge } from './parser'
 
-export function buildMermaidGraph(deps: DepEdge[]): string {
+export function buildMermaidGraph(deps: DepEdge[]): GenericNullable<string> {
+  if (deps.length === 0) {
+    return null
+  }
+
   const lines = ['flowchart TD']
   for (const { from, to, type, importedFrom } of deps) {
     const safeFrom = sanitize(from)

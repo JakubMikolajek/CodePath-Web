@@ -72,12 +72,16 @@ export class EmbeddingService {
       const src = await fsp.readFile(abs, 'utf8')
       const { segments, dependencies } = parseSegments(src, path.extname(file.path), file.path)
 
-      await this.dependenciesRepo.save({
-        repoId: repoId,
-        fileId: file.id,
-        fileName: path.basename(file.path),
-        graph: buildMermaidGraph(dependencies),
-      })
+      const graph = buildMermaidGraph(dependencies)
+
+      if (graph) {
+        await this.dependenciesRepo.save({
+          repoId: repoId,
+          fileId: file.id,
+          fileName: path.basename(file.path),
+          graph,
+        })
+      }
 
       for (let i = 0; i < segments.length; i += BATCH) {
         const batch = segments.slice(i, i + BATCH)
