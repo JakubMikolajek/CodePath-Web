@@ -1,6 +1,6 @@
+import { GenericNullable } from '@workspace/codepath-common/globals'
 import { create } from 'zustand'
 
-import { GenericNullable } from '@/interfaces/globals'
 
 interface Store {
   openRepoId: GenericNullable<number>

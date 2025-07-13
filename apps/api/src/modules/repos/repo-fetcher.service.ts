@@ -6,12 +6,12 @@ import path from 'path'
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { InjectRepository } from '@nestjs/typeorm'
+import { GenericNullable } from '@workspace/codepath-common/globals'
 import { has, map, replace } from 'lodash'
 import NodeRSA from 'node-rsa'
 import simpleGit from 'simple-git'
 import { Repository } from 'typeorm'
 
-import { GenericNullable } from '../../interfaces/globals'
 import { IGNORED_DIRS, IGNORED_EXTENSIONS, IGNORED_FILES } from '../../utils/ignores'
 
 import { File } from './entities/file.entity'

@@ -1,9 +1,9 @@
 'use client'
 
+import type { GenericNullable } from '@workspace/codepath-common/globals'
 import { IUser } from '@workspace/codepath-common/user'
 import { create } from 'zustand'
 
-import type { GenericNullable } from '@/interfaces/globals'
 import { login, register, logout } from '@/lib/auth/client'
 
 interface Store {

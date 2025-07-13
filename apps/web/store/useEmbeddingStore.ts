@@ -1,6 +1,6 @@
+import { GenericNullable } from '@workspace/codepath-common/globals'
 import { create } from 'zustand'
 
-import { GenericNullable } from '@/interfaces/globals'
 import { runEmbedding, shouldBeEmbedded } from '@/lib/embedding'
 
 interface Store {

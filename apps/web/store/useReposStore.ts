@@ -1,6 +1,6 @@
+import { GenericNullable } from '@workspace/codepath-common/globals'
 import { create } from 'zustand'
 
-import { GenericNullable } from '@/interfaces/globals'
 import { Repo } from '@/interfaces/repo'
 import { createRepo, getRepos } from '@/lib/repos'
 import { CreateRepoFormData } from '@/utils/validators/createRepoForm'

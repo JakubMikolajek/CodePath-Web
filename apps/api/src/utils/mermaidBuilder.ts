@@ -1,6 +1,5 @@
+import { GenericNullable } from '@workspace/codepath-common/globals'
 import { join, isEmpty } from 'lodash'
-
-import { GenericNullable } from '../interfaces/globals'
 
 import { sanitizeString } from './helpers'
 import { DepEdge } from './parser'

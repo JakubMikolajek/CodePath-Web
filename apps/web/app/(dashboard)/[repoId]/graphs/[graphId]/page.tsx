@@ -1,11 +1,11 @@
 'use client'
 
+import { GenericNullable } from '@workspace/codepath-common/globals'
 import { useParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 import MermaidGraph from '@/components/MermaidGraph'
 import { DependencyEdge } from '@/interfaces/dependencies'
-import { GenericNullable } from '@/interfaces/globals'
 import { useDependenciesStore } from '@/store'
 
 export default function Page() {
