@@ -16,23 +16,30 @@ import { Spinner } from '@workspace/ui/components/spinnder'
 import {
   FolderGit2,
 } from 'lucide-react'
-import React, { ComponentProps, useEffect } from 'react'
+import React, { useEffect } from 'react'
 
 
 import CreateRepoDialog from '@/components/repo/CreateRepoDialog'
 import RepoItem from '@/components/repo/RepoItem'
 import UserDropdownMenu from '@/components/UserDropdownMenu'
-import { useReposStore } from '@/store'
+import { User } from '@/interfaces/auth'
+import { useAuthStore, useReposStore } from '@/store'
 
-export default function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
+interface AppSideBarProps {
+  me: User
+}
+
+export default function AppSidebar({ me }: AppSideBarProps) {
+  const { setMe } = useAuthStore()
   const { repos, getRepos, loading } = useReposStore()
 
   useEffect(() => {
+    setMe(me)
     getRepos()
   }, [])
 
   return (
-    <Sidebar variant="sidebar" {...props}>
+    <Sidebar variant="sidebar">
       <SidebarHeader className="h-16 border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-4 justify-center h-full">
           <div className="text-left text-sm leading-tight">

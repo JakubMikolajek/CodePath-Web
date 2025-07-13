@@ -4,8 +4,7 @@ import { create } from 'zustand'
 
 import type { User } from '@/interfaces/auth'
 import type { GenericNullable } from '@/interfaces/globals'
-import { getCurrentUser, login, register } from '@/lib/auth/auth'
-import { logoutAction } from '@/lib/auth/authServer'
+import { login, register, logout } from '@/lib/auth/client'
 
 interface Store {
   user: GenericNullable<User>
@@ -13,7 +12,7 @@ interface Store {
   register: (email: string, login: string, password: string) => Promise<void>
   login: (identifier: string, password: string) => Promise<void>
   logout: () => Promise<void>
-  getMe: () => Promise<void>
+  setMe: (user: User) => void
   clearError: () => void
   error: GenericNullable<string>
 }
@@ -23,7 +22,9 @@ export const useAuthStore = create<Store>((setState) => ({
   loading: false,
   error: null,
 
-  clearError: () => setState({ error: null }),
+  clearError: () => setState(() => ({ error: null })),
+
+  setMe: (user) => setState(() => ({ user })),
 
   register: async (email, login, password) => {
     setState({ loading: true, error: null })
@@ -43,8 +44,7 @@ export const useAuthStore = create<Store>((setState) => ({
     setState({ loading: true, error: null })
     try {
       await login(identifier, password)
-      const user = await getCurrentUser()
-      setState({ user, loading: false })
+      setState({ loading: false })
       window.location.href = '/dashboard'
     } catch (error: any) {
       setState({
@@ -60,27 +60,11 @@ export const useAuthStore = create<Store>((setState) => ({
     setState({ loading: true })
     try {
       setState({ user: null, loading: false, error: null })
-      await logoutAction()
+      await logout()
+      window.location.href = '/'
     } catch (error) {
       console.error('Logout error:', error)
       setState({ loading: false })
-    }
-  },
-
-  getMe: async () => {
-    const hasToken = typeof window !== 'undefined' && document.cookie.includes('access_token=')
-
-    if (!hasToken) {
-      setState({ user: null, loading: false })
-      return
-    }
-
-    setState({ loading: true, error: null })
-    try {
-      const user = await getCurrentUser()
-      setState({ user, loading: false })
-    } catch (error) {
-      setState({ user: null, loading: false })
     }
   },
 }))

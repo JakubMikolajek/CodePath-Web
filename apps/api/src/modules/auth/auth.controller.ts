@@ -44,6 +44,20 @@ export class AuthController {
   }
 
   @UseGuards(AuthGuard('jwt'))
+  @Get('logout')
+  logout(@Res({ passthrough: true }) res: Response) {
+    res.cookie('access_token', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 0,
+      path: '/',
+    })
+
+    return { message: 'logged_out' }
+  }
+
+  @UseGuards(AuthGuard('jwt'))
   @Get('me')
   getMe(@Req() req: { user: User }) {
     const { id, email, login } = req.user

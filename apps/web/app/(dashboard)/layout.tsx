@@ -4,15 +4,18 @@ import { SidebarInset, SidebarProvider } from '@workspace/ui/components/sidebar'
 import  { ReactNode } from 'react'
 
 import AppSidebar from '@/components/AppSideBar'
+import { getCurrentUser } from '@/lib/auth/server'
 
 interface DashboardLayoutProps {
   children: ReactNode
 }
 
 export default async function DashboardLayout({ children }: Readonly<DashboardLayoutProps>) {
+  const me = await getCurrentUser()
+
   return (
     <SidebarProvider defaultOpen>
-      <AppSidebar />
+      <AppSidebar me={me} />
       <SidebarInset>
         <div className="flex flex-1 flex-col gap-4 p-4 bg-background min-h-screen">{children}</div>
       </SidebarInset>
