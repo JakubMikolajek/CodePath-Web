@@ -1,5 +1,6 @@
 'use client'
 
+import { Repository } from '@workspace/codepath-common/repository'
 import { Button } from '@workspace/ui/components/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@workspace/ui/components/collapsible'
 import {
@@ -14,11 +15,10 @@ import Link from 'next/link'
 import React, { useEffect, useState } from 'react'
 
 import PopoverWrapper from '@/components/PopoverWrapper'
-import type { Repo } from '@/interfaces/repo'
 import { useChatStore, useEmbeddingStore, useCollapsibleStore, useGraphsStore } from '@/store'
 
 interface RepoItemProps {
-  item: Repo
+  item: Repository
 }
 
 export default function RepoItem({ item }: RepoItemProps) {

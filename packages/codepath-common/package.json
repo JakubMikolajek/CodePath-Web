@@ -21,6 +21,10 @@
     "./graph": {
       "types": "./graph.ts",
       "default": "./dist/graph.js"
+    },
+    "./repository": {
+      "types": "./repository.ts",
+      "default": "./dist/repository.js"
     }
   }
 }

@@ -1,7 +1,7 @@
 import { Graph } from '@workspace/codepath-common/graph'
 import { create } from 'zustand'
 
-import { getRepoDependencies } from '@/lib/dependencies'
+import { getRepoGraphs } from '@/lib/graphs'
 
 interface Store {
   graphs: Graph[]
@@ -13,7 +13,7 @@ export const useGraphsStore = create<Store>((setState) => ({
 
   getGraphs: async (repoId) => {
     setState(() => ({ graphs: [] }))
-    const deps = await getRepoDependencies(repoId)
+    const deps = await getRepoGraphs(repoId)
     setState(() => ({ graphs: deps }))
   },
 }))

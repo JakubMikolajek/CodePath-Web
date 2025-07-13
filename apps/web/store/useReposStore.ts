@@ -1,12 +1,12 @@
 import { GenericNullable } from '@workspace/codepath-common/globals'
+import { Repository } from '@workspace/codepath-common/repository'
 import { create } from 'zustand'
 
-import { Repo } from '@/interfaces/repo'
 import { createRepo, getRepos } from '@/lib/repos'
 import { CreateRepoFormData } from '@/utils/validators/createRepoForm'
 
 interface Store {
-  repos: Repo[]
+  repos: Repository[]
   loading: boolean
   error: GenericNullable<string>
   clearError: () => void
