@@ -1,14 +1,14 @@
+import { Graph } from '@workspace/codepath-common/graph'
 import { create } from 'zustand'
 
-import { DependencyEdge } from '@/interfaces/dependencies'
 import { getRepoDependencies } from '@/lib/dependencies'
 
 interface Store {
-  graphs: DependencyEdge[]
+  graphs: Graph[]
   getGraphs: (repoId: number) => Promise<void>
 }
 
-export const useDependenciesStore = create<Store>((setState) => ({
+export const useGraphsStore = create<Store>((setState) => ({
   graphs: [],
 
   getGraphs: async (repoId) => {

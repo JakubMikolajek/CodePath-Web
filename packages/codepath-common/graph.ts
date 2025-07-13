@@ -1,4 +1,4 @@
-export interface DependencyEdge {
+export interface Graph {
   id: number
   fileName: string
   fileId: number

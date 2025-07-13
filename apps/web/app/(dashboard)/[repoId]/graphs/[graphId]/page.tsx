@@ -1,18 +1,18 @@
 'use client'
 
 import { GenericNullable } from '@workspace/codepath-common/globals'
+import { Graph } from '@workspace/codepath-common/graph'
 import { useParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 import MermaidGraph from '@/components/MermaidGraph'
-import { DependencyEdge } from '@/interfaces/dependencies'
-import { useDependenciesStore } from '@/store'
+import { useGraphsStore } from '@/store'
 
 export default function Page() {
   const params = useParams()
-  const [activeGraph, setActiveGraph] = useState<GenericNullable<DependencyEdge>>(null)
+  const [activeGraph, setActiveGraph] = useState<GenericNullable<Graph>>(null)
 
-  const { graphs } = useDependenciesStore()
+  const { graphs } = useGraphsStore()
 
   useEffect(() => {
     setActiveGraph(graphs.find((graph) => graph.id === Number(params.graphId)) ?? null)

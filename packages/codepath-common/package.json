@@ -17,6 +17,10 @@
     "./globals": {
       "types": "./globals.ts",
       "default": "./dist/globals.js"
+    },
+    "./graph": {
+      "types": "./graph.ts",
+      "default": "./dist/graph.js"
     }
   }
 }

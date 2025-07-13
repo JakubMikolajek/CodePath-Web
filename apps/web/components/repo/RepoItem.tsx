@@ -15,7 +15,7 @@ import React, { useEffect, useState } from 'react'
 
 import PopoverWrapper from '@/components/PopoverWrapper'
 import type { Repo } from '@/interfaces/repo'
-import { useChatStore, useEmbeddingStore, useCollapsibleStore, useDependenciesStore } from '@/store'
+import { useChatStore, useEmbeddingStore, useCollapsibleStore, useGraphsStore } from '@/store'
 
 interface RepoItemProps {
   item: Repo
@@ -26,7 +26,7 @@ export default function RepoItem({ item }: RepoItemProps) {
   const { shouldBeEmbedded, runEmbedding } = useEmbeddingStore()
   const { getChatSessions, chatSessions, createSession } = useChatStore()
   const { isRepoOpen, setOpenRepoId, openRepoId } = useCollapsibleStore()
-  const { graphs, getGraphs } = useDependenciesStore()
+  const { graphs, getGraphs } = useGraphsStore()
 
   const checkEmbedding = async () => setToEmbedding(await shouldBeEmbedded(item.id))
   const handleEmbedding = async () => await runEmbedding(item.id)
