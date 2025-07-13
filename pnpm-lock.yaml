@@ -195,6 +195,9 @@ importers:
       '@types/supertest':
         specifier: ^6.0.2
         version: 6.0.3
+      '@workspace/codepath-common':
+        specifier: workspace:*
+        version: link:../../packages/codepath-common
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config

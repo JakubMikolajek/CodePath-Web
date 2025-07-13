@@ -1,18 +1,18 @@
 'use client'
 
-import type { User } from '@workspace/codepath-common/user'
+import { IUser } from '@workspace/codepath-common/user'
 import { create } from 'zustand'
 
 import type { GenericNullable } from '@/interfaces/globals'
 import { login, register, logout } from '@/lib/auth/client'
 
 interface Store {
-  user: GenericNullable<User>
+  user: GenericNullable<IUser>
   loading: boolean
   register: (email: string, login: string, password: string) => Promise<void>
   login: (identifier: string, password: string) => Promise<void>
   logout: () => Promise<void>
-  setMe: (user: User) => void
+  setMe: (user: IUser) => void
   clearError: () => void
   error: GenericNullable<string>
 }

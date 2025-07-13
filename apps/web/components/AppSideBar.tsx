@@ -1,6 +1,6 @@
 'use client'
 
-import { User } from '@workspace/codepath-common/user'
+import { IUser } from '@workspace/codepath-common/user'
 import {
   Sidebar,
   SidebarContent,
@@ -26,7 +26,7 @@ import UserDropdownMenu from '@/components/UserDropdownMenu'
 import { useAuthStore, useReposStore } from '@/store'
 
 interface AppSideBarProps {
-  me: User
+  me: IUser
 }
 
 export default function AppSidebar({ me }: AppSideBarProps) {

@@ -1,6 +1,6 @@
 'use server'
 
-import { User } from '@workspace/codepath-common/user'
+import { IUser } from '@workspace/codepath-common/user'
 import { cookies } from 'next/headers'
 
 import { apiServer } from '@/lib/api/api'
@@ -11,5 +11,5 @@ export async function getCurrentUser() {
 
   const api = apiServer(cookie)
 
-  return api.get<User>('/auth/me')
+  return api.get<IUser>('/auth/me')
 }

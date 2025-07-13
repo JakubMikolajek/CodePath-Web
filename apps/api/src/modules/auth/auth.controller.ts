@@ -61,6 +61,7 @@ export class AuthController {
   @Get('me')
   getMe(@Req() req: { user: User }) {
     const { id, email, login } = req.user
+
     return { id, email, login }
   }
 }
