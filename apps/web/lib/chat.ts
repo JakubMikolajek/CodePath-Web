@@ -1,4 +1,5 @@
-import { ChatSession, SessionDetail } from '@/interfaces/chat'
+import { ChatSession, SessionDetail } from '@workspace/codepath-common/chat'
+
 import { apiClient } from '@/lib/api/api'
 
 export async function createSession (repoId: number) {

@@ -1,6 +1,6 @@
+import { ChatSession, SessionDetail } from '@workspace/codepath-common/chat'
 import { create } from 'zustand'
 
-import { ChatSession, SessionDetail } from '@/interfaces/chat'
 import { createSession, getChatSessions, getSessionDetails, sendMessage } from '@/lib/chat'
 
 interface Store {

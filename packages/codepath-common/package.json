@@ -25,6 +25,10 @@
     "./repository": {
       "types": "./repository.ts",
       "default": "./dist/repository.js"
+    },
+    "./chat": {
+      "types": "./chat.ts",
+      "default": "./dist/chat.js"
     }
   }
 }
