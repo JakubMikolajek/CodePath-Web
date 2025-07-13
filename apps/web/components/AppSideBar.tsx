@@ -12,6 +12,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from '@workspace/ui/components/sidebar'
+import { Spinner } from '@workspace/ui/components/spinnder'
 import {
   FolderGit2,
 } from 'lucide-react'
@@ -40,20 +41,26 @@ export default function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>)
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <CreateRepoDialog>
-            <SidebarMenuButton>
-              <span>Add repo</span>
-              <FolderGit2 className="ml-auto h-4 w-4" />
-            </SidebarMenuButton>
-          </CreateRepoDialog>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>Repositories</SidebarGroupLabel>
-          <SidebarMenu>
-            {repos.map((item) => <RepoItem key={item.id} item={item} />)}
-          </SidebarMenu>
-        </SidebarGroup>
+        {loading ? <div className="flex items-center gap-2 px-4 justify-center h-full">
+          <div className="text-left text-sm leading-tight">
+            <Spinner>Loading...</Spinner>
+          </div>
+        </div> : <>
+          <SidebarGroup>
+            <CreateRepoDialog>
+              <SidebarMenuButton>
+                <span>Add repo</span>
+                <FolderGit2 className="ml-auto h-4 w-4" />
+              </SidebarMenuButton>
+            </CreateRepoDialog>
+          </SidebarGroup>
+          <SidebarGroup>
+            <SidebarGroupLabel>Repositories</SidebarGroupLabel>
+            <SidebarMenu>
+              {repos.map((item) => <RepoItem key={item.id} item={item} />)}
+            </SidebarMenu>
+          </SidebarGroup>
+        </>}
       </SidebarContent>
       <SidebarFooter className="h-16 border-t border-sidebar-border">
         <SidebarMenu>

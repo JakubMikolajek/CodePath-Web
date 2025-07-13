@@ -115,7 +115,7 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
                 <FormItem>
                   <FormLabel>Access Key</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Enter access key" {...field} />
+                    <Textarea className="max-h-40" placeholder="Enter access key" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
