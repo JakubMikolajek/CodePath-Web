@@ -310,6 +310,9 @@ importers:
       '@types/react-dom':
         specifier: ^19
         version: 19.0.4(@types/react@19.0.10)
+      '@workspace/codepath-common':
+        specifier: workspace:*
+        version: link:../../packages/codepath-common
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
@@ -322,6 +325,12 @@ importers:
       typescript:
         specifier: ^5.7.3
         version: 5.7.3
+
+  packages/codepath-common:
+    dependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.8.3
 
   packages/eslint-config:
     devDependencies:

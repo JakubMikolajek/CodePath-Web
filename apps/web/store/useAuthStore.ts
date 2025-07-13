@@ -1,8 +1,8 @@
 'use client'
 
+import type { User } from '@workspace/codepath-common/user'
 import { create } from 'zustand'
 
-import type { User } from '@/interfaces/auth'
 import type { GenericNullable } from '@/interfaces/globals'
 import { login, register, logout } from '@/lib/auth/client'
 

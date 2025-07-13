@@ -1,8 +1,8 @@
 'use server'
 
+import { User } from '@workspace/codepath-common/user'
 import { cookies } from 'next/headers'
 
-import { User } from '@/interfaces/auth'
 import { apiServer } from '@/lib/api/api'
 
 export async function getCurrentUser() {

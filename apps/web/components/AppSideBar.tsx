@@ -1,5 +1,6 @@
 'use client'
 
+import { User } from '@workspace/codepath-common/user'
 import {
   Sidebar,
   SidebarContent,
@@ -22,7 +23,6 @@ import React, { useEffect } from 'react'
 import CreateRepoDialog from '@/components/repo/CreateRepoDialog'
 import RepoItem from '@/components/repo/RepoItem'
 import UserDropdownMenu from '@/components/UserDropdownMenu'
-import { User } from '@/interfaces/auth'
 import { useAuthStore, useReposStore } from '@/store'
 
 interface AppSideBarProps {
