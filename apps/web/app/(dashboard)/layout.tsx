@@ -1,15 +1,15 @@
-'use client'
+'use server'
 
 import { SidebarInset, SidebarProvider } from '@workspace/ui/components/sidebar'
-import type React from 'react'
+import  { ReactNode } from 'react'
 
 import AppSidebar from '@/components/AppSideBar'
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+interface DashboardLayoutProps {
+  children: ReactNode
+}
+
+export default async function DashboardLayout({ children }: Readonly<DashboardLayoutProps>) {
   return (
     <SidebarProvider defaultOpen>
       <AppSidebar />

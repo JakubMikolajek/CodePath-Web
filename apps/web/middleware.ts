@@ -1,3 +1,4 @@
+import { some } from 'lodash'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -7,7 +8,7 @@ export function middleware(request: NextRequest) {
 
   const protectedRoutes = ['/dashboard']
 
-  const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
+  const isProtectedRoute = some(protectedRoutes, (route) => pathname.startsWith(route))
 
   if (isProtectedRoute && !token) {
     return NextResponse.redirect(new URL('/', request.url))

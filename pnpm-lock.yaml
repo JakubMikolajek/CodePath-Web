@@ -258,6 +258,9 @@ importers:
       highlight.js:
         specifier: ^11.11.1
         version: 11.11.1
+      lodash:
+        specifier: ^4.17.21
+        version: 4.17.21
       lucide-react:
         specifier: ^0.475.0
         version: 0.475.0(react@19.0.0)
@@ -295,6 +298,9 @@ importers:
         specifier: ^5.0.6
         version: 5.0.6(@types/react@19.0.10)(react@19.0.0)
     devDependencies:
+      '@types/lodash':
+        specifier: ^4.17.20
+        version: 4.17.20
       '@types/node':
         specifier: ^20
         version: 20.17.19

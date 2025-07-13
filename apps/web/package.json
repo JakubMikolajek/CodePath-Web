@@ -16,6 +16,7 @@
     "@workspace/ui": "workspace:*",
     "axios": "^1.10.0",
     "highlight.js": "^11.11.1",
+    "lodash": "^4.17.21",
     "lucide-react": "^0.475.0",
     "mermaid": "^11.8.1",
     "next": "^15.2.3",
@@ -30,6 +31,7 @@
     "zustand": "^5.0.6"
   },
   "devDependencies": {
+    "@types/lodash": "^4.17.20",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
