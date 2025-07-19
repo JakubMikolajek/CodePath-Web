@@ -16,7 +16,7 @@ import { useAuthStore } from '@/store'
 
 export default function UserDropdownMenu() {
   const { setTheme } = useTheme()
-  const { logout } = useAuthStore()
+  const { logout, user } = useAuthStore()
 
   const handleLogout = async () => {
     await logout()
@@ -30,7 +30,7 @@ export default function UserDropdownMenu() {
           className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
         >
           <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate text-xs">TEST</span>
+            <span className="truncate text-xs">{user?.login ?? ''}</span>
           </div>
         </SidebarMenuButton>
       </DropdownMenuTrigger>
