@@ -12,6 +12,7 @@ import { Repository } from 'typeorm'
 
 import { buildMermaidGraph } from '../../utils/mermaidBuilder'
 import { parseSegments } from '../../utils/parser'
+import { DocsSegment } from '../docs/entity/docs-segments.entity'
 import { Dependencies } from '../graphs/entity/dependencies.entity'
 import { File } from '../repos/entities/file.entity'
 
@@ -27,6 +28,7 @@ export class EmbeddingService {
     @InjectRepository(File) private fileRepo: Repository<File>,
     @InjectRepository(Embedding) private embeddingRepo: Repository<Embedding>,
     @InjectRepository(Dependencies) private dependenciesRepo: Repository<Dependencies>,
+    @InjectRepository(DocsSegment) private docsSegmentRepo: Repository<DocsSegment>,
     private readonly httpService: HttpService
   ) {}
 
@@ -41,12 +43,12 @@ export class EmbeddingService {
     await this.conn?.close()
   }
 
-  async publishEmbeddingsJob(segments: {
+  publishEmbeddingsJob(segments: {
     fileId: number
     symbolKind: string
     symbolName?: string
     content: string
-  }[]): Promise<void> {
+  }[]): void {
     this.channel.sendToQueue(
       this.queue,
       Buffer.from(
@@ -94,7 +96,22 @@ export class EmbeddingService {
           content: s.code,
         }))
 
-        await this.publishEmbeddingsJob(batchPayload)
+        // const docsSegmentsPayload = batch.map(s => ({
+        //   fileId: file.id,
+        //   kind: s.kind,
+        //   name: s.name,
+        //   content: s.code,
+        //   comment: s.comment,
+        //   decorators: s.decorators,
+        //   params: s.params,
+        //   returnType: s.returnType,
+        //   jsDoc: s.jsDoc,
+        //   startLine: s.startLine,
+        //   endLine: s.endLine,
+        // }))
+
+        this.publishEmbeddingsJob(batchPayload)
+        // await this.docsSegmentRepo.save(docsSegmentsPayload)
       }
     }
 

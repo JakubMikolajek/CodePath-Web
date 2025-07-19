@@ -3,10 +3,17 @@ import { forEach, has } from 'lodash'
 import Parser, { SyntaxNode } from 'tree-sitter'
 import { Project, SyntaxKind } from 'ts-morph'
 
-interface Segment {
+export interface Segment {
   kind: 'import' | 'function' | 'class' | 'file'
   name?: string
   code: string
+  comment?: string
+  startLine?: number
+  endLine?: number
+  decorators?: string[]
+  params?: string[]
+  returnType?: string
+  jsDoc?: string
 }
 
 export interface DepEdge {
@@ -163,6 +170,23 @@ function parseWithTsMorph(src: string, filePath: string): ParsedFile {
     segments.push({ kind: 'import', code: imp.getText() })
   })
 
+  // forEach(sourceFile.getImportDeclarations(), (imp) => {
+  //   const module = imp.getModuleSpecifierValue()
+  //
+  //   forEach(imp.getNamedImports(), named => importMap.set(named.getName(), module))
+  //
+  //   const def = imp.getDefaultImport()
+  //   if (def) importMap.set(def.getText(), module)
+  //
+  //   dependencies.push({ from: filePath, to: module, type: 'import' })
+  //   segments.push({
+  //     kind: 'import',
+  //     code: imp.getText(),
+  //     startLine: imp.getStartLineNumber(),
+  //     endLine: imp.getEndLineNumber(),
+  //   })
+  // })
+
   forEach(sourceFile.getClasses(), (cls) => {
     segments.push({ kind: 'class', name: cls.getName(), code: cls.getText() })
 
@@ -173,9 +197,48 @@ function parseWithTsMorph(src: string, filePath: string): ParsedFile {
     }
   })
 
+  // forEach(sourceFile.getClasses(), (cls) => {
+  //   const className = cls.getName()
+  //   const decorators = cls.getDecorators().map(d => d.getText())
+  //   const comment = cls.getJsDocs().map(doc => doc.getComment()).join('\n')
+  //   const ext = cls.getExtends()
+  //
+  //   if (ext) {
+  //     dependencies.push({ from: className!, to: ext.getText(), type: 'extends' })
+  //   }
+  //
+  //   segments.push({
+  //     kind: 'class',
+  //     name: className,
+  //     code: cls.getText(),
+  //     comment,
+  //     decorators,
+  //     startLine: cls.getStartLineNumber(),
+  //     endLine: cls.getEndLineNumber(),
+  //   })
+  // })
+
   forEach(sourceFile.getFunctions(), (fn) => {
     segments.push({ kind: 'function', name: fn.getName(), code: fn.getText() })
   })
+
+  // forEach(sourceFile.getFunctions(), (fn) => {
+  //   const name = fn.getName()
+  //   const comment = fn.getJsDocs().map(doc => doc.getComment()).join('\n')
+  //   const params = fn.getParameters().map(p => `${p.getName()}: ${p.getType().getText()}`)
+  //   const returns = fn.getReturnType().getText()
+  //
+  //   segments.push({
+  //     kind: 'function',
+  //     name,
+  //     code: fn.getText(),
+  //     comment,
+  //     params,
+  //     returnType: returns,
+  //     startLine: fn.getStartLineNumber(),
+  //     endLine: fn.getEndLineNumber(),
+  //   })
+  // })
 
   forEach(sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression), (call) => {
     const fromFn = call.getFirstAncestorByKind(SyntaxKind.FunctionDeclaration)

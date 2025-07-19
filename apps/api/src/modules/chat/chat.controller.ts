@@ -8,7 +8,7 @@ import { AskDto } from './dto/ask.dto'
 
 @Controller('chat')
 export class ChatController {
-  constructor(private readonly chatService: ChatService) {}
+  constructor(private readonly chatService: ChatService) { }
 
   @UseGuards(AuthGuard('jwt'))
   @Get(':repoId/createSession')

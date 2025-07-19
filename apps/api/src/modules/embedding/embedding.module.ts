@@ -2,6 +2,7 @@ import { HttpModule } from '@nestjs/axios'
 import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 
+import { DocsSegment } from '../docs/entity/docs-segments.entity'
 import { Dependencies } from '../graphs/entity/dependencies.entity'
 import { File } from '../repos/entities/file.entity'
 
@@ -16,6 +17,7 @@ import { Embedding } from './entities/embedding.entity'
       File,
       Embedding,
       Dependencies,
+      DocsSegment,
     ]),
   ],
   controllers: [EmbeddingController],

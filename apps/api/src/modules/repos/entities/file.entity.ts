@@ -7,6 +7,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm'
 
+import { DocsSegment } from '../../docs/entity/docs-segments.entity'
 import { Embedding } from '../../embedding/entities/embedding.entity'
 
 import { Repo } from './repo.entity'
@@ -25,6 +26,9 @@ export class File {
 
   @OneToMany(() => Embedding, embedding => embedding.file)
   embeddings: Embedding[]
+
+  @OneToMany(() => DocsSegment, segment => segment.file)
+  docsSegments: DocsSegment[]
 
   @Column()
   path: string

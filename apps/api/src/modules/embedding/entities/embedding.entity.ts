@@ -31,4 +31,25 @@ export class Embedding {
 
   @Column()
   embedding: string
+
+  @Column({ nullable: true })
+  comment?: string
+
+  @Column({ name: 'js_doc', nullable: true })
+  jsDoc?: string
+
+  @Column({ type: 'simple-array', nullable: true })
+  decorators?: string[]
+
+  @Column({ type: 'simple-array', nullable: true })
+  params?: string[]
+
+  @Column({ name: 'return_type', nullable: true })
+  returnType?: string
+
+  @Column({ name: 'start_line', nullable: true })
+  startLine?: number
+
+  @Column({ name: 'end_line', nullable: true })
+  endLine?: number
 }

@@ -8,6 +8,8 @@ import { ChatModule } from './modules/chat/chat.module'
 import { ChatHistory } from './modules/chat/entities/chat-history.entity'
 import { ChatSession } from './modules/chat/entities/chat-session.entity'
 import { Chat } from './modules/chat/entities/chat.entity'
+import { DocsModule } from './modules/docs/docs.module'
+import { DocsSegment } from './modules/docs/entity/docs-segments.entity'
 import { EmbeddingModule } from './modules/embedding/embedding.module'
 import { Embedding } from './modules/embedding/entities/embedding.entity'
 import { DependenciesModule } from './modules/graphs/dependencies.module'
@@ -49,6 +51,7 @@ import { User } from './modules/user/entities/user.entity'
         ChatHistory,
         ChatSession,
         Dependencies,
+        DocsSegment,
       ],
       synchronize: false,
     }),
@@ -58,6 +61,7 @@ import { User } from './modules/user/entities/user.entity'
     RepoModule,
     AuthModule,
     DependenciesModule,
+    DocsModule,
   ],
 })
 export class AppModule {}
