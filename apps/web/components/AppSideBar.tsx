@@ -16,7 +16,9 @@ import {
 import { Spinner } from '@workspace/ui/components/spinnder'
 import {
   FolderGit2,
+  LayoutDashboard,
 } from 'lucide-react'
+import Link from 'next/link'
 import React, { useEffect } from 'react'
 
 
@@ -54,16 +56,20 @@ export default function AppSidebar({ me }: AppSideBarProps) {
           </div>
         </div> : <>
           <SidebarGroup>
-            <CreateRepoDialog>
-              <SidebarMenuButton>
-                <span>Add repo</span>
-                <FolderGit2 className="ml-auto h-4 w-4" />
-              </SidebarMenuButton>
-            </CreateRepoDialog>
+            <SidebarMenuButton>
+              <Link href='/'>Dashboard</Link>
+              <LayoutDashboard className='ml-auto h-4 w-4 text-white' />
+            </SidebarMenuButton>
           </SidebarGroup>
           <SidebarGroup>
             <SidebarGroupLabel>Repositories</SidebarGroupLabel>
             <SidebarMenu>
+              <CreateRepoDialog>
+                <SidebarMenuButton>
+                  <span>Add repo</span>
+                  <FolderGit2 className="ml-auto h-4 w-4" />
+                </SidebarMenuButton>
+              </CreateRepoDialog>
               {repos.map((item) => <RepoItem key={item.id} item={item} />)}
             </SidebarMenu>
           </SidebarGroup>
