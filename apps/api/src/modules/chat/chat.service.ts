@@ -1,49 +1,44 @@
 import { HttpService } from '@nestjs/axios'
 import { Injectable, Logger } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
+import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { map } from 'lodash'
 import pgvector from 'pgvector'
 import { firstValueFrom } from 'rxjs'
-import { Repository } from 'typeorm'
 import { v4 as uuidv4 } from 'uuid'
 
 import { cutContext } from '../../utils/helpers'
+import { DbService } from '../db/db.service'
+import { chatHistory, chatSessions, embeddings, files } from '../db/schema'
 import { EmbeddingService } from '../embedding/embedding.service'
-import { Embedding } from '../embedding/entities/embedding.entity'
 
 import { AskDto } from './dto/ask.dto'
-import { ChatHistory } from './entities/chat-history.entity'
-import { ChatSession } from './entities/chat-session.entity'
 
 @Injectable()
 export class ChatService {
   constructor(
-    @InjectRepository(Embedding) private embeddingRepo: Repository<Embedding>,
-    @InjectRepository(ChatSession) private sessionRepo: Repository<ChatSession>,
-    @InjectRepository(ChatHistory) private historyRepo: Repository<ChatHistory>,
     private readonly embeddingService: EmbeddingService,
-    private readonly httpService: HttpService
-  ) {}
+    private readonly httpService: HttpService,
+    private readonly dbService: DbService
+  ) { }
 
   private logger: Logger = new Logger(ChatService.name)
 
   async createSession(userId: number, repoId: number) {
-    await this.sessionRepo.save({
+    await this.dbService.dbClient.insert(chatSessions).values({
       id: uuidv4(),
       name: `Session for repo ${repoId}`,
-      user_id: userId,
-      repo_id: repoId,
+      userId,
+      repoId,
     })
   }
 
   async askAboutRepo(userId: number, repoId: number, body: AskDto) {
-    const sessionId = body.sessionId
-    const question = body.question
+    const { question, sessionId } = body
     this.logger.log(`Repo: ${repoId}, Q: ${question}`)
 
-    await this.historyRepo.save({
-      user_id: userId,
-      session_id: sessionId,
+    await this.dbService.dbClient.insert(chatHistory).values({
+      userId,
+      sessionId,
       role: 'user',
       content: question,
     })
@@ -52,19 +47,16 @@ export class ChatService {
 
     const LIMIT = 20
 
-    const matches = await this.embeddingRepo
-      .createQueryBuilder('e')
-      .innerJoin('e.file', 'file')
-      .where('file.repo_id = :repoId', { repoId })
-      .andWhere('e.symbolKind IN (:...kinds)', {
-        kinds: ['function', 'class', 'file'],
-      })
-      .orderBy('e.embedding <-> :embedding', 'ASC')
-      .setParameters({ embedding: pgvector.toSql(questionVec) })
-      .limit(LIMIT)
-      .getMany()
+    const kinds = ['function', 'class', 'file']
 
-    const context = map(matches, match => match.content)
+    const matches = await this.dbService.dbClient.select()
+      .from(embeddings)
+      .innerJoin(files, eq(embeddings.fileId, files.id))
+      .where(inArray(embeddings.symbolKind, kinds))
+      .orderBy(sql`embedding <=> ${pgvector.toSql(questionVec)}`)
+      .limit(LIMIT)
+
+    const context = map(matches, match => match.embeddings.content)
 
     const safeContext = cutContext(context)
 
@@ -77,9 +69,9 @@ export class ChatService {
 
     const answer = response.data
 
-    await this.historyRepo.save({
-      user_id: userId,
-      session_id: sessionId,
+    await this.dbService.dbClient.insert(chatHistory).values({
+      userId,
+      sessionId,
       role: 'assistant',
       content: answer,
     })
@@ -88,23 +80,31 @@ export class ChatService {
   }
 
   async getRepoChats(userId: number, repoId: number) {
-    const sessions = await this.sessionRepo.find({
-      where: { user_id: userId, repo_id: repoId },
-      order: { created_at: 'DESC' },
-    })
+    const sessions = await this.dbService.dbClient.select()
+      .from(chatSessions)
+      .where(
+        and(
+          eq(chatSessions.userId, userId),
+          eq(chatSessions.repoId, repoId)
+        )
+      ).orderBy(desc(chatSessions.createdAt))
 
     return map(sessions, session => ({
       sessionId: session.id,
       sessionName: session.name,
-      createdAt: session.created_at,
+      createdAt: session.createdAt,
     }))
   }
 
   async getChatSessionDetails(userId: number, sessionId: string) {
-    const sessionDetails = await this.historyRepo.find({
-      where: { user_id: userId, session_id: sessionId },
-      order: { created_at: 'ASC' },
-    })
+    const sessionDetails = await this.dbService.dbClient.select()
+      .from(chatHistory)
+      .where(
+        and(
+          eq(chatHistory.userId, userId),
+          eq(chatHistory.sessionId, sessionId)
+        )
+      ).orderBy(desc(chatHistory.createdAt))
 
     return map(sessionDetails, detail => ({
       id: detail.id,
