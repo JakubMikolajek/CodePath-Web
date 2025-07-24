@@ -5,17 +5,15 @@ import path from 'path'
 
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
-import { InjectRepository } from '@nestjs/typeorm'
 import { GenericNullable } from '@workspace/codepath-common/globals'
+import { eq } from 'drizzle-orm'
 import { has, map, replace } from 'lodash'
 import NodeRSA from 'node-rsa'
 import simpleGit from 'simple-git'
-import { Repository } from 'typeorm'
 
 import { IGNORED_DIRS, IGNORED_EXTENSIONS, IGNORED_FILES } from '../../utils/ignores'
-
-import { File } from './entities/file.entity'
-import { Repo } from './entities/repo.entity'
+import { DbService } from '../db/db.service'
+import { files, InsertFile, repos, SelectRepo } from '../db/schema'
 
 const projectRoot = path.resolve(__dirname, '../../../../../')
 const defaultReposPath = path.join(projectRoot, 'storage', 'repos')
@@ -23,27 +21,27 @@ const defaultReposPath = path.join(projectRoot, 'storage', 'repos')
 @Injectable()
 export class RepoFetcherService {
   constructor(
-    @InjectRepository(Repo)
-    private readonly repoRepo: Repository<Repo>,
-    @InjectRepository(File)
-    private readonly fileRepo: Repository<File>,
-  ) {}
+    private readonly dbService: DbService,
+  ) { }
 
   private logger: Logger = new Logger(RepoFetcherService.name)
   private readonly REPOS_PATH = defaultReposPath
 
   @Cron(CronExpression.EVERY_10_SECONDS)
   async pollForPending() {
-    const repo = await this.repoRepo.findOne({
-      where: { cloneStatus: 'pending' },
-    })
+    const [repoToClone] = await this.dbService.dbClient.select()
+      .from(repos)
+      .where(eq(repos.cloneStatus, 'pending'))
+      .limit(1)
 
-    if (!repo) return
+    if (!repoToClone) {
+      return
+    }
 
-    await this.cloneRepo(repo)
+    await this.cloneRepo(repoToClone)
   }
 
-  private async cloneRepo(repo: Repo) {
+  private async cloneRepo(repo: SelectRepo) {
     const git = simpleGit()
     const sanitizedName = replace(repo.name, /[^a-zA-Z0-9_-]/g, '_')
     const targetPath = path.join(this.REPOS_PATH, sanitizedName)
@@ -51,8 +49,9 @@ export class RepoFetcherService {
     this.logger.log(`Cloning: ${repo.gitUrl} -> ${targetPath}`)
 
     try {
-      repo.cloneStatus = 'cloning'
-      await this.repoRepo.save(repo)
+      await this.dbService.dbClient.update(repos)
+        .set({ cloneStatus: 'cloning' })
+        .where(eq(repos.id, repo.id))
 
       if (existsSync(targetPath)) {
         rmSync(targetPath, { recursive: true })
@@ -79,33 +78,36 @@ export class RepoFetcherService {
       // await git.clone(repo.gitUrl, targetPath, ['--branch', 'develop', '--single-branch'])
       await git.clone(repo.gitUrl, targetPath)
 
-      repo.cloneStatus = 'cloned'
-      repo.path = targetPath
-
-      await this.repoRepo.save(repo)
+      await this.dbService.dbClient.update(repos)
+        .set({
+          cloneStatus: 'cloned',
+          path: targetPath,
+        })
+        .where(eq(repos.id, repo.id))
 
       const filePaths = await this.getAllFiles(targetPath)
       const filesData = await Promise.all(
-        map(filePaths, async (filePath) => {
+        map(filePaths, async (filePath): Promise<InsertFile> => {
           const relPath = path.relative(targetPath, filePath)
           const stats = await stat(filePath)
           const hash = await this.hashFile(filePath)
 
-          return this.fileRepo.create({
-            repo,
+          return {
+            repoId: repo.id,
             path: relPath,
             hash,
-            lastModified: stats.mtime,
-          })
+            lastModified: stats.mtime.toISOString(),
+          }
         }),
+
       )
 
-      await this.fileRepo.save(filesData)
+      await this.dbService.dbClient.insert(files).values(filesData)
 
       this.logger.log(`✓ Cloned and indexed ${repo.name}`)
 
       if (tmpKeyPath) {
-        await unlink(tmpKeyPath).catch(() => {})
+        await unlink(tmpKeyPath).catch(() => { })
         process.env.GIT_SSH_COMMAND = gitEnvBackup
       }
     }
@@ -113,7 +115,10 @@ export class RepoFetcherService {
       this.logger.error(`✗ Error cloning ${repo.name}: ${error.message}`)
 
       repo.cloneStatus = 'failed'
-      await this.repoRepo.save(repo)
+
+      await this.dbService.dbClient.update(repos)
+        .set({ cloneStatus: 'failed' })
+        .where(eq(repos.id, repo.id))
       throw error
     }
   }
