@@ -1,4 +1,4 @@
-import { relations } from 'drizzle-orm'
+import { InferInsertModel, InferSelectModel, relations } from 'drizzle-orm'
 import { foreignKey, integer, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core'
 
 import { files } from './index'
@@ -31,3 +31,6 @@ export const docsSegmentsRelations = relations(docsSegments, ({ one }) => ({
     references: [files.id],
   }),
 }))
+
+export type SelectDocsSegment = InferSelectModel<typeof docsSegments>
+export type InsertDocsSegment = InferInsertModel<typeof docsSegments>

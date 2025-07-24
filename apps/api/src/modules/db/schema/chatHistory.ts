@@ -1,4 +1,4 @@
-import { relations, sql } from 'drizzle-orm'
+import { InferInsertModel, InferSelectModel, relations, sql } from 'drizzle-orm'
 import { check, foreignKey, index, integer, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core'
 
 import { chatSessions, users } from './index'
@@ -36,3 +36,6 @@ export const chatHistoryRelations = relations(chatHistory, ({ one }) => ({
     references: [chatSessions.id],
   }),
 }))
+
+export type SelectChatHistory = InferSelectModel<typeof chatHistory>
+export type InsertChatHistory = InferInsertModel<typeof chatHistory>

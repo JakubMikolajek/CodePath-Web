@@ -1,4 +1,4 @@
-import { relations } from 'drizzle-orm'
+import { InferInsertModel, InferSelectModel, relations } from 'drizzle-orm'
 import { foreignKey, index, integer, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core'
 
 import { files, repos } from './index'
@@ -35,3 +35,6 @@ export const dependenciesRelations = relations(dependencies, ({ one }) => ({
     references: [files.id],
   }),
 }))
+
+export type SelectDependencies = InferSelectModel<typeof dependencies>
+export type InsertDependencies = InferInsertModel<typeof dependencies>
