@@ -8,7 +8,7 @@ import { RepoService } from './repo.service'
 
 @Controller('repo')
 export class RepoController {
-  constructor(private readonly repoService: RepoService) {}
+  constructor(private readonly repoService: RepoService) { }
 
   @UseGuards(AuthGuard('jwt'))
   @Get()
@@ -22,6 +22,9 @@ export class RepoController {
     @Req() req: { user: User },
     @Body() body: CreateRepoDto
   ) {
-    return this.repoService.createRepo(req.user.id, body)
+    return this.repoService.createRepo({
+      ...body,
+      userId: req.user.id,
+    })
   }
 }

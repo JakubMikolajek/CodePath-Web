@@ -6,7 +6,6 @@ import { eq, or } from 'drizzle-orm'
 
 import { DbService } from '../db/db.service'
 import { InserUser, SelectUser, users } from '../db/schema'
-import { User } from '../user/entities/user.entity'
 
 import { RegisterDto } from './dto/register.dto'
 

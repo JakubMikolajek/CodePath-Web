@@ -1,35 +1,38 @@
 import { Injectable } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
+import { eq } from 'drizzle-orm'
 import { pick } from 'lodash'
-import { Repository } from 'typeorm'
 
-import { CreateRepoDto } from './dto/create-repo.dto'
-import { Repo } from './entities/repo.entity'
+import { DbService } from '../db/db.service'
+import { InsertRepo, repos } from '../db/schema'
 
 @Injectable()
 export class RepoService {
   constructor(
-    @InjectRepository(Repo) private repoRepo: Repository<Repo>,
-  ) {}
+    private readonly dbService: DbService
+  ) { }
 
-  async createRepo(userId: number, createRepoDto: CreateRepoDto) {
-    const { name, gitUrl, accessKey } = createRepoDto
+  async createRepo(payload: InsertRepo) {
+    const { name, gitUrl, accessKey, userId } = payload
 
-    const repo = this.repoRepo.create({
+    const createdRepo = await this.dbService.dbClient.insert(repos).values({
       name,
       gitUrl,
       accessKey,
-      user: { id: userId },
-    })
-    const savedRepo = await this.repoRepo.save(repo)
+      userId,
+    }).returning()
 
-    return { newRepo: pick(savedRepo, ['id', 'name', 'cloneStatus']) }
+    return { newRepo: pick(createdRepo, ['id', 'name', 'cloneStatus']) }
   }
 
   async getUserRepos(userId: number) {
-    return await this.repoRepo.find({
-      where: { user: { id: userId } },
-      select: ['name', 'cloneStatus', 'id'],
+    const userRepos = await this.dbService.dbClient.select({
+      name: repos.name,
+      cloneStatus: repos.cloneStatus,
+      id: repos.id,
     })
+      .from(repos)
+      .where(eq(repos.userId, userId))
+
+    return userRepos
   }
 }

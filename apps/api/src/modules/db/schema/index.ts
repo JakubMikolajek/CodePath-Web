@@ -1,6 +1,6 @@
 export { chatHistory, chatHistoryRelations } from './chatHistory'
 export { users, usersRelations, type SelectUser, type InserUser } from './users'
-export { repos, reposRelations } from './repos'
+export { repos, reposRelations, type SelectRepo, type InsertRepo } from './repos'
 export { docsSegments, docsSegmentsRelations } from './docsSegments'
 export { files, filesRelations } from './files'
 export { chatSessions, chatSessionsRelations } from './chatSessions'
