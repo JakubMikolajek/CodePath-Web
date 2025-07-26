@@ -10,6 +10,13 @@ export const embeddings = pgTable('embeddings', {
   embedding: vector({ dimensions: 384 }),
   symbolKind: text('symbol_kind').default('fragment').notNull(),
   symbolName: text('symbol_name'),
+  comment: text('comment'),
+  jsDoc: text('js_doc'),
+  decorators: text('decorators').array(),
+  params: text('params').array(),
+  returnType: text('return_type'),
+  startLine: integer('start_line'),
+  endLine: integer('end_line'),
 }, table => [
   index('idx_embeddings_vector').using('ivfflat', table.embedding.asc().nullsLast().op('vector_cosine_ops')).with({ lists: '100' }),
   foreignKey({

@@ -1,31 +1,36 @@
 import { HttpService } from '@nestjs/axios'
 import { Injectable, Logger } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
+import { eq, inArray, and } from 'drizzle-orm'
 import { firstValueFrom } from 'rxjs'
-import { Repository } from 'typeorm'
 
 import { summarizeSegments } from '../../utils/helpers'
-import { Embedding } from '../embedding/entities/embedding.entity'
+import { DbService } from '../db/db.service'
+import { embeddings, files } from '../db/schema'
 
 @Injectable()
 export class DocsService {
   constructor(
-    @InjectRepository(Embedding) private embeddingRepo: Repository<Embedding>,
-    private readonly httpService: HttpService
+    private readonly httpService: HttpService,
+    private readonly dbService: DbService
   ) { }
 
   private logger: Logger = new Logger(DocsService.name)
 
   async generateDocumentation(repoId: number): Promise<string> {
-    const matches = await this.embeddingRepo
-      .createQueryBuilder('e')
-      .innerJoin('e.file', 'file')
-      .where('file.repo_id = :repoId', { repoId })
-      .andWhere('e.symbolKind IN (:...kinds)', {
-        kinds: ['function', 'class', 'file'],
-      })
-      .limit(2000)
-      .getMany()
+    const LIMIT = 2000
+
+    const kinds = ['function', 'class', 'file']
+
+    const matches = await this.dbService.dbClient.select()
+      .from(embeddings)
+      .innerJoin(files, eq(embeddings.fileId, files.id))
+      .where(
+        and(
+          eq(files.repoId, repoId),
+          inArray(embeddings.symbolKind, kinds)
+        )
+      )
+      .limit(LIMIT)
 
     const safeContext = summarizeSegments(matches, 200000)
 

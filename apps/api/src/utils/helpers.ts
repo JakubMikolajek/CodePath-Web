@@ -1,5 +1,7 @@
 import { toLower, replace } from 'lodash'
 
+import { SelectEmbedding, SelectFile } from '../modules/db/schema'
+
 import { Segment } from './parser'
 
 export function sanitizeString(value: string): string {
@@ -21,8 +23,13 @@ export function cutContext(chunks: string[], maxChars = 64000) {
   return out
 }
 
+interface SegmentItem {
+  embeddings: SelectEmbedding
+  files: SelectFile
+}
+
 export function summarizeSegments(
-  segments: any[],
+  segments: SegmentItem[],
   maxLength = 100000
 ): string[] {
   const summaries: string[] = []
@@ -31,17 +38,17 @@ export function summarizeSegments(
   for (const seg of segments) {
     const lines: string[] = []
 
-    if (seg.symbolKind) lines.push(`Kind: ${seg.symbolKind}`)
-    if (seg.symbolName) lines.push(`Name: ${seg.symbolName}`)
-    if (seg.comment) lines.push(`Comment: ${seg.comment}`)
-    if (seg.jsDoc) lines.push(`JSDoc: ${seg.jsDoc}`)
-    if (Array.isArray(seg.params) && seg.params.length)
-      lines.push(`Params: ${seg.params.join(', ')}`)
-    if (seg.returnType) lines.push(`Returns: ${seg.returnType}`)
-    if (Array.isArray(seg.decorators) && seg.decorators.length)
-      lines.push(`Decorators: ${seg.decorators.join(', ')}`)
-    if (seg.startLine != null && seg.endLine != null)
-      lines.push(`Lines: ${seg.startLine}-${seg.endLine}`)
+    if (seg.embeddings.symbolKind) lines.push(`Kind: ${seg.embeddings.symbolKind}`)
+    if (seg.embeddings.symbolName) lines.push(`Name: ${seg.embeddings.symbolName}`)
+    if (seg.embeddings.comment) lines.push(`Comment: ${seg.embeddings.comment}`)
+    if (seg.embeddings.jsDoc) lines.push(`JSDoc: ${seg.embeddings.jsDoc}`)
+    if (Array.isArray(seg.embeddings.params) && seg.embeddings.params.length)
+      lines.push(`Params: ${seg.embeddings.params.join(', ')}`)
+    if (seg.embeddings.returnType) lines.push(`Returns: ${seg.embeddings.returnType}`)
+    if (Array.isArray(seg.embeddings.decorators) && seg.embeddings.decorators.length)
+      lines.push(`Decorators: ${seg.embeddings.decorators.join(', ')}`)
+    if (seg.embeddings.startLine != null && seg.embeddings.endLine != null)
+      lines.push(`Lines: ${seg.embeddings.startLine}-${seg.embeddings.endLine}`)
 
     if (lines.length === 0) continue
 

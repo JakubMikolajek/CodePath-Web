@@ -1,25 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
+import { desc, eq } from 'drizzle-orm'
 import { map } from 'lodash'
-import { Repository } from 'typeorm'
 
-import { Dependencies } from './entity/dependencies.entity'
+import { DbService } from '../db/db.service'
+import { dependencies } from '../db/schema'
 
 @Injectable()
 export class DependenciesService {
   constructor(
-    @InjectRepository(Dependencies) private dependenciesRepo: Repository<Dependencies>
-  ) {}
+    private readonly dbService: DbService
+  ) { }
 
   private logger: Logger = new Logger(DependenciesService.name)
 
   async getRepoDependencies(repoId: number) {
-    const dependencies = await this.dependenciesRepo.find({
-      where: { repoId: repoId },
-      order: { created_at: 'DESC' },
-    })
+    const allDependencies = await this.dbService.dbClient.select()
+      .from(dependencies)
+      .where(eq(dependencies.repoId, repoId))
+      .orderBy(desc(dependencies.createdAt))
 
-    return map(dependencies, dependency => ({
+    return map(allDependencies, dependency => ({
       id: dependency.id,
       fileId: dependency.fileId,
       fileName: dependency.fileName,
