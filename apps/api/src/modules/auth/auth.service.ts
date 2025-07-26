@@ -1,31 +1,33 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
-import { InjectRepository } from '@nestjs/typeorm'
+import { GenericNullable } from '@workspace/codepath-common/globals'
 import * as bcrypt from 'bcrypt'
-import { Repository } from 'typeorm'
+import { eq, or } from 'drizzle-orm'
 
-import { User } from '../user/entities/user.entity'
+import { DbService } from '../db/db.service'
+import { InserUser, SelectUser, users } from '../db/schema'
 
 import { RegisterDto } from './dto/register.dto'
 
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectRepository(User)
-    private readonly userRepo: Repository<User>,
     private readonly jwtService: JwtService,
-  ) {}
+    private readonly dbService: DbService,
+  ) { }
 
-  async validateUser(identifier: string, password: string): Promise<User | null> {
-    const user = await this.userRepo.findOne({
-      where: [{ email: identifier }, { login: identifier }],
-    })
-    if (!user) return null
+  async validateUser(identifier: string, password: string): Promise<GenericNullable<SelectUser>> {
+    const user = await this.getUserByIdentifier(identifier, identifier)
+
+    if (!user) {
+      return null
+    }
+
     const match = await bcrypt.compare(password, user.passwordHash)
     return match ? user : null
   }
 
-  login(user: User) {
+  login(user: SelectUser) {
     const payload = { sub: user.id, email: user.email }
     return {
       access_token: this.jwtService.sign(payload),
@@ -35,19 +37,36 @@ export class AuthService {
   async register(body: RegisterDto) {
     const { email, login, password } = body
 
-    const existing = await this.userRepo.findOne({
-      where: [{ email }, { login }],
-    })
+    const existing = await this.getUserByIdentifier(email, login)
 
     if (existing) {
       throw new UnauthorizedException('Email or login already in use')
     }
 
     const passwordHash = await bcrypt.hash(password, 10)
-    const user = this.userRepo.create({ email, login, passwordHash })
+    const user = await this.createUser({ email, login, passwordHash })
 
-    await this.userRepo.save(user)
+    return { message: 'User registered', login: user.login, id: user.id }
+  }
 
-    return { message: 'User registered' }
+  private async getUserByIdentifier(email: string, login: string): Promise<SelectUser> {
+    const [user] = await this.dbService.dbClient.select()
+      .from(users)
+      .where(
+        or(
+          eq(users.email, email),
+          eq(users.login, login)
+        )
+      ).limit(1)
+
+    return user
+  }
+
+  private async createUser(payload: InserUser): Promise<SelectUser> {
+    const [createdUser] = await this.dbService.dbClient.insert(users)
+      .values(payload)
+      .returning()
+
+    return createdUser
   }
 }

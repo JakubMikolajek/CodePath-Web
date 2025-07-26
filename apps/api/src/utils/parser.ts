@@ -24,8 +24,8 @@ export interface DepEdge {
 }
 
 interface ParsedFile {
-  segments: Segment[]
-  dependencies: DepEdge[]
+  parsedSegments: Segment[]
+  parsedDependencies: DepEdge[]
 }
 
 const logger = new Logger('Parser')
@@ -46,7 +46,7 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
 
   if (has(unsupportedExts, ext)) {
     logger.log(`[parser] unsupported extension "${ext}", returning full file as-is`)
-    return { segments: [{ kind: 'file', code: src }], dependencies: [] }
+    return { parsedSegments: [{ kind: 'file', code: src }], parsedDependencies: [] }
   }
 
   if (ext === '.ts' || ext === '.tsx') {
@@ -69,7 +69,7 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
   if (!lang) {
     logger.log(`[parser] no mapping found for extension "${ext}", returning full file as-is`)
 
-    return { segments: [{ kind: 'file', code: src }], dependencies: [] }
+    return { parsedSegments: [{ kind: 'file', code: src }], parsedDependencies: [] }
   }
 
   let Lang
@@ -80,7 +80,7 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
   catch (err) {
     logger.error(`[parser] failed to load tree-sitter-${lang}:`, err)
 
-    return { segments: [{ kind: 'file', code: src }], dependencies: [] }
+    return { parsedSegments: [{ kind: 'file', code: src }], parsedDependencies: [] }
   }
 
   const parser = new Parser()
@@ -138,12 +138,12 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
   if (!segments.length) {
     logger.log(`[parser] no segments detected, returning full file`)
 
-    return { segments: [{ kind: 'file', code: src }], dependencies }
+    return { parsedSegments: [{ kind: 'file', code: src }], parsedDependencies: dependencies }
   }
 
   logger.log(`[parser] extracted ${segments.length} segments`)
 
-  return { segments, dependencies }
+  return { parsedSegments: segments, parsedDependencies: dependencies }
 }
 
 function parseWithTsMorph(src: string, filePath: string): ParsedFile {
@@ -256,5 +256,5 @@ function parseWithTsMorph(src: string, filePath: string): ParsedFile {
     }
   })
 
-  return { segments, dependencies }
+  return { parsedSegments: segments, parsedDependencies: dependencies }
 }

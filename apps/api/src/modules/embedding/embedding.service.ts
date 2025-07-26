@@ -4,19 +4,15 @@ import * as path from 'node:path'
 
 import { HttpService } from '@nestjs/axios'
 import { Injectable } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
 import * as amqp from 'amqplib'
+import { eq, sql } from 'drizzle-orm'
 import { slice } from 'lodash'
 import { firstValueFrom } from 'rxjs'
-import { Repository } from 'typeorm'
 
 import { buildMermaidGraph } from '../../utils/mermaidBuilder'
 import { parseSegments } from '../../utils/parser'
-import { DocsSegment } from '../docs/entity/docs-segments.entity'
-import { Dependencies } from '../graphs/entity/dependencies.entity'
-import { File } from '../repos/entities/file.entity'
-
-import { Embedding } from './entities/embedding.entity'
+import { DbService } from '../db/db.service'
+import { dependencies, embeddings, files, repos } from '../db/schema'
 
 @Injectable()
 export class EmbeddingService {
@@ -25,12 +21,9 @@ export class EmbeddingService {
   private readonly queue = 'embedding'
 
   constructor(
-    @InjectRepository(File) private fileRepo: Repository<File>,
-    @InjectRepository(Embedding) private embeddingRepo: Repository<Embedding>,
-    @InjectRepository(Dependencies) private dependenciesRepo: Repository<Dependencies>,
-    @InjectRepository(DocsSegment) private docsSegmentRepo: Repository<DocsSegment>,
-    private readonly httpService: HttpService
-  ) {}
+    private readonly httpService: HttpService,
+    private readonly dbService: DbService
+  ) { }
 
   async onModuleInit() {
     this.conn = await amqp.connect('amqp://admin:admin@192.168.1.245')
@@ -60,37 +53,37 @@ export class EmbeddingService {
   async embedRepo(repoId: number) {
     const BATCH = 64
 
-    const files = await this.fileRepo.find({
-      where: { repoId },
-      relations: ['repo'],
-    })
+    const allFiles = await this.dbService.dbClient.select()
+      .from(files)
+      .innerJoin(repos, eq(files.repoId, repos.id))
+      .where(eq(files.repoId, repoId))
 
-    for (const file of files) {
-      const abs = path.join(file.repo.path, file.path)
+    for (const file of allFiles) {
+      const abs = path.join(file.repos.path ?? '', file.files.path ?? '')
 
       if (!fs.existsSync(abs)) {
         continue
       }
 
       const src = await fsp.readFile(abs, 'utf8')
-      const { segments, dependencies } = parseSegments(src, path.extname(file.path), file.path)
+      const { parsedSegments, parsedDependencies } = parseSegments(src, path.extname(file.files.path), file.files.path)
 
-      const graph = buildMermaidGraph(dependencies)
+      const graph = buildMermaidGraph(parsedDependencies)
 
       if (graph) {
-        await this.dependenciesRepo.save({
-          repoId: repoId,
-          fileId: file.id,
-          fileName: path.basename(file.path),
+        await this.dbService.dbClient.insert(dependencies).values({
+          repoId,
+          fileId: file.files.id,
+          fileName: path.basename(file.files.path),
           graph,
         })
       }
 
-      for (let i = 0; i < segments.length; i += BATCH) {
-        const batch = slice(segments, i, i + BATCH)
+      for (let i = 0; i < parsedSegments.length; i += BATCH) {
+        const batch = slice(parsedSegments, i, i + BATCH)
 
         const batchPayload = batch.map(s => ({
-          fileId: file.id,
+          fileId: file.files.id,
           symbolKind: s.kind,
           symbolName: s.name,
           content: s.code,
@@ -119,13 +112,17 @@ export class EmbeddingService {
   }
 
   async shouldBeEmbedded(repoId: number) {
-    const files = await this.fileRepo.find({
-      where: { repoId },
-      relations: ['repo'],
-    })
+    const allFiles = await this.dbService.dbClient.select()
+      .from(files)
+      .innerJoin(repos, eq(repos.id, repoId))
+      .where(eq(files.repoId, repoId))
 
-    for (const file of files) {
-      const count = await this.embeddingRepo.count({ where: { fileId: file.id } })
+    for (const file of allFiles) {
+      const count = await this.dbService.dbClient
+        .select({ count: sql<number>`count(*)` })
+        .from(embeddings)
+        .where(eq(embeddings.fileId, file.files.id))
+        .then(rows => rows[0]?.count ?? 0)
 
       if (count > 0) {
         return false

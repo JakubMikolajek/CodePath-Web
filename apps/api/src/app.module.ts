@@ -8,6 +8,7 @@ import { ChatModule } from './modules/chat/chat.module'
 import { ChatHistory } from './modules/chat/entities/chat-history.entity'
 import { ChatSession } from './modules/chat/entities/chat-session.entity'
 import { Chat } from './modules/chat/entities/chat.entity'
+import { DbModule } from './modules/db/db.module'
 import { DocsModule } from './modules/docs/docs.module'
 import { DocsSegment } from './modules/docs/entity/docs-segments.entity'
 import { EmbeddingModule } from './modules/embedding/embedding.module'
@@ -56,6 +57,7 @@ import { User } from './modules/user/entities/user.entity'
       synchronize: false,
     }),
     ScheduleModule.forRoot(),
+    DbModule,
     ChatModule,
     EmbeddingModule,
     RepoModule,
@@ -64,4 +66,4 @@ import { User } from './modules/user/entities/user.entity'
     DocsModule,
   ],
 })
-export class AppModule {}
+export class AppModule { }

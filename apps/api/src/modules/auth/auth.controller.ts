@@ -9,7 +9,7 @@ import {
 import { AuthGuard } from '@nestjs/passport'
 import { Response } from 'express'
 
-import { User } from '../user/entities/user.entity'
+import { SelectUser } from '../db/schema'
 
 import { AuthService } from './auth.service'
 import { RegisterDto } from './dto/register.dto'
@@ -17,7 +17,7 @@ import { LocalAuthGuard } from './local-auth.guard'
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Post('register')
   register(@Body() body: RegisterDto) {
@@ -27,7 +27,7 @@ export class AuthController {
   @UseGuards(LocalAuthGuard)
   @Post('login')
   login(
-    @Req() req: { user: User },
+    @Req() req: { user: SelectUser },
     @Res({ passthrough: true }) res: Response
   ) {
     const { access_token } = this.authService.login(req.user)
@@ -59,7 +59,7 @@ export class AuthController {
 
   @UseGuards(AuthGuard('jwt'))
   @Get('me')
-  getMe(@Req() req: { user: User }) {
+  getMe(@Req() req: { user: SelectUser }) {
     const { id, email, login } = req.user
 
     return { id, email, login }
