@@ -38,7 +38,7 @@ export class EmbeddingService {
     await this.conn?.close()
   }
 
-  @Cron(CronExpression.EVERY_MINUTE)
+  @Cron(CronExpression.EVERY_30_SECONDS)
   async poolFromPending() {
     const [repoToEmbedding] = await this.dbService.dbClient.select()
       .from(repos)
@@ -118,7 +118,6 @@ export class EmbeddingService {
         //   endLine: s.endLine,
         // }))
 
-        this.logger.log(batchPayload)
         this.publishEmbeddingsJob(batchPayload)
         // await this.docsSegmentRepo.save(docsSegmentsPayload)
       }

@@ -14,14 +14,14 @@ export class RepoService {
   async createRepo(payload: InsertRepo) {
     const { name, gitUrl, accessKey, userId } = payload
 
-    const createdRepo = await this.dbService.dbClient.insert(repos).values({
+    const [createdRepo] = await this.dbService.dbClient.insert(repos).values({
       name,
       gitUrl,
       accessKey,
       userId,
     }).returning()
 
-    return { newRepo: pick(createdRepo, ['id', 'name', 'cloneStatus', 'embeddingStatus']) }
+    return pick(createdRepo, ['id', 'name', 'cloneStatus', 'embeddingStatus'])
   }
 
   async getUserRepos(userId: number) {
