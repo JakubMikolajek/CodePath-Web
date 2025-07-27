@@ -1,7 +1,6 @@
 'use client'
 
 import { Repository } from '@workspace/codepath-common/repository'
-import { Button } from '@workspace/ui/components/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@workspace/ui/components/collapsible'
 import {
   SidebarMenuButton,
@@ -12,33 +11,24 @@ import {
 } from '@workspace/ui/components/sidebar'
 import { ChevronRight, TriangleAlert } from 'lucide-react'
 import Link from 'next/link'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect } from 'react'
 
-import PopoverWrapper from '@/components/PopoverWrapper'
-import { useChatStore, useEmbeddingStore, useCollapsibleStore, useGraphsStore } from '@/store'
+import { useChatStore, useCollapsibleStore, useGraphsStore } from '@/store'
 
 interface RepoItemProps {
   item: Repository
 }
 
 export default function RepoItem({ item }: RepoItemProps) {
-  const [toEmbedding, setToEmbedding] = useState<boolean>(false)
-  const { shouldBeEmbedded, runEmbedding } = useEmbeddingStore()
   const { getChatSessions, chatSessions, createSession } = useChatStore()
   const { isRepoOpen, setOpenRepoId, openRepoId } = useCollapsibleStore()
   const { graphs, getGraphs } = useGraphsStore()
 
-  const checkEmbedding = async () => setToEmbedding(await shouldBeEmbedded(item.id))
-  const handleEmbedding = async () => await runEmbedding(item.id)
   const handleGetChatSessions = async () => await getChatSessions(item.id)
 
   const handleOpenChange = (open: boolean) => {
     setOpenRepoId(open ? item.id : null)
   }
-
-  useEffect(() => {
-    checkEmbedding()
-  }, [])
 
   useEffect(() => {
     if (isRepoOpen(item.id)) {
@@ -60,15 +50,8 @@ export default function RepoItem({ item }: RepoItemProps) {
           <SidebarMenuButton tooltip={item.name}>
             <div className="flex flex-row gap-1 items-center">
               <span>{item.name}</span>
-              {toEmbedding && (
-                <PopoverWrapper asChild trigger={<TriangleAlert color="orange" />}>
-                  <div className="flex flex-col justify-center items-center gap-2">
-                    <p>Embedding required</p>
-                    <Button onClick={handleEmbedding} variant="outline">
-                      Embed
-                    </Button>
-                  </div>
-                </PopoverWrapper>
+              {item.embeddingStatus === 'pending' && (
+                <TriangleAlert color="orange" />
               )}
             </div>
             <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible-main:rotate-90" />

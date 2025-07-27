@@ -5,9 +5,7 @@ import { EmbeddingController } from './embedding.controller'
 import { EmbeddingService } from './embedding.service'
 
 @Module({
-  imports: [
-    HttpModule,
-  ],
+  imports: [HttpModule],
   controllers: [EmbeddingController],
   providers: [EmbeddingService],
   exports: [EmbeddingService],

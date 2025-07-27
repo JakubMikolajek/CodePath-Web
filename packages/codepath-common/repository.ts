@@ -1,5 +1,6 @@
 export interface Repository {
   id: number
   name: string
-  clone_status: string
+  cloneStatus: string
+  embeddingStatus: string
 }

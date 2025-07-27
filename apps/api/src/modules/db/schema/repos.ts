@@ -11,6 +11,7 @@ export const repos = pgTable('repos', {
   gitUrl: text('git_url').notNull(),
   accessKey: text('access_key'),
   cloneStatus: text('clone_status').default('pending'),
+  embeddingStatus: text('embedding_status').default('pending'),
   indexedAt: timestamp('indexed_at', { mode: 'string' }).defaultNow(),
 }, table => [
   foreignKey({

@@ -3,22 +3,24 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 
 import { HttpService } from '@nestjs/axios'
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
+import { Cron, CronExpression } from '@nestjs/schedule'
 import * as amqp from 'amqplib'
-import { eq, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { slice } from 'lodash'
 import { firstValueFrom } from 'rxjs'
 
 import { buildMermaidGraph } from '../../utils/mermaidBuilder'
 import { parseSegments } from '../../utils/parser'
 import { DbService } from '../db/db.service'
-import { dependencies, embeddings, files, repos } from '../db/schema'
+import { dependencies, files, repos, SelectRepo } from '../db/schema'
 
 @Injectable()
 export class EmbeddingService {
   private conn: amqp.ChannelModel
   private channel: amqp.Channel
   private readonly queue = 'embedding'
+  private readonly logger: Logger = new Logger(EmbeddingService.name)
 
   constructor(
     private readonly httpService: HttpService,
@@ -36,6 +38,20 @@ export class EmbeddingService {
     await this.conn?.close()
   }
 
+  @Cron(CronExpression.EVERY_MINUTE)
+  async poolFromPending() {
+    const [repoToEmbedding] = await this.dbService.dbClient.select()
+      .from(repos)
+      .where(eq(repos.embeddingStatus, 'pending'))
+      .limit(1)
+
+    if (!repoToEmbedding) {
+      return
+    }
+
+    await this.embedRepo(repoToEmbedding)
+  }
+
   publishEmbeddingsJob(segments: {
     fileId: number
     symbolKind: string
@@ -50,31 +66,30 @@ export class EmbeddingService {
     )
   }
 
-  async embedRepo(repoId: number) {
+  async embedRepo(repo: SelectRepo) {
     const BATCH = 64
 
     const allFiles = await this.dbService.dbClient.select()
       .from(files)
-      .innerJoin(repos, eq(files.repoId, repos.id))
-      .where(eq(files.repoId, repoId))
+      .where(eq(files.repoId, repo.id))
 
     for (const file of allFiles) {
-      const abs = path.join(file.repos.path ?? '', file.files.path ?? '')
+      const abs = path.join(repo.path ?? '', file.path ?? '')
 
       if (!fs.existsSync(abs)) {
         continue
       }
 
       const src = await fsp.readFile(abs, 'utf8')
-      const { parsedSegments, parsedDependencies } = parseSegments(src, path.extname(file.files.path), file.files.path)
+      const { parsedSegments, parsedDependencies } = parseSegments(src, path.extname(file.path), file.path)
 
       const graph = buildMermaidGraph(parsedDependencies)
 
       if (graph) {
         await this.dbService.dbClient.insert(dependencies).values({
-          repoId,
-          fileId: file.files.id,
-          fileName: path.basename(file.files.path),
+          repoId: repo.id,
+          fileId: file.id,
+          fileName: path.basename(file.path),
           graph,
         })
       }
@@ -83,7 +98,7 @@ export class EmbeddingService {
         const batch = slice(parsedSegments, i, i + BATCH)
 
         const batchPayload = batch.map(s => ({
-          fileId: file.files.id,
+          fileId: file.id,
           symbolKind: s.kind,
           symbolName: s.name,
           content: s.code,
@@ -103,33 +118,17 @@ export class EmbeddingService {
         //   endLine: s.endLine,
         // }))
 
+        this.logger.log(batchPayload)
         this.publishEmbeddingsJob(batchPayload)
         // await this.docsSegmentRepo.save(docsSegmentsPayload)
       }
     }
 
-    return { message: `Embeddings queued for repo ${repoId}` }
-  }
+    await this.dbService.dbClient.update(repos).set({
+      embeddingStatus: 'embeded',
+    }).where(eq(repos.id, repo.id))
 
-  async shouldBeEmbedded(repoId: number) {
-    const allFiles = await this.dbService.dbClient.select()
-      .from(files)
-      .innerJoin(repos, eq(repos.id, repoId))
-      .where(eq(files.repoId, repoId))
-
-    for (const file of allFiles) {
-      const count = await this.dbService.dbClient
-        .select({ count: sql<number>`count(*)` })
-        .from(embeddings)
-        .where(eq(embeddings.fileId, file.files.id))
-        .then(rows => rows[0]?.count ?? 0)
-
-      if (count > 0) {
-        return false
-      }
-    }
-
-    return true
+    return { message: `Embeddings queued for repo ${repo.id}` }
   }
 
   async getEmbedding(text: string) {
