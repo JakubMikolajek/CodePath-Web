@@ -1,12 +1,10 @@
 import { Repository } from '@workspace/codepath-common/repository'
 
-import { apiClient } from '@/lib/api/api'
-import { CreateRepoFormData } from '@/utils/validators/createRepoForm'
+import { apiClient } from '../api/api'
 
-export async function getRepos() {
-  return await apiClient.get<Repository[]>('/repo')
-}
+import { CreateRepoFormData } from '@/utils/validators/createRepoForm'
 
 export async function createRepo(repo: CreateRepoFormData) {
   return await apiClient.post<Repository, CreateRepoFormData>('/repo', repo)
 }
+

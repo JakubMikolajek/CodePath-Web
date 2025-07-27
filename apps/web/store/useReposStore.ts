@@ -2,7 +2,7 @@ import { GenericNullable } from '@workspace/codepath-common/globals'
 import { Repository } from '@workspace/codepath-common/repository'
 import { create } from 'zustand'
 
-import { createRepo, getRepos } from '@/lib/repos'
+import { createRepo } from '@/lib/repos/client'
 import { CreateRepoFormData } from '@/utils/validators/createRepoForm'
 
 interface Store {
@@ -10,7 +10,7 @@ interface Store {
   loading: boolean
   error: GenericNullable<string>
   clearError: () => void
-  getRepos: () => Promise<void>
+  setRepos: (repos: Repository[]) => void
   createRepo: (repo: CreateRepoFormData) => Promise<void>
 }
 
@@ -21,18 +21,7 @@ export const useReposStore = create<Store>((setState) => ({
 
   clearError: () => setState(() => ({ error: null })),
 
-  getRepos: async () => {
-    setState(() => ({ loading: true, error: null }))
-    try {
-      const repos = await getRepos()
-      setState(() => ({ repos, loading: false }))
-    } catch (error: any) {
-      setState(() => ({
-        loading: false,
-        error: error.response?.data?.message || 'Cannot fetch repos',
-      }))
-    }
-  },
+  setRepos: async (repos) => setState(() => ({ repos })),
 
   createRepo: async (repo) => {
     setState(() => ({ loading: true, error: null }))

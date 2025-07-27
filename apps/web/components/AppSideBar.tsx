@@ -1,5 +1,6 @@
 'use client'
 
+import { Repository } from '@workspace/codepath-common/repository'
 import { IUser } from '@workspace/codepath-common/user'
 import {
   Sidebar,
@@ -13,7 +14,6 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from '@workspace/ui/components/sidebar'
-import { Spinner } from '@workspace/ui/components/spinnder'
 import {
   FolderGit2,
   LayoutDashboard,
@@ -29,15 +29,16 @@ import { useAuthStore, useReposStore } from '@/store'
 
 interface AppSideBarProps {
   me: IUser
+  repos: Repository[]
 }
 
 export default function AppSidebar({ me }: AppSideBarProps) {
   const { setMe } = useAuthStore()
-  const { repos, getRepos, loading } = useReposStore()
+  const { repos, setRepos } = useReposStore()
 
   useEffect(() => {
     setMe(me)
-    getRepos()
+    setRepos(repos)
   }, [])
 
   return (
@@ -50,30 +51,24 @@ export default function AppSidebar({ me }: AppSideBarProps) {
         </div>
       </SidebarHeader>
       <SidebarContent>
-        {loading ? <div className="flex items-center gap-2 px-4 justify-center h-full">
-          <div className="text-left text-sm leading-tight">
-            <Spinner>Loading...</Spinner>
-          </div>
-        </div> : <>
-          <SidebarGroup>
-            <SidebarMenuButton>
-              <Link href='/'>Dashboard</Link>
-              <LayoutDashboard className='ml-auto h-4 w-4 text-white' />
-            </SidebarMenuButton>
-          </SidebarGroup>
-          <SidebarGroup>
-            <SidebarGroupLabel>Repositories</SidebarGroupLabel>
-            <SidebarMenu>
-              <CreateRepoDialog>
-                <SidebarMenuButton>
-                  <span>Add repo</span>
-                  <FolderGit2 className="ml-auto h-4 w-4" />
-                </SidebarMenuButton>
-              </CreateRepoDialog>
-              {repos.map((item) => <RepoItem key={item.id} item={item} />)}
-            </SidebarMenu>
-          </SidebarGroup>
-        </>}
+        <SidebarGroup>
+          <SidebarMenuButton>
+            <Link href='/'>Dashboard</Link>
+            <LayoutDashboard className='ml-auto h-4 w-4 text-white' />
+          </SidebarMenuButton>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Repositories</SidebarGroupLabel>
+          <SidebarMenu>
+            <CreateRepoDialog>
+              <SidebarMenuButton>
+                <span>Add repo</span>
+                <FolderGit2 className="ml-auto h-4 w-4" />
+              </SidebarMenuButton>
+            </CreateRepoDialog>
+            {repos.map((item) => <RepoItem key={item.id} item={item} />)}
+          </SidebarMenu>
+        </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="h-16 border-t border-sidebar-border">
         <SidebarMenu>

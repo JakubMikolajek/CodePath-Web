@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { redirect } from 'next/navigation'
 
 export const axiosClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? '/api',
@@ -12,7 +13,7 @@ axiosClient.interceptors.response.use(
       document.cookie = 'access_token=; Max-Age=0; path=/; SameSite=strict'
 
       if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-        window.location.href = '/'
+        redirect('/')
       }
     }
     return Promise.reject(error)
