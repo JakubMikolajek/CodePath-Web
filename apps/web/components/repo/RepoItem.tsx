@@ -111,7 +111,7 @@ export default function RepoItem({ item }: RepoItemProps) {
                 <CollapsibleContent>
                   <SidebarMenuSub>
                     {graphs.map((graph) => (
-                      <SidebarMenuSubItem key={graph.fileId}>
+                      <SidebarMenuSubItem key={graph.id}>
                         <SidebarMenuSubButton asChild>
                           <Link href={`/${item.id}/graphs/${graph.id}`}>
                             <span>{graph.fileName}</span>
