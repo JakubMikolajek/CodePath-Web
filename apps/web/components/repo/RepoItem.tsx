@@ -11,7 +11,7 @@ import {
 } from '@workspace/ui/components/sidebar'
 import { ChevronRight, TriangleAlert } from 'lucide-react'
 import Link from 'next/link'
-import React, { useEffect } from 'react'
+import React from 'react'
 
 import { useChatStore, useCollapsibleStore, useGraphsStore } from '@/store'
 
@@ -21,21 +21,17 @@ interface RepoItemProps {
 
 export default function RepoItem({ item }: RepoItemProps) {
   const { getChatSessions, chatSessions, createSession } = useChatStore()
-  const { isRepoOpen, setOpenRepoId, openRepoId } = useCollapsibleStore()
+  const { isRepoOpen, setOpenRepoId } = useCollapsibleStore()
   const { graphs, getGraphs } = useGraphsStore()
 
-  const handleGetChatSessions = async () => await getChatSessions(item.id)
-
-  const handleOpenChange = (open: boolean) => {
+  const handleOpenChange = async (open: boolean) => {
     setOpenRepoId(open ? item.id : null)
-  }
 
-  useEffect(() => {
-    if (isRepoOpen(item.id)) {
-      handleGetChatSessions()
-      getGraphs(item.id)
+    if (open) {
+      await getChatSessions(item.id)
+      await getGraphs(item.id)
     }
-  }, [openRepoId])
+  }
 
   return (
     <Collapsible
