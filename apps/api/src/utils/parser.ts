@@ -1,10 +1,11 @@
 import { Logger } from '@nestjs/common'
+import { DependencyType, SegmentKind } from '@workspace/codepath-common/globals'
 import { forEach, has } from 'lodash'
 import Parser, { SyntaxNode } from 'tree-sitter'
 import { Project, SyntaxKind } from 'ts-morph'
 
 export interface Segment {
-  kind: 'import' | 'function' | 'class' | 'file'
+  kind: SegmentKind
   name?: string
   code: string
   comment?: string
@@ -19,7 +20,7 @@ export interface Segment {
 export interface DepEdge {
   from: string
   to: string
-  type: 'import' | 'extends' | 'calls'
+  type: DependencyType
   importedFrom?: string
 }
 
