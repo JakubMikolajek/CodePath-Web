@@ -23,7 +23,7 @@ export default async function DashboardLayout({ children }: Readonly<DashboardLa
 
   return (
     <SidebarProvider defaultOpen>
-      <AppSidebar me={me} repos={repos} />
+      <AppSidebar me={me} fetchedRepos={repos} />
       <SidebarInset>
         <div className="flex flex-1 flex-col gap-4 p-4 bg-background min-h-screen">{children}</div>
       </SidebarInset>

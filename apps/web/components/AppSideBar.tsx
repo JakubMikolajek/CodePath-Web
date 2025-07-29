@@ -29,16 +29,16 @@ import { useAuthStore, useReposStore } from '@/store'
 
 interface AppSideBarProps {
   me: IUser
-  repos: Repository[]
+  fetchedRepos: Repository[]
 }
 
-export default function AppSidebar({ me }: AppSideBarProps) {
+export default function AppSidebar({ fetchedRepos, me }: AppSideBarProps) {
   const { setMe } = useAuthStore()
   const { repos, setRepos } = useReposStore()
 
   useEffect(() => {
     setMe(me)
-    setRepos(repos)
+    setRepos(fetchedRepos)
   }, [])
 
   return (
