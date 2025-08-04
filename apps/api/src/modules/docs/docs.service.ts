@@ -1,46 +1,51 @@
 import { HttpService } from '@nestjs/axios'
 import { Injectable, Logger } from '@nestjs/common'
-import { eq, inArray, and } from 'drizzle-orm'
-import { firstValueFrom } from 'rxjs'
+import * as amqp from 'amqplib'
+import { eq } from 'drizzle-orm'
 
-import { summarizeSegments } from '../../utils/helpers'
 import { DbService } from '../db/db.service'
 import { embeddings, files } from '../db/schema'
 
 @Injectable()
 export class DocsService {
+  private conn: amqp.ChannelModel
+  private channel: amqp.Channel
+  private readonly quque = 'docs'
+  private logger: Logger = new Logger(DocsService.name)
+
   constructor(
     private readonly httpService: HttpService,
     private readonly dbService: DbService
   ) { }
 
-  private logger: Logger = new Logger(DocsService.name)
+  async onModuleInit() {
+    this.conn = await amqp.connect('amqp://admin:admin@192.168.1.245')
+    this.channel = await this.conn.createChannel()
+    await this.channel.assertQueue(this.quque, { durable: true })
+  }
+
+  async onModuleDestroy() {
+    await this.channel?.close()
+    await this.conn?.close()
+  }
 
   async generateDocumentation(repoId: number): Promise<string> {
-    const LIMIT = 2000
+    const repoFiles = await this.dbService.dbClient.select()
+      .from(files)
+      .where(eq(files.repoId, repoId))
 
-    const kinds = ['function', 'class', 'file']
+    for (const file of repoFiles) {
+      const fileEmbeddings = await this.dbService.dbClient.select()
+        .from(embeddings)
+        .where(eq(embeddings.fileId, file.id))
 
-    const matches = await this.dbService.dbClient.select()
-      .from(embeddings)
-      .innerJoin(files, eq(embeddings.fileId, files.id))
-      .where(
-        and(
-          eq(files.repoId, repoId),
-          inArray(embeddings.symbolKind, kinds)
-        )
+      this.channel.sendToQueue(
+        this.quque,
+        Buffer.from(JSON.stringify({ embeddings: fileEmbeddings })),
+        { persistent: true }
       )
-      .limit(LIMIT)
+    }
 
-    const safeContext = summarizeSegments(matches, 200000)
-
-    const response = await firstValueFrom(
-      this.httpService.post<string>('http://localhost:8000/docs', {
-        prompt: 'Wygeneruj dokumentację',
-        context: safeContext,
-      })
-    )
-
-    return response.data
+    return 'TEST'
   }
 }

@@ -37,6 +37,7 @@ export function summarizeSegments(
 
   for (const seg of segments) {
     const lines: string[] = []
+    lines.push('Source:\n```ts\n' + seg.embeddings.content + '\n```')
 
     if (seg.embeddings.symbolKind) lines.push(`Kind: ${seg.embeddings.symbolKind}`)
     if (seg.embeddings.symbolName) lines.push(`Name: ${seg.embeddings.symbolName}`)

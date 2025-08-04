@@ -15,7 +15,7 @@ import { IGNORED_DIRS, IGNORED_EXTENSIONS, IGNORED_FILES } from '../../utils/ign
 import { DbService } from '../db/db.service'
 import { files, InsertFile, repos, SelectRepo } from '../db/schema'
 
-const projectRoot = path.resolve(__dirname, '../../../../../')
+const projectRoot = path.resolve(__dirname, '../../../../../../')
 const defaultReposPath = path.join(projectRoot, 'storage', 'repos')
 
 @Injectable()
@@ -75,8 +75,8 @@ export class RepoFetcherService {
         process.env.GIT_SSH_COMMAND = `ssh -i ${tmpKeyPath} -o StrictHostKeyChecking=no`
       }
 
-      await git.clone(repo.gitUrl, targetPath, ['--branch', 'develop', '--single-branch'])
-      // await git.clone(repo.gitUrl, targetPath)
+      // await git.clone(repo.gitUrl, targetPath, ['--branch', 'develop', '--single-branch'])
+      await git.clone(repo.gitUrl, targetPath)
 
       await this.dbService.dbClient.update(repos)
         .set({
@@ -131,7 +131,7 @@ export class RepoFetcherService {
       const entryPath = path.resolve(dir, entry.name)
 
       if (entry.isDirectory()) {
-        if (!has(IGNORED_DIRS, entry.name)) {
+        if (!IGNORED_DIRS.has(entry.name)) {
           const subFiles = await this.getAllFiles(entryPath)
           files.push(...subFiles)
         }
@@ -139,8 +139,8 @@ export class RepoFetcherService {
       else {
         const ext = path.extname(entry.name).toLowerCase()
         if (
-          !has(IGNORED_EXTENSIONS, ext)
-          && !has(IGNORED_FILES, entry.name)
+          !IGNORED_EXTENSIONS.has(ext)
+          && !IGNORED_FILES.has(entry.name)
         ) {
           files.push(entryPath)
         }
