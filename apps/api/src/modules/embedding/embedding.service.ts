@@ -2,13 +2,11 @@ import { promises as fsp } from 'fs'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import { HttpService } from '@nestjs/axios'
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import * as amqp from 'amqplib'
 import { eq } from 'drizzle-orm'
 import { slice } from 'lodash'
-import { firstValueFrom } from 'rxjs'
 
 import { buildMermaidGraph } from '../../utils/mermaidBuilder'
 import { parseSegments } from '../../utils/parser'
@@ -23,7 +21,6 @@ export class EmbeddingService {
   private readonly logger: Logger = new Logger(EmbeddingService.name)
 
   constructor(
-    private readonly httpService: HttpService,
     private readonly dbService: DbService
   ) { }
 
@@ -128,13 +125,5 @@ export class EmbeddingService {
     }).where(eq(repos.id, repo.id))
 
     return { message: `Embeddings queued for repo ${repo.id}` }
-  }
-
-  async getEmbedding(text: string) {
-    const response = await firstValueFrom(
-      this.httpService.post<number[]>('http://localhost:8000/embed-question', { text }),
-    )
-
-    return response.data
   }
 }
