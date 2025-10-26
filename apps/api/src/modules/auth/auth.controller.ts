@@ -4,13 +4,12 @@ import {
   Get,
   Post,
   Req, Res,
-  UseGuards,
+  UseGuards
 } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
 import { Response } from 'express'
 
 import { SelectUser } from '../db/schema'
-
 import { AuthService } from './auth.service'
 import { RegisterDto } from './dto/register.dto'
 import { LocalAuthGuard } from './local-auth.guard'
@@ -19,13 +18,16 @@ import { LocalAuthGuard } from './local-auth.guard'
 export class AuthController {
   constructor(private readonly authService: AuthService) { }
 
-  @Post('register')
-  register(@Body() body: RegisterDto) {
-    return this.authService.register(body)
+  @Get('me')
+  @UseGuards(AuthGuard('jwt'))
+  getMe(@Req() req: { user: SelectUser }) {
+    const { email, id, login } = req.user
+
+    return { email, id, login }
   }
 
-  @UseGuards(LocalAuthGuard)
   @Post('login')
+  @UseGuards(LocalAuthGuard)
   login(
     @Req() req: { user: SelectUser },
     @Res({ passthrough: true }) res: Response
@@ -34,34 +36,31 @@ export class AuthController {
 
     res.cookie('access_token', access_token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/',
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production'
     })
 
     return { message: 'logged_in' }
   }
 
-  @UseGuards(AuthGuard('jwt'))
   @Get('logout')
+  @UseGuards(AuthGuard('jwt'))
   logout(@Res({ passthrough: true }) res: Response) {
     res.cookie('access_token', '', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
       maxAge: 0,
       path: '/',
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production'
     })
 
     return { message: 'logged_out' }
   }
 
-  @UseGuards(AuthGuard('jwt'))
-  @Get('me')
-  getMe(@Req() req: { user: SelectUser }) {
-    const { id, email, login } = req.user
-
-    return { id, email, login }
+  @Post('register')
+  register(@Body() body: RegisterDto) {
+    return this.authService.register(body)
   }
 }

@@ -4,8 +4,8 @@ import { Module } from '@nestjs/common'
 import { EmbeddingService } from './embedding.service'
 
 @Module({
-  imports: [HttpModule],
-  providers: [EmbeddingService],
   exports: [EmbeddingService],
+  imports: [HttpModule],
+  providers: [EmbeddingService]
 })
 export class EmbeddingModule { }

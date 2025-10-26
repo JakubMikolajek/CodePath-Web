@@ -2,11 +2,11 @@ import { IsString } from 'class-validator'
 
 export class CreateRepoDto {
   @IsString()
-  name: string
+  accessKey: string
 
   @IsString()
   gitUrl: string
 
   @IsString()
-  accessKey: string
+  name: string
 }

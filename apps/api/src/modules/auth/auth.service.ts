@@ -6,7 +6,6 @@ import { eq, or } from 'drizzle-orm'
 
 import { DbService } from '../db/db.service'
 import { InserUser, SelectUser, users } from '../db/schema'
-
 import { RegisterDto } from './dto/register.dto'
 
 @Injectable()
@@ -16,21 +15,10 @@ export class AuthService {
     private readonly dbService: DbService,
   ) { }
 
-  async validateUser(identifier: string, password: string): Promise<GenericNullable<SelectUser>> {
-    const user = await this.getUserByIdentifier(identifier, identifier)
-
-    if (!user) {
-      return null
-    }
-
-    const match = await bcrypt.compare(password, user.passwordHash)
-    return match ? user : null
-  }
-
   login(user: SelectUser) {
-    const payload = { sub: user.id, email: user.email }
+    const payload = { email: user.email, sub: user.id }
     return {
-      access_token: this.jwtService.sign(payload),
+      access_token: this.jwtService.sign(payload)
     }
   }
 
@@ -46,7 +34,26 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(password, 10)
     const user = await this.createUser({ email, login, passwordHash })
 
-    return { message: 'User registered', login: user.login, id: user.id }
+    return { id: user.id, login: user.login, message: 'User registered' }
+  }
+
+  async validateUser(identifier: string, password: string): Promise<GenericNullable<SelectUser>> {
+    const user = await this.getUserByIdentifier(identifier, identifier)
+
+    if (!user) {
+      return null
+    }
+
+    const match = await bcrypt.compare(password, user.passwordHash)
+    return match ? user : null
+  }
+
+  private async createUser(payload: InserUser): Promise<SelectUser> {
+    const [createdUser] = await this.dbService.dbClient.insert(users)
+      .values(payload)
+      .returning()
+
+    return createdUser
   }
 
   private async getUserByIdentifier(email: string, login: string): Promise<SelectUser> {
@@ -60,13 +67,5 @@ export class AuthService {
       ).limit(1)
 
     return user
-  }
-
-  private async createUser(payload: InserUser): Promise<SelectUser> {
-    const [createdUser] = await this.dbService.dbClient.insert(users)
-      .values(payload)
-      .returning()
-
-    return createdUser
   }
 }

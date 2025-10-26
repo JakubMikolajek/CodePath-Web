@@ -5,6 +5,6 @@ import { DependenciesService } from './dependencies.service'
 
 @Module({
   controllers: [DependenciesController],
-  providers: [DependenciesService],
+  providers: [DependenciesService]
 })
 export class DependenciesModule { }

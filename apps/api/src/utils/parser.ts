@@ -1,32 +1,33 @@
 import { Logger } from '@nestjs/common'
-import { DependencyType, SegmentKind } from '@workspace/codepath-common/globals'
+import type { DependencyType, SegmentKind } from '@workspace/codepath-common/globals'
 import { forEach, has } from 'lodash'
-import Parser, { SyntaxNode } from 'tree-sitter'
+import type { SyntaxNode } from 'tree-sitter'
+import Parser from 'tree-sitter'
 import { Project, SyntaxKind } from 'ts-morph'
 
 export interface Segment {
-  kind: SegmentKind
-  name?: string
   code: string
   comment?: string
-  startLine?: number
-  endLine?: number
   decorators?: string[]
+  endLine?: number
+  jsDoc?: string
+  kind: SegmentKind
+  name?: string
   params?: string[]
   returnType?: string
-  jsDoc?: string
+  startLine?: number
 }
 
 export interface DepEdge {
   from: string
+  importedFrom?: string
   to: string
   type: DependencyType
-  importedFrom?: string
 }
 
 interface ParsedFile {
-  parsedSegments: Segment[]
   parsedDependencies: DepEdge[]
+  parsedSegments: Segment[]
 }
 
 const logger = new Logger('Parser')
@@ -34,12 +35,12 @@ const logger = new Logger('Parser')
 const extToLang = {
   '.js': 'javascript',
   '.jsx': 'javascript',
-  '.vue': 'vue',
   '.py': 'python',
+  '.vue': 'vue'
 } as const
 
 const unsupportedExts = new Set([
-  '.json', '.md', '.cjs', '', '.lock', '.env',
+  '.json', '.md', '.cjs', '', '.lock', '.env'
 ])
 
 export function parseSegments(src: string, ext: string, filePath: string): ParsedFile {
@@ -47,7 +48,7 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
 
   if (has(unsupportedExts, ext)) {
     logger.log(`[parser] unsupported extension "${ext}", returning full file as-is`)
-    return { parsedSegments: [{ kind: 'file', code: src }], parsedDependencies: [] }
+    return { parsedDependencies: [], parsedSegments: [{ code: src, kind: 'file' }] }
   }
 
   if (ext === '.ts' || ext === '.tsx') {
@@ -70,18 +71,17 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
   if (!lang) {
     logger.log(`[parser] no mapping found for extension "${ext}", returning full file as-is`)
 
-    return { parsedSegments: [{ kind: 'file', code: src }], parsedDependencies: [] }
+    return { parsedDependencies: [], parsedSegments: [{ code: src, kind: 'file' }] }
   }
 
   let Lang
 
   try {
     Lang = require(`tree-sitter-${lang}`)
-  }
-  catch (err) {
+  } catch (err) {
     logger.error(`[parser] failed to load tree-sitter-${lang}:`, err)
 
-    return { parsedSegments: [{ kind: 'file', code: src }], parsedDependencies: [] }
+    return { parsedDependencies: [], parsedSegments: [{ code: src, kind: 'file' }] }
   }
 
   const parser = new Parser()
@@ -131,20 +131,20 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
   }
 
   function push(n: SyntaxNode, kind: Segment['kind'], name?: string) {
-    segments.push({ kind, name, code: src.slice(n.startIndex, n.endIndex) })
+    segments.push({ code: src.slice(n.startIndex, n.endIndex), kind, name })
   }
 
   visit(tree.rootNode)
 
   if (!segments.length) {
-    logger.log(`[parser] no segments detected, returning full file`)
+    logger.log('[parser] no segments detected, returning full file')
 
-    return { parsedSegments: [{ kind: 'file', code: src }], parsedDependencies: dependencies }
+    return { parsedDependencies: dependencies, parsedSegments: [{ code: src, kind: 'file' }] }
   }
 
   logger.log(`[parser] extracted ${segments.length} segments`)
 
-  return { parsedSegments: segments, parsedDependencies: dependencies }
+  return { parsedDependencies: dependencies, parsedSegments: segments }
 }
 
 function parseWithTsMorph(src: string, filePath: string): ParsedFile {
@@ -156,7 +156,7 @@ function parseWithTsMorph(src: string, filePath: string): ParsedFile {
 
   const importMap = new Map<string, string>()
 
-  forEach(sourceFile.getImportDeclarations(), (imp) => {
+  forEach(sourceFile.getImportDeclarations(), imp => {
     const module = imp.getModuleSpecifierValue()
 
     forEach(imp.getNamedImports(), named => importMap.set(named.getName(), module))
@@ -168,7 +168,7 @@ function parseWithTsMorph(src: string, filePath: string): ParsedFile {
     }
 
     dependencies.push({ from: filePath, to: module, type: 'import' })
-    segments.push({ kind: 'import', code: imp.getText() })
+    segments.push({ code: imp.getText(), kind: 'import' })
   })
 
   // forEach(sourceFile.getImportDeclarations(), (imp) => {
@@ -188,8 +188,8 @@ function parseWithTsMorph(src: string, filePath: string): ParsedFile {
   //   })
   // })
 
-  forEach(sourceFile.getClasses(), (cls) => {
-    segments.push({ kind: 'class', name: cls.getName(), code: cls.getText() })
+  forEach(sourceFile.getClasses(), cls => {
+    segments.push({ code: cls.getText(), kind: 'class', name: cls.getName() })
 
     const ext = cls.getExtends()
 
@@ -219,8 +219,8 @@ function parseWithTsMorph(src: string, filePath: string): ParsedFile {
   //   })
   // })
 
-  forEach(sourceFile.getFunctions(), (fn) => {
-    segments.push({ kind: 'function', name: fn.getName(), code: fn.getText() })
+  forEach(sourceFile.getFunctions(), fn => {
+    segments.push({ code: fn.getText(), kind: 'function', name: fn.getName() })
   })
 
   // forEach(sourceFile.getFunctions(), (fn) => {
@@ -241,7 +241,7 @@ function parseWithTsMorph(src: string, filePath: string): ParsedFile {
   //   })
   // })
 
-  forEach(sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression), (call) => {
+  forEach(sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression), call => {
     const fromFn = call.getFirstAncestorByKind(SyntaxKind.FunctionDeclaration)
     const fnName = call.getExpression().getText()
 
@@ -250,12 +250,12 @@ function parseWithTsMorph(src: string, filePath: string): ParsedFile {
 
       dependencies.push({
         from: fromFn.getName() ?? '<anonymous>',
-        to: fnName,
-        type: 'calls',
         importedFrom,
+        to: fnName,
+        type: 'calls'
       })
     }
   })
 
-  return { parsedSegments: segments, parsedDependencies: dependencies }
+  return { parsedDependencies: dependencies, parsedSegments: segments }
 }

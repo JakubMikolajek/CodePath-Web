@@ -7,11 +7,11 @@ import { dependencies } from '../db/schema'
 
 @Injectable()
 export class DependenciesService {
+  private logger: Logger = new Logger(DependenciesService.name)
+
   constructor(
     private readonly dbService: DbService
   ) { }
-
-  private logger: Logger = new Logger(DependenciesService.name)
 
   async getRepoDependencies(repoId: number) {
     const allDependencies = await this.dbService.dbClient.select()
@@ -20,10 +20,10 @@ export class DependenciesService {
       .orderBy(desc(dependencies.createdAt))
 
     return map(allDependencies, dependency => ({
-      id: dependency.id,
       fileId: dependency.fileId,
       fileName: dependency.fileName,
       graph: dependency.graph,
+      id: dependency.id
     }))
   }
 }

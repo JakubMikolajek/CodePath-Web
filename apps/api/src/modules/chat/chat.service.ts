@@ -8,15 +8,14 @@ import { v4 as uuidv4 } from 'uuid'
 import { DbService } from '../db/db.service'
 import { chatHistory, chatSessions } from '../db/schema'
 import { EmbeddingService } from '../embedding/embedding.service'
-
 import { AskDto } from './dto/ask.dto'
 
 @Injectable()
 export class ChatService {
-  private conn: amqp.ChannelModel
   private channel: amqp.Channel
-  private readonly queue = 'chat'
+  private conn: amqp.ChannelModel
   private logger: Logger = new Logger(ChatService.name)
+  private readonly queue = 'chat'
 
   constructor(
     private readonly embeddingService: EmbeddingService,
@@ -24,24 +23,84 @@ export class ChatService {
     private readonly dbService: DbService
   ) { }
 
-  async onModuleInit() {
-    this.conn = await amqp.connect('amqp://admin:admin@192.168.1.245')
-    this.channel = await this.conn.createChannel()
-    await this.channel.assertQueue(this.queue, { durable: true })
+  async askAboutRepo(userId: number, repoId: number, body: AskDto) {
+    const { question, sessionId } = body
+    this.logger.log(`Repo: ${repoId}, Q: ${question}`)
+
+    await this.dbService.dbClient.insert(chatHistory).values({
+      content: question,
+      role: 'user',
+      sessionId,
+      userId
+    })
+
+    const answer = await this.publishChatJob({
+      prompt: question,
+      repoId
+    })
+
+    await this.dbService.dbClient.insert(chatHistory).values({
+      content: answer,
+      role: 'assistant',
+      sessionId,
+      userId
+    })
+
+    return answer
   }
 
   async createSession(userId: number, repoId: number) {
     await this.dbService.dbClient.insert(chatSessions).values({
       id: uuidv4(),
       name: `Session for repo ${repoId}`,
-      userId,
       repoId,
+      userId
     })
+  }
+
+  async getChatSessionDetails(userId: number, sessionId: string) {
+    const sessionDetails = await this.dbService.dbClient.select()
+      .from(chatHistory)
+      .where(
+        and(
+          eq(chatHistory.userId, userId),
+          eq(chatHistory.sessionId, sessionId)
+        )
+      ).orderBy(desc(chatHistory.createdAt))
+
+    return map(sessionDetails, detail => ({
+      content: detail.content,
+      id: detail.id,
+      role: detail.role
+    }))
+  }
+
+  async getRepoChats(userId: number, repoId: number) {
+    const sessions = await this.dbService.dbClient.select()
+      .from(chatSessions)
+      .where(
+        and(
+          eq(chatSessions.userId, userId),
+          eq(chatSessions.repoId, repoId)
+        )
+      ).orderBy(desc(chatSessions.createdAt))
+
+    return map(sessions, session => ({
+      createdAt: session.createdAt,
+      sessionId: session.id,
+      sessionName: session.name
+    }))
   }
 
   async onModuleDestroy() {
     await this.channel?.close()
     await this.conn?.close()
+  }
+
+  async onModuleInit() {
+    this.conn = await amqp.connect('amqp://admin:admin@192.168.1.245')
+    this.channel = await this.conn.createChannel()
+    await this.channel.assertQueue(this.queue, { durable: true })
   }
 
   private async publishChatJob(segments: {
@@ -53,8 +112,8 @@ export class ChatService {
       const timeoutMs = 60_000
 
       const { queue: replyTo } = await this.channel.assertQueue('', {
-        exclusive: true,
         autoDelete: true,
+        exclusive: true
       })
 
       let timer: NodeJS.Timeout | undefined
@@ -80,8 +139,7 @@ export class ChatService {
             return reject(new Error('Invalid response payload'))
           }
           resolve(answer)
-        }
-        catch (e) {
+        } catch (e) {
           this.channel.cancel(consumerTag).catch(() => {})
 
           if (timer) {
@@ -103,72 +161,12 @@ export class ChatService {
         this.queue,
         Buffer.from(JSON.stringify(segments)),
         {
-          persistent: true,
-          replyTo,
-          correlationId,
           contentType: 'application/json',
+          correlationId,
+          persistent: true,
+          replyTo
         }
       )
     })
-  }
-
-  async askAboutRepo(userId: number, repoId: number, body: AskDto) {
-    const { question, sessionId } = body
-    this.logger.log(`Repo: ${repoId}, Q: ${question}`)
-
-    await this.dbService.dbClient.insert(chatHistory).values({
-      userId,
-      sessionId,
-      role: 'user',
-      content: question,
-    })
-
-    const answer = await this.publishChatJob({
-      prompt: question,
-      repoId,
-    })
-
-    await this.dbService.dbClient.insert(chatHistory).values({
-      userId,
-      sessionId,
-      role: 'assistant',
-      content: answer,
-    })
-
-    return answer
-  }
-
-  async getRepoChats(userId: number, repoId: number) {
-    const sessions = await this.dbService.dbClient.select()
-      .from(chatSessions)
-      .where(
-        and(
-          eq(chatSessions.userId, userId),
-          eq(chatSessions.repoId, repoId)
-        )
-      ).orderBy(desc(chatSessions.createdAt))
-
-    return map(sessions, session => ({
-      sessionId: session.id,
-      sessionName: session.name,
-      createdAt: session.createdAt,
-    }))
-  }
-
-  async getChatSessionDetails(userId: number, sessionId: string) {
-    const sessionDetails = await this.dbService.dbClient.select()
-      .from(chatHistory)
-      .where(
-        and(
-          eq(chatHistory.userId, userId),
-          eq(chatHistory.sessionId, sessionId)
-        )
-      ).orderBy(desc(chatHistory.createdAt))
-
-    return map(sessionDetails, detail => ({
-      id: detail.id,
-      role: detail.role,
-      content: detail.content,
-    }))
   }
 }

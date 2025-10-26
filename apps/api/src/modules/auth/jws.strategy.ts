@@ -8,8 +8,8 @@ import { DbService } from '../db/db.service'
 import { SelectUser, users } from '../db/schema'
 
 interface JWTPayload {
-  sub: number
   email: string
+  sub: number
 }
 
 @Injectable()
@@ -18,8 +18,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private readonly dbService: DbService
   ) {
     super({
+      ignoreExpiration: false,
       jwtFromRequest: ExtractJwt.fromExtractors([
-        (req) => {
+        req => {
           let token = null
 
           if (req && req.cookies) {
@@ -27,10 +28,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           }
 
           return token
-        },
+        }
       ]),
-      ignoreExpiration: false,
-      secretOrKey: 'supersecret',
+      secretOrKey: 'supersecret'
     })
   }
 

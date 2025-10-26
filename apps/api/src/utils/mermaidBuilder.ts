@@ -1,8 +1,8 @@
-import { GenericNullable } from '@workspace/codepath-common/globals'
-import { join, isEmpty } from 'lodash'
+import type { GenericNullable } from '@workspace/codepath-common/globals'
+import { isEmpty, join } from 'lodash'
 
 import { sanitizeString } from './helpers'
-import { DepEdge } from './parser'
+import type { DepEdge } from './parser'
 
 export function buildMermaidGraph(deps: DepEdge[]): GenericNullable<string> {
   if (isEmpty(deps)) {
@@ -11,7 +11,7 @@ export function buildMermaidGraph(deps: DepEdge[]): GenericNullable<string> {
 
   const lines = ['flowchart TD']
 
-  for (const { from, to, type, importedFrom } of deps) {
+  for (const { from, importedFrom, to, type } of deps) {
     const safeFrom = sanitizeString(from)
     const safeTo = sanitizeString(to)
     const safeType = sanitizeString(type)

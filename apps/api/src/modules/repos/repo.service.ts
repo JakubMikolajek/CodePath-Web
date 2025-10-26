@@ -12,13 +12,13 @@ export class RepoService {
   ) { }
 
   async createRepo(payload: InsertRepo) {
-    const { name, gitUrl, accessKey, userId } = payload
+    const { accessKey, gitUrl, name, userId } = payload
 
     const [createdRepo] = await this.dbService.dbClient.insert(repos).values({
-      name,
-      gitUrl,
       accessKey,
-      userId,
+      gitUrl,
+      name,
+      userId
     }).returning()
 
     return pick(createdRepo, ['id', 'name', 'cloneStatus', 'embeddingStatus'])
@@ -26,10 +26,10 @@ export class RepoService {
 
   async getUserRepos(userId: number) {
     const userRepos = await this.dbService.dbClient.select({
-      name: repos.name,
       cloneStatus: repos.cloneStatus,
       embeddingStatus: repos.embeddingStatus,
       id: repos.id,
+      name: repos.name
     })
       .from(repos)
       .where(eq(repos.userId, userId))

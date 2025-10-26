@@ -1,14 +1,13 @@
-import crypto from 'crypto'
-import { existsSync, rmSync } from 'fs'
-import { access, mkdir, readdir, readFile, stat, unlink, writeFile } from 'fs/promises'
-import path from 'path'
-
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { GenericNullable } from '@workspace/codepath-common/globals'
+import crypto from 'crypto'
 import { eq } from 'drizzle-orm'
-import { has, map, replace } from 'lodash'
+import { existsSync, rmSync } from 'fs'
+import { access, mkdir, readdir, readFile, stat, unlink, writeFile } from 'fs/promises'
+import { map, replace } from 'lodash'
 import NodeRSA from 'node-rsa'
+import path from 'path'
 import simpleGit from 'simple-git'
 
 import { IGNORED_DIRS, IGNORED_EXTENSIONS, IGNORED_FILES } from '../../utils/ignores'
@@ -20,12 +19,12 @@ const defaultReposPath = path.join(projectRoot, 'storage', 'repos')
 
 @Injectable()
 export class RepoFetcherService {
+  private logger: Logger = new Logger(RepoFetcherService.name)
+
+  private readonly REPOS_PATH = defaultReposPath
   constructor(
     private readonly dbService: DbService,
   ) { }
-
-  private logger: Logger = new Logger(RepoFetcherService.name)
-  private readonly REPOS_PATH = defaultReposPath
 
   @Cron(CronExpression.EVERY_10_SECONDS)
   async pollForPending() {
@@ -55,12 +54,10 @@ export class RepoFetcherService {
 
       if (existsSync(targetPath)) {
         rmSync(targetPath, { recursive: true })
-      }
-      else {
+      } else {
         try {
           await access(this.REPOS_PATH)
-        }
-        catch {
+        } catch {
           await mkdir(this.REPOS_PATH, { recursive: true })
         }
       }
@@ -81,7 +78,7 @@ export class RepoFetcherService {
       await this.dbService.dbClient.update(repos)
         .set({
           cloneStatus: 'cloned',
-          path: targetPath,
+          path: targetPath
         })
         .where(eq(repos.id, repo.id))
 
@@ -93,10 +90,10 @@ export class RepoFetcherService {
           const hash = await this.hashFile(filePath)
 
           return {
-            repoId: repo.id,
-            path: relPath,
             hash,
             lastModified: stats.mtime.toISOString(),
+            path: relPath,
+            repoId: repo.id
           }
         }),
 
@@ -110,8 +107,7 @@ export class RepoFetcherService {
         await unlink(tmpKeyPath).catch(() => { })
         process.env.GIT_SSH_COMMAND = gitEnvBackup
       }
-    }
-    catch (error: any) {
+    } catch (error: any) {
       this.logger.error(`✗ Error cloning ${repo.name}: ${error.message}`)
 
       repo.cloneStatus = 'failed'
@@ -135,8 +131,7 @@ export class RepoFetcherService {
           const subFiles = await this.getAllFiles(entryPath)
           files.push(...subFiles)
         }
-      }
-      else {
+      } else {
         const ext = path.extname(entry.name).toLowerCase()
         if (
           !IGNORED_EXTENSIONS.has(ext)

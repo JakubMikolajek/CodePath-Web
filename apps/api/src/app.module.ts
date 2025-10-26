@@ -16,15 +16,15 @@ import { RepoModule } from './modules/repos/repo.module'
       pinoHttp: {
         level: 'debug',
         transport: {
-          target: 'pino-pretty',
           options: {
             colorize: true,
             colorizedObject: true,
             levelFirst: true,
-            translateTime: 'HH:MM:ss',
+            translateTime: 'HH:MM:ss'
           },
-        },
-      },
+          target: 'pino-pretty'
+        }
+      }
     }),
     ScheduleModule.forRoot(),
     DbModule,
@@ -33,7 +33,7 @@ import { RepoModule } from './modules/repos/repo.module'
     RepoModule,
     AuthModule,
     DependenciesModule,
-    DocsModule,
-  ],
+    DocsModule
+  ]
 })
 export class AppModule { }

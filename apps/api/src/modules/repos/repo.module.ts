@@ -1,18 +1,18 @@
 import { Module } from '@nestjs/common'
 
-import { RepoFetcherService } from './repo-fetcher.service'
 import { RepoController } from './repo.controller'
 import { RepoService } from './repo.service'
+import { RepoFetcherService } from './repo-fetcher.service'
 
 @Module({
   controllers: [RepoController],
-  providers: [
-    RepoService,
-    RepoFetcherService,
-  ],
   exports: [
     RepoService,
-    RepoFetcherService,
+    RepoFetcherService
   ],
+  providers: [
+    RepoService,
+    RepoFetcherService
+  ]
 })
 export class RepoModule { }

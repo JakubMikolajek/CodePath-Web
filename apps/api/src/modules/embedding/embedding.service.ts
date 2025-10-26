@@ -1,4 +1,3 @@
-import { promises as fsp } from 'fs'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
@@ -6,6 +5,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import * as amqp from 'amqplib'
 import { eq } from 'drizzle-orm'
+import { promises as fsp } from 'fs'
 import { slice } from 'lodash'
 
 import { buildMermaidGraph } from '../../utils/mermaidBuilder'
@@ -15,53 +15,14 @@ import { dependencies, files, repos, SelectRepo } from '../db/schema'
 
 @Injectable()
 export class EmbeddingService {
-  private conn: amqp.ChannelModel
   private channel: amqp.Channel
-  private readonly queue = 'embedding'
+  private conn: amqp.ChannelModel
   private readonly logger: Logger = new Logger(EmbeddingService.name)
+  private readonly queue = 'embedding'
 
   constructor(
     private readonly dbService: DbService
   ) { }
-
-  async onModuleInit() {
-    this.conn = await amqp.connect('amqp://admin:admin@192.168.1.245')
-    this.channel = await this.conn.createChannel()
-    await this.channel.assertQueue(this.queue, { durable: true })
-  }
-
-  async onModuleDestroy() {
-    await this.channel?.close()
-    await this.conn?.close()
-  }
-
-  @Cron(CronExpression.EVERY_30_SECONDS)
-  async poolFromPending() {
-    const [repoToEmbedding] = await this.dbService.dbClient.select()
-      .from(repos)
-      .where(eq(repos.embeddingStatus, 'pending'))
-      .limit(1)
-
-    if (!repoToEmbedding) {
-      return
-    }
-
-    await this.embedRepo(repoToEmbedding)
-  }
-
-  publishEmbeddingsJob(segments: {
-    fileId: number
-    symbolKind: string
-    symbolName?: string
-    content: string
-  }[]): void {
-    this.channel.sendToQueue(
-      this.queue,
-      Buffer.from(
-        JSON.stringify({ segments })
-      ), { persistent: true }
-    )
-  }
 
   async embedRepo(repo: SelectRepo) {
     const BATCH = 64
@@ -78,16 +39,16 @@ export class EmbeddingService {
       }
 
       const src = await fsp.readFile(abs, 'utf8')
-      const { parsedSegments, parsedDependencies } = parseSegments(src, path.extname(file.path), file.path)
+      const { parsedDependencies, parsedSegments } = parseSegments(src, path.extname(file.path), file.path)
 
       const graph = buildMermaidGraph(parsedDependencies)
 
       if (graph) {
         await this.dbService.dbClient.insert(dependencies).values({
-          repoId: repo.id,
           fileId: file.id,
           fileName: path.basename(file.path),
           graph,
+          repoId: repo.id
         })
       }
 
@@ -95,10 +56,10 @@ export class EmbeddingService {
         const batch = slice(parsedSegments, i, i + BATCH)
 
         const batchPayload = batch.map(s => ({
+          content: s.code,
           fileId: file.id,
           symbolKind: s.kind,
-          symbolName: s.name,
-          content: s.code,
+          symbolName: s.name
         }))
 
         // const docsSegmentsPayload = batch.map(s => ({
@@ -121,9 +82,48 @@ export class EmbeddingService {
     }
 
     await this.dbService.dbClient.update(repos).set({
-      embeddingStatus: 'embeded',
+      embeddingStatus: 'embeded'
     }).where(eq(repos.id, repo.id))
 
     return { message: `Embeddings queued for repo ${repo.id}` }
+  }
+
+  async onModuleDestroy() {
+    await this.channel?.close()
+    await this.conn?.close()
+  }
+
+  async onModuleInit() {
+    this.conn = await amqp.connect('amqp://admin:admin@192.168.1.245')
+    this.channel = await this.conn.createChannel()
+    await this.channel.assertQueue(this.queue, { durable: true })
+  }
+
+  @Cron(CronExpression.EVERY_30_SECONDS)
+  async poolFromPending() {
+    const [repoToEmbedding] = await this.dbService.dbClient.select()
+      .from(repos)
+      .where(eq(repos.embeddingStatus, 'pending'))
+      .limit(1)
+
+    if (!repoToEmbedding) {
+      return
+    }
+
+    await this.embedRepo(repoToEmbedding)
+  }
+
+  publishEmbeddingsJob(segments: {
+    content: string
+    fileId: number
+    symbolKind: string
+    symbolName?: string
+  }[]): void {
+    this.channel.sendToQueue(
+      this.queue,
+      Buffer.from(
+        JSON.stringify({ segments })
+      ), { persistent: true }
+    )
   }
 }
