@@ -32,10 +32,13 @@ export default function Page() {
           <p className="text-muted-foreground">{params.repoId}</p>
           <article className="prose prose-sm dark:prose-invert max-w-none prose-pre:bg-gray-900 prose-pre:text-gray-100">
             <Markdown
-              rehypePlugins={[rehypeHighlight]}
-              remarkPlugins={[remarkGfm]}
               components={{
-                code: ({ node, className, children, ...props }) => {
+                blockquote: ({ children }) => (
+                  <blockquote className="border-l-4 border-blue-500 pl-4 italic bg-blue-50 dark:bg-blue-950/20 py-2 my-4">
+                    {children}
+                  </blockquote>
+                ),
+                code: ({ children, className, node, ...props }) => {
                   const match = /language-(\w+)/.exec(className || '')
                   return match ? (
                     <div className="relative">
@@ -55,11 +58,6 @@ export default function Page() {
                     </code>
                   )
                 },
-                blockquote: ({ children }) => (
-                  <blockquote className="border-l-4 border-blue-500 pl-4 italic bg-blue-50 dark:bg-blue-950/20 py-2 my-4">
-                    {children}
-                  </blockquote>
-                ),
                 table: ({ children }) => (
                   <div className="overflow-x-auto">
                     <table className="min-w-full border-collapse border border-gray-300 dark:border-gray-600">
@@ -67,15 +65,17 @@ export default function Page() {
                     </table>
                   </div>
                 ),
+                td: ({ children }) => (
+                  <td className="border border-gray-300 dark:border-gray-600 px-4 py-2">{children}</td>
+                ),
                 th: ({ children }) => (
                   <th className="border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 px-4 py-2 text-left font-semibold">
                     {children}
                   </th>
-                ),
-                td: ({ children }) => (
-                  <td className="border border-gray-300 dark:border-gray-600 px-4 py-2">{children}</td>
-                ),
+                )
               }}
+              rehypePlugins={[rehypeHighlight]}
+              remarkPlugins={[remarkGfm]}
             >
               {text}
             </Markdown>
@@ -85,4 +85,3 @@ export default function Page() {
     </>
   )
 }
-

@@ -3,7 +3,8 @@ import { Button } from '@workspace/ui/components/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@workspace/ui/components/card'
 import { Input } from '@workspace/ui/components/input'
 import { Label } from '@workspace/ui/components/label'
-import { FormEvent, useState } from 'react'
+import type { FormEvent } from 'react'
+import { useState } from 'react'
 
 import { useAuthStore } from '@/store'
 
@@ -18,11 +19,11 @@ interface RegisterFormState {
 }
 
 export default function RegisterForm({ handleShowRegisterForm }: RegisterFormProps) {
-  const { register, loading, error, clearError } = useAuthStore()
+  const { clearError, error, loading, register } = useAuthStore()
   const [formData, setFormData] = useState<RegisterFormState>({
     email: '',
     login: '',
-    password: '',
+    password: ''
   })
   const [success, setSuccess] = useState(false)
 
@@ -63,44 +64,44 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
               <div className="grid gap-3">
                 <Label htmlFor="email">Email</Label>
                 <Input
+                  disabled={loading}
                   id="email"
-                  type="email"
+                  onChange={e => handleInputChange('email', e.target.value)}
                   placeholder="your@email.com"
                   required
+                  type="email"
                   value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  disabled={loading}
                 />
               </div>
               <div className="grid gap-3">
                 <Label htmlFor="login">Login</Label>
                 <Input
+                  disabled={loading}
                   id="login"
-                  type="text"
+                  onChange={e => handleInputChange('login', e.target.value)}
                   placeholder="Choose a username"
                   required
+                  type="text"
                   value={formData.login}
-                  onChange={(e) => handleInputChange('login', e.target.value)}
-                  disabled={loading}
                 />
               </div>
               <div className="grid gap-3">
                 <Label htmlFor="password">Password</Label>
                 <Input
+                  disabled={loading}
                   id="password"
-                  type="password"
+                  onChange={e => handleInputChange('password', e.target.value)}
                   placeholder="Enter your password"
                   required
+                  type="password"
                   value={formData.password}
-                  onChange={(e) => handleInputChange('password', e.target.value)}
-                  disabled={loading}
                 />
               </div>
               <div className="flex flex-col gap-3">
                 <Button
-                  type="submit"
                   className="w-full"
                   disabled={loading || !formData.email || !formData.login || !formData.password}
+                  type="submit"
                 >
                   {loading ? 'Registering...' : 'Register'}
                 </Button>
@@ -109,8 +110,8 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
             <div className="mt-4 text-center text-sm">
               Already have an account?{' '}
               <span
-                onClick={() => handleShowRegisterForm(false)}
                 className="underline underline-offset-4 cursor-pointer hover:text-primary"
+                onClick={() => handleShowRegisterForm(false)}
               >
                 Sign in
               </span>

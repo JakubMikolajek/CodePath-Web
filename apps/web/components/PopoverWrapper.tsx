@@ -1,17 +1,17 @@
 import {
   Popover,
-  PopoverTrigger,
   PopoverContent,
+  PopoverTrigger
 } from '@workspace/ui/components/popover'
-import { ReactNode, MouseEvent } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
 
 interface PopoverWrapperProps {
-  trigger: ReactNode
-  children: ReactNode
   asChild?: boolean
+  children: ReactNode
+  trigger: ReactNode
 }
 
-export default function PopoverWrapper({ trigger, children, asChild }: PopoverWrapperProps) {
+export default function PopoverWrapper({ asChild, children, trigger }: PopoverWrapperProps) {
   const stopPropagation = (e: MouseEvent) => e.stopPropagation()
 
   return (

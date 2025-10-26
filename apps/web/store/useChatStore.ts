@@ -1,26 +1,26 @@
-import { ChatSession, SessionDetail } from '@workspace/codepath-common/chat'
+import type { ChatSession, SessionDetail } from '@workspace/codepath-common/chat'
 import { create } from 'zustand'
 
 import { createSession, getChatSessions, getSessionDetails, sendMessage } from '@/lib/chat'
 
 interface Store {
   chatSessions: ChatSession[]
-  sessionDetails: SessionDetail[]
-  getChatSessions: (repoId: number) => Promise<void>
   createSession: (repoId: number) => Promise<void>
+  getChatSessions: (repoId: number) => Promise<void>
   getSessionDetails: (repoId: number, sessionId: string) => Promise<void>
   sendMessage: (repoId: number, question: string, sessionId: string) => Promise<string>
+  sessionDetails: SessionDetail[]
 }
 
-export const useChatStore = create<Store>((setState) => ({
+export const useChatStore = create<Store>(setState => ({
   chatSessions: [],
   sessionDetails: [],
 
-  createSession: async (repoId) => {
+  createSession: async repoId => {
     await createSession(repoId)
   },
 
-  getChatSessions: async (repoId) => {
+  getChatSessions: async repoId => {
     setState(() => ({ chatSessions: [] }))
     const chatSessions = await getChatSessions(repoId)
     setState(() => ({ chatSessions }))
@@ -34,5 +34,5 @@ export const useChatStore = create<Store>((setState) => ({
 
   sendMessage: async (repoId, question, sessionId) => {
     return await sendMessage(repoId, { question, sessionId }) as string
-  },
+  }
 }))

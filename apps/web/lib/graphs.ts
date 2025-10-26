@@ -1,4 +1,4 @@
-import { Graph } from '@workspace/codepath-common/graph'
+import type { Graph } from '@workspace/codepath-common/graph'
 
 import { apiClient } from '@/lib/api/api'
 

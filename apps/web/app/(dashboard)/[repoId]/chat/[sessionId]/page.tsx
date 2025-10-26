@@ -1,9 +1,10 @@
 'use client'
 import 'highlight.js/styles/github-dark-dimmed.css'
+
 import { Button } from '@workspace/ui/components/button'
 import { Card, CardContent } from '@workspace/ui/components/card'
 import { Input } from '@workspace/ui/components/input'
-import { Send, User, Bot, Copy, Check } from 'lucide-react'
+import { Bot, Check, Copy, Send, User } from 'lucide-react'
 import { useParams } from 'next/navigation'
 import type React from 'react'
 import { useEffect, useState } from 'react'
@@ -15,10 +16,10 @@ import { useChatStore } from '@/store'
 
 export default function ChatPage() {
   const params = useParams()
-  const { sendMessage, getSessionDetails, sessionDetails } = useChatStore()
+  const { getSessionDetails, sendMessage, sessionDetails } = useChatStore()
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [copiedId, setCopiedId] = useState<null | string>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -53,8 +54,8 @@ export default function ChatPage() {
     <div className="w-full relative bg-background">
       <div className="flex flex-col h-screen max-w-6xl mx-auto">
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
-          {sessionDetails.map((detail) => (
-            <div key={detail.id} className="space-y-4">
+          {sessionDetails.map(detail => (
+            <div className="space-y-4" key={detail.id}>
               {detail.role === 'user' ? (
                 <div className="flex justify-end">
                   <div className="flex items-start space-x-3 max-w-[70%]">
@@ -80,10 +81,10 @@ export default function ChatPage() {
                             <span className="text-sm font-medium">Asystent AI</span>
                           </div>
                           <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => copyToClipboard(detail.content, detail.id)}
                             className="h-8 w-8 p-0"
+                            onClick={() => copyToClipboard(detail.content, detail.id)}
+                            size="sm"
+                            variant="ghost"
                           >
                             {copiedId === detail.id ? (
                               <Check className="w-3 h-3 text-green-500" />
@@ -94,10 +95,13 @@ export default function ChatPage() {
                         </div>
                         <article className="prose prose-sm dark:prose-invert max-w-none prose-pre:bg-gray-900 prose-pre:text-gray-100">
                           <Markdown
-                            rehypePlugins={[rehypeHighlight]}
-                            remarkPlugins={[remarkGfm]}
                             components={{
-                              code: ({ node, className, children, ...props }) => {
+                              blockquote: ({ children }) => (
+                                <blockquote className="border-l-4 border-blue-500 pl-4 italic bg-blue-50 dark:bg-blue-950/20 py-2 my-4">
+                                  {children}
+                                </blockquote>
+                              ),
+                              code: ({ children, className, node, ...props }) => {
                                 const match = /language-(\w+)/.exec(className || '')
                                 return match ? (
                                   <div className="relative">
@@ -117,11 +121,6 @@ export default function ChatPage() {
                                   </code>
                                 )
                               },
-                              blockquote: ({ children }) => (
-                                <blockquote className="border-l-4 border-blue-500 pl-4 italic bg-blue-50 dark:bg-blue-950/20 py-2 my-4">
-                                  {children}
-                                </blockquote>
-                              ),
                               table: ({ children }) => (
                                 <div className="overflow-x-auto">
                                   <table className="min-w-full border-collapse border border-gray-300 dark:border-gray-600">
@@ -129,15 +128,17 @@ export default function ChatPage() {
                                   </table>
                                 </div>
                               ),
+                              td: ({ children }) => (
+                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-2">{children}</td>
+                              ),
                               th: ({ children }) => (
                                 <th className="border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 px-4 py-2 text-left font-semibold">
                                   {children}
                                 </th>
-                              ),
-                              td: ({ children }) => (
-                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-2">{children}</td>
-                              ),
+                              )
                             }}
+                            rehypePlugins={[rehypeHighlight]}
+                            remarkPlugins={[remarkGfm]}
                           >
                             {detail.content}
                           </Markdown>
@@ -182,27 +183,27 @@ export default function ChatPage() {
 
         <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="p-4">
-            <form onSubmit={handleSubmit} className="flex items-end space-x-2">
+            <form className="flex items-end space-x-2" onSubmit={handleSubmit}>
               <div className="flex-1">
                 <Input
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  placeholder="Zadaj pytanie..."
                   className="min-h-[44px] resize-none"
                   disabled={isLoading}
-                  onKeyDown={(e) => {
+                  onChange={e => setInputValue(e.target.value)}
+                  onKeyDown={e => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault()
                       handleSubmit(e)
                     }
                   }}
+                  placeholder="Zadaj pytanie..."
+                  value={inputValue}
                 />
               </div>
               <Button
-                type="submit"
-                size="icon"
-                disabled={isLoading || !inputValue.trim()}
                 className="h-[44px] w-[44px]"
+                disabled={isLoading || !inputValue.trim()}
+                size="icon"
+                type="submit"
               >
                 <Send className="w-4 h-4" />
                 <span className="sr-only">Wyślij wiadomość</span>

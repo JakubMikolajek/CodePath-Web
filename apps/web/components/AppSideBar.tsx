@@ -1,7 +1,7 @@
 'use client'
 
-import { Repository } from '@workspace/codepath-common/repository'
-import { IUser } from '@workspace/codepath-common/user'
+import type { Repository } from '@workspace/codepath-common/repository'
+import type { IUser } from '@workspace/codepath-common/user'
 import {
   Sidebar,
   SidebarContent,
@@ -12,15 +12,14 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
+  SidebarRail
 } from '@workspace/ui/components/sidebar'
 import {
   FolderGit2,
-  LayoutDashboard,
+  LayoutDashboard
 } from 'lucide-react'
 import Link from 'next/link'
 import React, { useEffect } from 'react'
-
 
 import CreateRepoDialog from '@/components/repo/CreateRepoDialog'
 import RepoItem from '@/components/repo/RepoItem'
@@ -28,8 +27,8 @@ import UserDropdownMenu from '@/components/UserDropdownMenu'
 import { useAuthStore, useReposStore } from '@/store'
 
 interface AppSideBarProps {
-  me: IUser
   fetchedRepos: Repository[]
+  me: IUser
 }
 
 export default function AppSidebar({ fetchedRepos, me }: AppSideBarProps) {
@@ -66,7 +65,7 @@ export default function AppSidebar({ fetchedRepos, me }: AppSideBarProps) {
                 <FolderGit2 className="ml-auto h-4 w-4" />
               </SidebarMenuButton>
             </CreateRepoDialog>
-            {repos.map((item) => <RepoItem key={item.id} item={item} />)}
+            {repos.map(item => <RepoItem item={item} key={item.id} />)}
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>

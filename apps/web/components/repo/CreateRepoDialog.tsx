@@ -9,7 +9,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
+  DialogTrigger
 } from '@workspace/ui/components/dialog'
 import {
   Form,
@@ -17,15 +17,16 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
+  FormMessage
 } from '@workspace/ui/components/form'
 import { Input } from '@workspace/ui/components/input'
 import { Textarea } from '@workspace/ui/components/textarea'
-import { useState, type ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
 import { useReposStore } from '@/store'
-import { CreateRepoFormData, createRepoFormSchema } from '@/utils/validators/createRepoForm'
+import type { CreateRepoFormData } from '@/utils/validators/createRepoForm'
+import { createRepoFormSchema } from '@/utils/validators/createRepoForm'
 
 interface CreateRepoDialogProps {
   children: ReactNode
@@ -37,12 +38,12 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<CreateRepoFormData>({
-    resolver: zodResolver(createRepoFormSchema),
     defaultValues: {
-      name: '',
-      gitUrl: '',
       accessKey: '',
+      gitUrl: '',
+      name: ''
     },
+    resolver: zodResolver(createRepoFormSchema)
   })
 
   const handleSubmit = async (data: CreateRepoFormData) => {
@@ -68,7 +69,7 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
   }
 
   return (
-    <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
+    <Dialog onOpenChange={handleDialogChange} open={dialogOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
@@ -79,7 +80,7 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <form className="space-y-4" onSubmit={form.handleSubmit(handleSubmit)}>
             <FormField
               control={form.control}
               name="name"
@@ -123,10 +124,10 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
             />
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={isSubmitting}>
+              <Button disabled={isSubmitting} onClick={() => setDialogOpen(false)} type="button" variant="outline">
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button disabled={isSubmitting} type="submit">
                 {isSubmitting ? 'Adding...' : 'Add Repository'}
               </Button>
             </DialogFooter>

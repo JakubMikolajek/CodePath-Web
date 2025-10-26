@@ -1,6 +1,6 @@
 'use server'
 
-import { IUser } from '@workspace/codepath-common/user'
+import type { IUser } from '@workspace/codepath-common/user'
 
 import { apiServer } from '@/lib/api/api'
 

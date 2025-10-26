@@ -4,7 +4,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenuTrigger
 } from '@workspace/ui/components/dropdown-menu'
 import { SidebarMenuButton } from '@workspace/ui/components/sidebar'
 import { LogOut, Moon, Sun } from 'lucide-react'
@@ -12,7 +12,6 @@ import { useTheme } from 'next-themes'
 import React from 'react'
 
 import { useAuthStore } from '@/store'
-
 
 export default function UserDropdownMenu() {
   const { setTheme } = useTheme()
@@ -26,8 +25,8 @@ export default function UserDropdownMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <SidebarMenuButton
-          size="lg"
           className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+          size="lg"
         >
           <div className="grid flex-1 text-left text-sm leading-tight">
             <span className="truncate text-xs">{user?.login ?? ''}</span>
@@ -35,16 +34,16 @@ export default function UserDropdownMenu() {
         </SidebarMenuButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent
+        align="end"
         className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
         side="bottom"
-        align="end"
         sideOffset={4}
       >
-        <DropdownMenuItem onClick={() => setTheme('light')} className="gap-2 p-2">
+        <DropdownMenuItem className="gap-2 p-2" onClick={() => setTheme('light')}>
           <Sun className="h-4 w-4" />
           Light theme
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme('dark')} className="gap-2 p-2">
+        <DropdownMenuItem className="gap-2 p-2" onClick={() => setTheme('dark')}>
           <Moon className="h-4 w-4" />
           Dark theme
         </DropdownMenuItem>

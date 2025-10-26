@@ -1,14 +1,14 @@
 'use client'
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
-import { ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
 interface TooltipWrapperProps {
-  trigger: ReactNode
   children: ReactNode
+  trigger: ReactNode
 }
 
-export default function TooltipWrapper({ trigger, children }: TooltipWrapperProps) {
+export default function TooltipWrapper({ children, trigger }: TooltipWrapperProps) {
   return (
     <Tooltip>
       <TooltipTrigger>{trigger}</TooltipTrigger>

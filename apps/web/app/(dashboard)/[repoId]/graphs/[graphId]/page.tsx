@@ -1,7 +1,7 @@
 'use client'
 
-import { GenericNullable } from '@workspace/codepath-common/globals'
-import { Graph } from '@workspace/codepath-common/graph'
+import type { GenericNullable } from '@workspace/codepath-common/globals'
+import type { Graph } from '@workspace/codepath-common/graph'
 import { useParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
@@ -15,14 +15,14 @@ export default function Page() {
   const { graphs } = useGraphsStore()
 
   useEffect(() => {
-    setActiveGraph(graphs.find((graph) => graph.id === Number(params.graphId)) ?? null)
+    setActiveGraph(graphs.find(graph => graph.id === Number(params.graphId)) ?? null)
   }, [params])
 
   return (
     <div className="w-full relative bg-background">
       <div className="flex flex-col">
         <h1 className="text-2xl font-semibold text-foreground">Graph</h1>
-        {activeGraph && <MermaidGraph key={activeGraph.id} graph={activeGraph.graph} />}
+        {activeGraph && <MermaidGraph graph={activeGraph.graph} key={activeGraph.id} />}
       </div>
     </div>
   )

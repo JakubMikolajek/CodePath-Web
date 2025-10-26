@@ -1,13 +1,13 @@
 'use client'
 
-import { Repository } from '@workspace/codepath-common/repository'
+import type { Repository } from '@workspace/codepath-common/repository'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@workspace/ui/components/collapsible'
 import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubButton,
-  SidebarMenuSubItem,
+  SidebarMenuSubItem
 } from '@workspace/ui/components/sidebar'
 import { ChevronRight, TriangleAlert } from 'lucide-react'
 import Link from 'next/link'
@@ -20,9 +20,9 @@ interface RepoItemProps {
 }
 
 export default function RepoItem({ item }: RepoItemProps) {
-  const { getChatSessions, chatSessions, createSession } = useChatStore()
+  const { chatSessions, createSession, getChatSessions } = useChatStore()
   const { isRepoOpen, setOpenRepoId } = useCollapsibleStore()
-  const { graphs, getGraphs } = useGraphsStore()
+  const { getGraphs, graphs } = useGraphsStore()
 
   const handleOpenChange = async (open: boolean) => {
     setOpenRepoId(open ? item.id : null)
@@ -35,11 +35,11 @@ export default function RepoItem({ item }: RepoItemProps) {
 
   return (
     <Collapsible
-      key={item.id}
       asChild
       className="group/collapsible-main"
-      open={isRepoOpen(item.id)}
+      key={item.id}
       onOpenChange={handleOpenChange}
+      open={isRepoOpen(item.id)}
     >
       <SidebarMenuItem>
         <CollapsibleTrigger asChild>
@@ -69,7 +69,7 @@ export default function RepoItem({ item }: RepoItemProps) {
                       <span>New chat</span>
                       {/*<LucideMessagesSquare className="ml-auto h-4 w-4" />*/}
                     </SidebarMenuButton>
-                    {chatSessions.map((session) => (
+                    {chatSessions.map(session => (
                       <SidebarMenuSubItem key={session.sessionId}>
                         <SidebarMenuSubButton asChild>
                           <Link href={`/${item.id}/chat/${session.sessionId}`}>
@@ -106,7 +106,7 @@ export default function RepoItem({ item }: RepoItemProps) {
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <SidebarMenuSub>
-                    {graphs.map((graph) => (
+                    {graphs.map(graph => (
                       <SidebarMenuSubItem key={graph.id}>
                         <SidebarMenuSubButton asChild>
                           <Link href={`/${item.id}/graphs/${graph.id}`}>

@@ -1,19 +1,20 @@
 'use server'
 
-import { Geist, Geist_Mono } from 'next/font/google'
 import '@workspace/ui/globals.css'
-import { ReactNode } from 'react'
+
+import { Geist, Geist_Mono } from 'next/font/google'
+import type { ReactNode } from 'react'
 
 import { Providers } from '@/components/providers'
 
 const fontSans = Geist({
   subsets: ['latin'],
-  variable: '--font-sans',
+  variable: '--font-sans'
 })
 
 const fontMono = Geist_Mono({
   subsets: ['latin'],
-  variable: '--font-mono',
+  variable: '--font-mono'
 })
 
 interface RootLayoutProps {

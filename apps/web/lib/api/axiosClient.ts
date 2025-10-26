@@ -3,12 +3,12 @@ import { redirect } from 'next/navigation'
 
 export const axiosClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? '/api',
-  withCredentials: true,
+  withCredentials: true
 })
 
 axiosClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  response => response,
+  error => {
     if (error.response?.status === 401) {
       document.cookie = 'access_token=; Max-Age=0; path=/; SameSite=strict'
 
@@ -17,5 +17,5 @@ axiosClient.interceptors.response.use(
       }
     }
     return Promise.reject(error)
-  },
+  }
 )

@@ -8,12 +8,12 @@ interface MermaidGraphProps {
 }
 
 mermaid.initialize({
-  startOnLoad: true,
-  theme: 'dark',
-  securityLevel: 'loose',
   flowchart: {
-    useMaxWidth: true,
+    useMaxWidth: true
   },
+  securityLevel: 'loose',
+  startOnLoad: true,
+  theme: 'dark'
 })
 
 export default function MermaidGraph({ graph }: MermaidGraphProps) {

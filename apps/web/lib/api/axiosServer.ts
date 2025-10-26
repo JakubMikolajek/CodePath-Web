@@ -1,4 +1,5 @@
-import axios, { AxiosInstance } from 'axios'
+import type { AxiosInstance } from 'axios'
+import axios from 'axios'
 import { redirect } from 'next/navigation'
 
 let apiInstance: AxiosInstance | null = null
@@ -9,18 +10,18 @@ export const createAxiosServer = (cookie: string) => {
   const instance = axios.create({
     baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api',
     headers: {
-      Cookie: cookie,
-    },
+      Cookie: cookie
+    }
   })
 
   instance.interceptors.response.use(
-    (res) => res,
-    (err) => {
+    res => res,
+    err => {
       if (err.response?.status === 401) {
         redirect('/')
       }
       return Promise.reject(err)
-    },
+    }
   )
 
   apiInstance = instance
@@ -30,7 +31,7 @@ export const createAxiosServer = (cookie: string) => {
 export const getAxiosServerInstance = (): AxiosInstance => {
   if (!apiInstance) {
     throw new Error(
-      'Axios server instance not initialized. Call createAxiosServer(cookie) first.',
+      'Axios server instance not initialized. Call createAxiosServer(cookie) first.'
     )
   }
   return apiInstance
