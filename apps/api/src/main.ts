@@ -1,14 +1,29 @@
+import compress from '@fastify/compress'
+import cors from '@fastify/cors'
+import helmet from '@fastify/helmet'
 import { ValidationPipe } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
+import type { NestFastifyApplication } from '@nestjs/platform-fastify'
+import { FastifyAdapter } from '@nestjs/platform-fastify'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import * as bodyParser from 'body-parser'
 import cookieParser from 'cookie-parser'
-import { Logger } from 'nestjs-pino'
 
 import { AppModule } from './app.module'
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true })
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter({
+    logger: {
+      transport: {
+        options: {
+          colorize: true,
+          ignore: 'pid,hostname',
+          translateTime: 'SYS:standard'
+        },
+        target: 'pino-pretty'
+      }
+    }
+  }))
 
   app.use(bodyParser.json({ limit: '50mb' }))
   app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }))
@@ -21,7 +36,21 @@ async function bootstrap() {
   )
 
   app.setGlobalPrefix('api')
-  app.useLogger(app.get(Logger))
+
+  await app.register(helmet, {
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: false
+  })
+
+  await app.register(compress)
+
+  await app.register(cors, {
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    origin: '*'
+  })
+
+  app.enableShutdownHooks()
 
   const config = new DocumentBuilder().setTitle('CodePath').build()
   const document = SwaggerModule.createDocument(app, config)
