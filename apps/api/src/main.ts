@@ -12,18 +12,23 @@ import cookieParser from 'cookie-parser'
 import { AppModule } from './app.module'
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter({
-    logger: {
-      transport: {
-        options: {
-          colorize: true,
-          ignore: 'pid,hostname',
-          translateTime: 'SYS:standard'
-        },
-        target: 'pino-pretty'
+  const app = await NestFactory.create<NestFastifyApplication>(
+    AppModule,
+    new FastifyAdapter({
+      logger: {
+        transport: {
+          options: {
+            colorize: true,
+            ignore: 'pid,hostname',
+            translateTime: 'SYS:standard'
+          },
+          target: 'pino-pretty'
+        }
       }
-    }
-  }))
+    })
+  )
+
+  app.setGlobalPrefix('api')
 
   app.use(bodyParser.json({ limit: '50mb' }))
   app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }))
@@ -34,8 +39,6 @@ async function bootstrap() {
       transform: true
     }),
   )
-
-  app.setGlobalPrefix('api')
 
   await app.register(helmet, {
     contentSecurityPolicy: false,
