@@ -56,28 +56,21 @@ export class EmbeddingService {
         const batch = slice(parsedSegments, i, i + BATCH)
 
         const batchPayload = batch.map(s => ({
+          comment: s.comment,
           content: s.code,
+          decorators: s.decorators,
+          endLine: s.endLine,
           fileId: file.id,
+          filePath: file.path,
+          jsDoc: s.jsDoc,
+          params: s.params,
+          returnType: s.returnType,
+          startLine: s.startLine,
           symbolKind: s.kind,
-          symbolName: s.name
+          symbolName: s.name,
         }))
 
-        // const docsSegmentsPayload = batch.map(s => ({
-        //   fileId: file.id,
-        //   kind: s.kind,
-        //   name: s.name,
-        //   content: s.code,
-        //   comment: s.comment,
-        //   decorators: s.decorators,
-        //   params: s.params,
-        //   returnType: s.returnType,
-        //   jsDoc: s.jsDoc,
-        //   startLine: s.startLine,
-        //   endLine: s.endLine,
-        // }))
-
         this.publishEmbeddingsJob(batchPayload)
-        // await this.docsSegmentRepo.save(docsSegmentsPayload)
       }
     }
 
@@ -114,8 +107,16 @@ export class EmbeddingService {
   }
 
   publishEmbeddingsJob(segments: {
+    comment?: string
     content: string
+    decorators?: string[]
+    endLine?: number
     fileId: number
+    filePath?: string
+    jsDoc?: string
+    params?: string[]
+    returnType?: string
+    startLine?: number
     symbolKind: string
     symbolName?: string
   }[]): void {

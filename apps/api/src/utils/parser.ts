@@ -9,13 +9,13 @@ export interface Segment {
   code: string
   comment?: string
   decorators?: string[]
-  endLine?: number
+  endLine: number
   jsDoc?: string
   kind: SegmentKind
   name?: string
   params?: string[]
   returnType?: string
-  startLine?: number
+  startLine: number
 }
 
 export interface DepEdge {
@@ -48,7 +48,15 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
 
   if (has(unsupportedExts, ext)) {
     logger.log(`[parser] unsupported extension "${ext}", returning full file as-is`)
-    return { parsedDependencies: [], parsedSegments: [{ code: src, kind: 'file' }] }
+    return {
+      parsedDependencies: [],
+      parsedSegments: [{
+        code: src,
+        kind: 'file',
+        startLine: 1,
+        endLine: src.split('\n').length
+      }]
+    }
   }
 
   if (ext === '.ts' || ext === '.tsx') {
@@ -71,7 +79,15 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
   if (!lang) {
     logger.log(`[parser] no mapping found for extension "${ext}", returning full file as-is`)
 
-    return { parsedDependencies: [], parsedSegments: [{ code: src, kind: 'file' }] }
+    return {
+      parsedDependencies: [],
+      parsedSegments: [{
+        code: src,
+        kind: 'file',
+        startLine: 1,
+        endLine: src.split('\n').length
+      }]
+    }
   }
 
   let Lang
@@ -81,7 +97,15 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
   } catch (err) {
     logger.error(`[parser] failed to load tree-sitter-${lang}:`, err)
 
-    return { parsedDependencies: [], parsedSegments: [{ code: src, kind: 'file' }] }
+    return {
+      parsedDependencies: [],
+      parsedSegments: [{
+        code: src,
+        kind: 'file',
+        startLine: 1,
+        endLine: src.split('\n').length
+      }]
+    }
   }
 
   const parser = new Parser()
@@ -131,7 +155,33 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
   }
 
   function push(n: SyntaxNode, kind: Segment['kind'], name?: string) {
-    segments.push({ code: src.slice(n.startIndex, n.endIndex), kind, name })
+    // Attempt to find preceding comments
+    let comment = ''
+    let prev = n.previousSibling
+    while (prev && (prev.type === 'comment' || prev.type === 'string_literal' || prev.type === 'doc_string')) { // python doc_string
+      comment = prev.text + '\n' + comment
+      prev = prev.previousSibling
+    }
+
+    // For Python, check body for docstring if it's a function/class
+    if (!comment && (kind === 'function' || kind === 'class')) {
+      const body = n.childForFieldName?.('body')
+      if (body && body.firstNamedChild && body.firstNamedChild.type === 'expression_statement') {
+        const expr = body.firstNamedChild.firstNamedChild
+        if (expr && expr.type === 'string') {
+          comment = expr.text
+        }
+      }
+    }
+
+    segments.push({
+      code: src.slice(n.startIndex, n.endIndex),
+      kind,
+      name: name ?? 'anonymous',
+      startLine: n.startPosition.row + 1,
+      endLine: n.endPosition.row + 1,
+      comment: comment.trim() || undefined
+    })
   }
 
   visit(tree.rootNode)
@@ -139,7 +189,15 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
   if (!segments.length) {
     logger.log('[parser] no segments detected, returning full file')
 
-    return { parsedDependencies: dependencies, parsedSegments: [{ code: src, kind: 'file' }] }
+    return {
+      parsedDependencies: dependencies,
+      parsedSegments: [{
+        code: src,
+        kind: 'file',
+        startLine: 1,
+        endLine: src.split('\n').length
+      }]
+    }
   }
 
   logger.log(`[parser] extracted ${segments.length} segments`)
@@ -156,90 +214,61 @@ function parseWithTsMorph(src: string, filePath: string): ParsedFile {
 
   const importMap = new Map<string, string>()
 
-  forEach(sourceFile.getImportDeclarations(), imp => {
+  forEach(sourceFile.getImportDeclarations(), (imp) => {
     const module = imp.getModuleSpecifierValue()
 
     forEach(imp.getNamedImports(), named => importMap.set(named.getName(), module))
 
     const def = imp.getDefaultImport()
-
-    if (def) {
-      importMap.set(def.getText(), module)
-    }
+    if (def) importMap.set(def.getText(), module)
 
     dependencies.push({ from: filePath, to: module, type: 'import' })
-    segments.push({ code: imp.getText(), kind: 'import' })
+    segments.push({
+      kind: 'import',
+      code: imp.getText(),
+      startLine: imp.getStartLineNumber(),
+      endLine: imp.getEndLineNumber(),
+    })
   })
 
-  // forEach(sourceFile.getImportDeclarations(), (imp) => {
-  //   const module = imp.getModuleSpecifierValue()
-  //
-  //   forEach(imp.getNamedImports(), named => importMap.set(named.getName(), module))
-  //
-  //   const def = imp.getDefaultImport()
-  //   if (def) importMap.set(def.getText(), module)
-  //
-  //   dependencies.push({ from: filePath, to: module, type: 'import' })
-  //   segments.push({
-  //     kind: 'import',
-  //     code: imp.getText(),
-  //     startLine: imp.getStartLineNumber(),
-  //     endLine: imp.getEndLineNumber(),
-  //   })
-  // })
-
-  forEach(sourceFile.getClasses(), cls => {
-    segments.push({ code: cls.getText(), kind: 'class', name: cls.getName() })
-
+  forEach(sourceFile.getClasses(), (cls) => {
+    const className = cls.getName()
+    const decorators = cls.getDecorators().map(d => d.getText())
+    const comment = cls.getJsDocs().map(doc => doc.getCommentText()).join('\n')
     const ext = cls.getExtends()
 
     if (ext) {
-      dependencies.push({ from: cls.getName()!, to: ext.getText(), type: 'extends' })
+      dependencies.push({ from: className!, to: ext.getText(), type: 'extends' })
     }
+
+    segments.push({
+      kind: 'class',
+      name: className || 'anonymous',
+      code: cls.getText(),
+      comment,
+      decorators,
+      startLine: cls.getStartLineNumber(),
+      endLine: cls.getEndLineNumber(),
+    })
   })
 
-  // forEach(sourceFile.getClasses(), (cls) => {
-  //   const className = cls.getName()
-  //   const decorators = cls.getDecorators().map(d => d.getText())
-  //   const comment = cls.getJsDocs().map(doc => doc.getComment()).join('\n')
-  //   const ext = cls.getExtends()
-  //
-  //   if (ext) {
-  //     dependencies.push({ from: className!, to: ext.getText(), type: 'extends' })
-  //   }
-  //
-  //   segments.push({
-  //     kind: 'class',
-  //     name: className,
-  //     code: cls.getText(),
-  //     comment,
-  //     decorators,
-  //     startLine: cls.getStartLineNumber(),
-  //     endLine: cls.getEndLineNumber(),
-  //   })
-  // })
+  forEach(sourceFile.getFunctions(), (fn) => {
+    const name = fn.getName()
+    const comment = fn.getJsDocs().map(doc => doc.getCommentText()).join('\n')
+    const params = fn.getParameters().map(p => `${p.getName()}: ${p.getType().getText()}`)
+    const returns = fn.getReturnType().getText()
 
-  forEach(sourceFile.getFunctions(), fn => {
-    segments.push({ code: fn.getText(), kind: 'function', name: fn.getName() })
+    segments.push({
+      kind: 'function',
+      name: name || 'anonymous',
+      code: fn.getText(),
+      comment,
+      params,
+      returnType: returns,
+      startLine: fn.getStartLineNumber(),
+      endLine: fn.getEndLineNumber(),
+    })
   })
-
-  // forEach(sourceFile.getFunctions(), (fn) => {
-  //   const name = fn.getName()
-  //   const comment = fn.getJsDocs().map(doc => doc.getComment()).join('\n')
-  //   const params = fn.getParameters().map(p => `${p.getName()}: ${p.getType().getText()}`)
-  //   const returns = fn.getReturnType().getText()
-  //
-  //   segments.push({
-  //     kind: 'function',
-  //     name,
-  //     code: fn.getText(),
-  //     comment,
-  //     params,
-  //     returnType: returns,
-  //     startLine: fn.getStartLineNumber(),
-  //     endLine: fn.getEndLineNumber(),
-  //   })
-  // })
 
   forEach(sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression), call => {
     const fromFn = call.getFirstAncestorByKind(SyntaxKind.FunctionDeclaration)
