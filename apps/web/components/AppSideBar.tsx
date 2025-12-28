@@ -24,7 +24,9 @@ import React, { useEffect } from 'react'
 import CreateRepoDialog from '@/components/repo/CreateRepoDialog'
 import RepoItem from '@/components/repo/RepoItem'
 import UserDropdownMenu from '@/components/UserDropdownMenu'
-import { useAuthStore, useReposStore } from '@/store'
+import { useAppDispatch, useAppSelector } from '@/redux/hooks'
+import { setMe } from '@/redux/slices/authSlice'
+import { setRepos } from '@/redux/slices/reposSlice'
 
 interface AppSideBarProps {
   fetchedRepos: Repository[]
@@ -32,12 +34,12 @@ interface AppSideBarProps {
 }
 
 export default function AppSidebar({ fetchedRepos, me }: AppSideBarProps) {
-  const { setMe } = useAuthStore()
-  const { repos, setRepos } = useReposStore()
+  const dispatch = useAppDispatch()
+  const repos = useAppSelector(state => state.repos.repos)
 
   useEffect(() => {
-    setMe(me)
-    setRepos(fetchedRepos)
+    dispatch(setMe(me))
+    dispatch(setRepos(fetchedRepos))
   }, [])
 
   return (

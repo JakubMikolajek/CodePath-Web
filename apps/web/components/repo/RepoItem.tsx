@@ -13,23 +13,29 @@ import { ChevronRight, TriangleAlert } from 'lucide-react'
 import Link from 'next/link'
 import React from 'react'
 
-import { useChatStore, useCollapsibleStore, useGraphsStore } from '@/store'
+import { useAppDispatch, useAppSelector } from '@/redux/hooks'
+import { createSession, getChatSessions } from '@/redux/slices/chatSlice'
+import { setOpenRepoId } from '@/redux/slices/collapsibleSlice'
+import { getGraphs } from '@/redux/slices/graphsSlice'
 
 interface RepoItemProps {
   item: Repository
 }
 
 export default function RepoItem({ item }: RepoItemProps) {
-  const { chatSessions, createSession, getChatSessions } = useChatStore()
-  const { isRepoOpen, setOpenRepoId } = useCollapsibleStore()
-  const { getGraphs, graphs } = useGraphsStore()
+  const dispatch = useAppDispatch()
+  const chatSessions = useAppSelector(state => state.chat.chatSessions)
+  const graphs = useAppSelector(state => state.graphs.graphs)
+  const openRepoId = useAppSelector(state => state.collapsible.openRepoId)
 
-  const handleOpenChange = async (open: boolean) => {
-    setOpenRepoId(open ? item.id : null)
+  const isRepoOpen = openRepoId === item.id
+
+  const handleOpenChange = (open: boolean) => {
+    dispatch(setOpenRepoId(open ? item.id : null))
 
     if (open) {
-      await getChatSessions(item.id)
-      await getGraphs(item.id)
+      dispatch(getChatSessions(item.id))
+      dispatch(getGraphs(item.id))
     }
   }
 
@@ -39,7 +45,7 @@ export default function RepoItem({ item }: RepoItemProps) {
       className="group/collapsible-main"
       key={item.id}
       onOpenChange={handleOpenChange}
-      open={isRepoOpen(item.id)}
+      open={isRepoOpen}
     >
       <SidebarMenuItem>
         <CollapsibleTrigger asChild>
@@ -65,7 +71,7 @@ export default function RepoItem({ item }: RepoItemProps) {
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <SidebarMenuSub>
-                    <SidebarMenuButton asChild onClick={() => createSession(item.id)}>
+                    <SidebarMenuButton asChild onClick={() => dispatch(createSession(item.id))}>
                       <span>New chat</span>
                       {/*<LucideMessagesSquare className="ml-auto h-4 w-4" />*/}
                     </SidebarMenuButton>

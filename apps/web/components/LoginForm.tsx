@@ -6,7 +6,8 @@ import { Label } from '@workspace/ui/components/label'
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 
-import { useAuthStore } from '@/store'
+import { useAppDispatch, useAppSelector } from '@/redux/hooks'
+import { clearError, login } from '@/redux/slices/authSlice'
 
 interface LoginFormProps {
   handleShowRegisterForm: (value: boolean) => void
@@ -18,20 +19,28 @@ interface LoginFormState {
 }
 
 export default function LoginForm({ handleShowRegisterForm }: LoginFormProps) {
-  const { clearError, error, loading, login } = useAuthStore()
+  const dispatch = useAppDispatch()
+  const { error, loading } = useAppSelector(state => state.auth)
   const [formData, setFormData] = useState<LoginFormState>({
     identifier: '',
     password: ''
   })
 
   const handleInputChange = (field: keyof LoginFormState, value: string) => {
-    if (error) clearError()
+    if (error) dispatch(clearError())
     setFormData({ ...formData, [field]: value })
   }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    await login(formData.identifier, formData.password)
+    try {
+      await dispatch(login({
+        identifier: formData.identifier,
+        password: formData.password
+      })).unwrap()
+    } catch {
+      // TODO add error log
+    }
   }
 
   return (

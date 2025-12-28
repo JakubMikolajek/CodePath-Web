@@ -6,7 +6,8 @@ import { Label } from '@workspace/ui/components/label'
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 
-import { useAuthStore } from '@/store'
+import { useAppDispatch, useAppSelector } from '@/redux/hooks'
+import { clearError, register } from '@/redux/slices/authSlice'
 
 interface RegisterFormProps {
   handleShowRegisterForm: (value: boolean) => void
@@ -19,7 +20,8 @@ interface RegisterFormState {
 }
 
 export default function RegisterForm({ handleShowRegisterForm }: RegisterFormProps) {
-  const { clearError, error, loading, register } = useAuthStore()
+  const dispatch = useAppDispatch()
+  const { error, loading } = useAppSelector(state => state.auth)
   const [formData, setFormData] = useState<RegisterFormState>({
     email: '',
     login: '',
@@ -28,7 +30,7 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
   const [success, setSuccess] = useState(false)
 
   const handleInputChange = (field: keyof RegisterFormState, value: string) => {
-    if (error) clearError()
+    if (error) dispatch(clearError())
     setFormData({ ...formData, [field]: value })
   }
 
@@ -36,11 +38,19 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
     e.preventDefault()
     setSuccess(false)
 
-    await register(formData.email, formData.login, formData.password)
-    setSuccess(true)
-    setTimeout(() => {
-      handleShowRegisterForm(false)
-    }, 1500)
+    try {
+      await dispatch(register({
+        email: formData.email,
+        login: formData.login,
+        password: formData.password
+      })).unwrap()
+      setSuccess(true)
+      setTimeout(() => {
+        handleShowRegisterForm(false)
+      }, 1500)
+    } catch {
+      // TODO add error handling
+    }
   }
 
   return (

@@ -24,7 +24,8 @@ import { Textarea } from '@workspace/ui/components/textarea'
 import { type ReactNode, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
-import { useReposStore } from '@/store'
+import { useAppDispatch } from '@/redux/hooks'
+import { createRepo } from '@/redux/slices/reposSlice'
 import type { CreateRepoFormData } from '@/utils/validators/createRepoForm'
 import { createRepoFormSchema } from '@/utils/validators/createRepoForm'
 
@@ -33,24 +34,24 @@ interface CreateRepoDialogProps {
 }
 
 export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
-  const { createRepo } = useReposStore()
+  const dispatch = useAppDispatch()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<CreateRepoFormData>({
+    resolver: zodResolver(createRepoFormSchema),
     defaultValues: {
       accessKey: '',
       gitUrl: '',
       name: ''
-    },
-    resolver: zodResolver(createRepoFormSchema)
+    }
   })
 
   const handleSubmit = async (data: CreateRepoFormData) => {
     try {
       setIsSubmitting(true)
 
-      await createRepo(data)
+      await dispatch(createRepo(data)).unwrap()
 
       setDialogOpen(false)
       form.reset()
@@ -71,7 +72,7 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
   return (
     <Dialog onOpenChange={handleDialogChange} open={dialogOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-106.25">
         <DialogHeader>
           <DialogTitle>Add New Repository</DialogTitle>
           <DialogDescription>

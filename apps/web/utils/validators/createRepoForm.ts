@@ -1,4 +1,4 @@
-import * as z from 'zod'
+import { z } from 'zod'
 
 export const createRepoFormSchema = z.object({
   accessKey: z.string().min(1, 'Access key is required'),

@@ -11,14 +11,16 @@ import { LogOut, Moon, Sun } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import React from 'react'
 
-import { useAuthStore } from '@/store'
+import { useAppDispatch, useAppSelector } from '@/redux/hooks'
+import { logout } from '@/redux/slices/authSlice'
 
 export default function UserDropdownMenu() {
   const { setTheme } = useTheme()
-  const { logout, user } = useAuthStore()
+  const dispatch = useAppDispatch()
+  const user = useAppSelector(state => state.auth.user)
 
   const handleLogout = async () => {
-    await logout()
+    await dispatch(logout())
   }
 
   return (

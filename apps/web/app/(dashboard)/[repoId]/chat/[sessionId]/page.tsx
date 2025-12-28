@@ -12,11 +12,13 @@ import Markdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 
-import { useChatStore } from '@/store'
+import { useAppDispatch, useAppSelector } from '@/redux/hooks'
+import { getSessionDetails, sendMessage } from '@/redux/slices/chatSlice'
 
 export default function ChatPage() {
   const params = useParams()
-  const { getSessionDetails, sendMessage, sessionDetails } = useChatStore()
+  const dispatch = useAppDispatch()
+  const sessionDetails = useAppSelector(state => state.chat.sessionDetails)
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [copiedId, setCopiedId] = useState<null | string>(null)
@@ -27,7 +29,11 @@ export default function ChatPage() {
 
     setIsLoading(true)
     try {
-      const response = await sendMessage(Number.parseFloat(params.repoId as string), inputValue, params.sessionId as string)
+      await dispatch(sendMessage({
+        question: inputValue,
+        repoId: Number.parseFloat(params.repoId as string),
+        sessionId: params.sessionId as string
+      })).unwrap()
       setInputValue('')
     } catch (error) {
       console.error('Error sending message:', error)
@@ -47,7 +53,10 @@ export default function ChatPage() {
   }
 
   useEffect(() => {
-    getSessionDetails(Number.parseFloat(params.repoId as string), params.sessionId as string)
+    dispatch(getSessionDetails({
+      repoId: Number.parseFloat(params.repoId as string),
+      sessionId: params.sessionId as string
+    }))
   }, [params.sessionId])
 
   return (
@@ -101,7 +110,7 @@ export default function ChatPage() {
                                   {children}
                                 </blockquote>
                               ),
-                              code: ({ children, className, node, ...props }) => {
+                              code: ({ children, className, ...props }) => {
                                 const match = /language-(\w+)/.exec(className || '')
                                 return match ? (
                                   <div className="relative">
@@ -181,18 +190,18 @@ export default function ChatPage() {
           )}
         </div>
 
-        <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="border-t bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
           <div className="p-4">
             <form className="flex items-end space-x-2" onSubmit={handleSubmit}>
               <div className="flex-1">
                 <Input
-                  className="min-h-[44px] resize-none"
+                  className="min-h-11 resize-none"
                   disabled={isLoading}
                   onChange={e => setInputValue(e.target.value)}
-                  onKeyDown={e => {
+                  onKeyDown={async e => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault()
-                      handleSubmit(e)
+                      await handleSubmit(e)
                     }
                   }}
                   placeholder="Zadaj pytanie..."
@@ -200,7 +209,7 @@ export default function ChatPage() {
                 />
               </div>
               <Button
-                className="h-[44px] w-[44px]"
+                className="h-11 w-11"
                 disabled={isLoading || !inputValue.trim()}
                 size="icon"
                 type="submit"

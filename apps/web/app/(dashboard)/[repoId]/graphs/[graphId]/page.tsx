@@ -6,13 +6,13 @@ import { useParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 import MermaidGraph from '@/components/MermaidGraph'
-import { useGraphsStore } from '@/store'
+import { useAppSelector } from '@/redux/hooks'
 
 export default function Page() {
   const params = useParams()
   const [activeGraph, setActiveGraph] = useState<GenericNullable<Graph>>(null)
 
-  const { graphs } = useGraphsStore()
+  const graphs = useAppSelector(state => state.graphs.graphs)
 
   useEffect(() => {
     setActiveGraph(graphs.find(graph => graph.id === Number(params.graphId)) ?? null)
