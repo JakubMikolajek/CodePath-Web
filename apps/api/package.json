@@ -33,6 +33,7 @@
     "@nestjs/platform-fastify": "^11.1.10",
     "@nestjs/schedule": "^6.1.0",
     "@nestjs/swagger": "^11.2.3",
+    "@qdrant/js-client-rest": "^1.16.2",
     "@vue/compiler-sfc": "^3.5.26",
     "amqplib": "^0.10.9",
     "axios": "^1.13.2",

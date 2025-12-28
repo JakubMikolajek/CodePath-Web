@@ -1,21 +1,20 @@
-import { HttpService } from '@nestjs/axios'
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import * as amqp from 'amqplib'
 import { eq } from 'drizzle-orm'
 
 import { DbService } from '../db/db.service'
-import { embeddings, files } from '../db/schema'
+import { files } from '../db/schema'
+import { QdrantService } from '../qdrant/qdrant.service'
 
 @Injectable()
 export class DocsService {
   private channel: amqp.Channel
   private conn: amqp.ChannelModel
-  private logger: Logger = new Logger(DocsService.name)
   private readonly quque = 'docs'
 
   constructor(
-    private readonly httpService: HttpService,
-    private readonly dbService: DbService
+    private readonly dbService: DbService,
+    private readonly qdrantService: QdrantService
   ) { }
 
   async generateDocumentation(repoId: number): Promise<string> {
@@ -24,9 +23,18 @@ export class DocsService {
       .where(eq(files.repoId, repoId))
 
     for (const file of repoFiles) {
-      const fileEmbeddings = await this.dbService.dbClient.select()
-        .from(embeddings)
-        .where(eq(embeddings.fileId, file.id))
+      const scrollResult = await this.qdrantService.scroll('embeddings', {
+        must: [
+          {
+            key: 'fileId',
+            match: {
+              value: file.id
+            }
+          }
+        ]
+      })
+
+      const fileEmbeddings = scrollResult.points.map(point => point.payload)
 
       this.channel.sendToQueue(
         this.quque,

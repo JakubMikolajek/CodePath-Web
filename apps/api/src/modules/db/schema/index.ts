@@ -2,7 +2,6 @@ export { chatHistory, chatHistoryRelations, type InsertChatHistory, type SelectC
 export { chatSessions, chatSessionsRelations, type InsertChatSession, type SelectChatSession } from './chatSessions'
 export { dependencies, dependenciesRelations, type InsertDependencies, type SelectDependencies } from './dependencies'
 export { docsSegments, docsSegmentsRelations, type InsertDocsSegment, type SelectDocsSegment } from './docsSegments'
-export { embeddings, embeddingsRelations, type InsertEmbedding, type SelectEmbedding } from './embeddings'
 export { files, filesRelations, type InsertFile, type SelectFile } from './files'
 export { type InsertRepo, repos, reposRelations, type SelectRepo } from './repos'
 export { type InserUser, type SelectUser, users, usersRelations } from './users'

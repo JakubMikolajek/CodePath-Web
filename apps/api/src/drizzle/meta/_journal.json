@@ -29,6 +29,13 @@
       "when": 1753613249708,
       "tag": "0003_lonely_screwball",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1766922511268,
+      "tag": "0004_handy_ink",
+      "breakpoints": true
     }
   ]
 }
