@@ -52,7 +52,7 @@ export class DocsService {
   }
 
   async onModuleInit() {
-    this.conn = await amqp.connect('amqp://admin:admin@192.168.1.245')
+    this.conn = await amqp.connect('amqp://admin:admin@127.0.0.1')
     this.channel = await this.conn.createChannel()
     await this.channel.assertQueue(this.quque, { durable: true })
   }

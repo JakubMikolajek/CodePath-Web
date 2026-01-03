@@ -72,8 +72,8 @@ export class RepoFetcherService {
         process.env.GIT_SSH_COMMAND = `ssh -i ${tmpKeyPath} -o StrictHostKeyChecking=no`
       }
 
-      // await git.clone(repo.gitUrl, targetPath, ['--branch', 'develop', '--single-branch'])
-      await git.clone(repo.gitUrl, targetPath)
+      await git.clone(repo.gitUrl, targetPath, ['--branch', 'develop', '--single-branch'])
+      // await git.clone(repo.gitUrl, targetPath)
 
       await this.dbService.dbClient.update(repos)
         .set({

@@ -8,7 +8,7 @@ export class QdrantService implements OnModuleInit {
 
   async onModuleInit() {
     this.client = new QdrantClient({
-      host: '192.168.1.245',
+      host: '127.0.0.1',
       port: 6333
     })
 

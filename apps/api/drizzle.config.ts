@@ -2,7 +2,7 @@ import { defineConfig } from 'drizzle-kit'
 
 export default defineConfig({
   dbCredentials: {
-    url: 'postgres://postgres:postgres@192.168.1.245:5432/codepath'
+    url: 'postgres://postgres:postgres@127.0.0.1:5432/codepath'
   },
   dialect: 'postgresql',
   out: './src/drizzle',

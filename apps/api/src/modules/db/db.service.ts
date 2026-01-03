@@ -7,7 +7,7 @@ export class DbService implements OnModuleDestroy {
   get dbClient() {
     return this.db
   }
-  private readonly pool = new Pool({ connectionString: 'postgres://postgres:postgres@192.168.1.245:5432/codepath' })
+  private readonly pool = new Pool({ connectionString: 'postgres://postgres:postgres@127.0.0.1:5432/codepath' })
 
   private readonly db: NodePgDatabase = drizzle(this.pool)
 

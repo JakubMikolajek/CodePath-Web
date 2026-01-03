@@ -1,4 +1,5 @@
 import compress from '@fastify/compress'
+import fastifyCookie from '@fastify/cookie'
 import cors from '@fastify/cors'
 import helmet from '@fastify/helmet'
 import { ValidationPipe } from '@nestjs/common'
@@ -6,8 +7,6 @@ import { NestFactory } from '@nestjs/core'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { FastifyAdapter } from '@nestjs/platform-fastify'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
-import * as bodyParser from 'body-parser'
-import cookieParser from 'cookie-parser'
 
 import { AppModule } from './app.module'
 
@@ -30,15 +29,13 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api')
 
-  app.use(bodyParser.json({ limit: '50mb' }))
-  app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }))
-  app.use(cookieParser())
-
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true
     }),
   )
+
+  await app.register(fastifyCookie)
 
   await app.register(helmet, {
     contentSecurityPolicy: false,

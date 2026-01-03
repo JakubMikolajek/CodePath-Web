@@ -67,10 +67,10 @@ export class EmbeddingService {
           returnType: s.returnType,
           startLine: s.startLine,
           symbolKind: s.kind,
-          symbolName: s.name,
+          symbolName: s.name
         }))
 
-        this.publishEmbeddingsJob(batchPayload)
+        this.publishEmbeddingsJob(batchPayload, repo.id)
       }
     }
 
@@ -87,7 +87,7 @@ export class EmbeddingService {
   }
 
   async onModuleInit() {
-    this.conn = await amqp.connect('amqp://admin:admin@192.168.1.245')
+    this.conn = await amqp.connect('amqp://admin:admin@127.0.0.1')
     this.channel = await this.conn.createChannel()
     await this.channel.assertQueue(this.queue, { durable: true })
   }
@@ -119,11 +119,11 @@ export class EmbeddingService {
     startLine?: number
     symbolKind: string
     symbolName?: string
-  }[]): void {
+  }[], repoId: number): void {
     this.channel.sendToQueue(
       this.queue,
       Buffer.from(
-        JSON.stringify({ segments })
+        JSON.stringify({ repoId, segments })
       ), { persistent: true }
     )
   }
