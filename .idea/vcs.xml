@@ -2,7 +2,5 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/storage/repos/CodePath-AI" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/storage/repos/TTLock-Admin-Panel" vcs="Git" />
   </component>
 </project>

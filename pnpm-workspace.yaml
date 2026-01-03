@@ -3,8 +3,12 @@ packages:
   - packages/*
 
 onlyBuiltDependencies:
+  - '@nestjs/core'
+  - '@swc/core'
+  - sharp
   - tree-sitter
   - tree-sitter-javascript
   - tree-sitter-python
   - tree-sitter-typescript
   - tree-sitter-vue
+  - unrs-resolver
