@@ -64,6 +64,7 @@ export class EmbeddingService {
           filePath: file.path,
           jsDoc: s.jsDoc,
           params: s.params,
+          repoId: repo.id,
           returnType: s.returnType,
           startLine: s.startLine,
           symbolKind: s.kind,

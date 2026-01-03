@@ -52,9 +52,9 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
       parsedDependencies: [],
       parsedSegments: [{
         code: src,
+        endLine: src.split('\n').length,
         kind: 'file',
-        startLine: 1,
-        endLine: src.split('\n').length
+        startLine: 1
       }]
     }
   }
@@ -83,9 +83,9 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
       parsedDependencies: [],
       parsedSegments: [{
         code: src,
+        endLine: src.split('\n').length,
         kind: 'file',
-        startLine: 1,
-        endLine: src.split('\n').length
+        startLine: 1
       }]
     }
   }
@@ -101,9 +101,9 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
       parsedDependencies: [],
       parsedSegments: [{
         code: src,
+        endLine: src.split('\n').length,
         kind: 'file',
-        startLine: 1,
-        endLine: src.split('\n').length
+        startLine: 1
       }]
     }
   }
@@ -176,11 +176,11 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
 
     segments.push({
       code: src.slice(n.startIndex, n.endIndex),
+      comment: comment.trim() || undefined,
+      endLine: n.endPosition.row + 1,
       kind,
       name: name ?? 'anonymous',
-      startLine: n.startPosition.row + 1,
-      endLine: n.endPosition.row + 1,
-      comment: comment.trim() || undefined
+      startLine: n.startPosition.row + 1
     })
   }
 
@@ -193,9 +193,9 @@ export function parseSegments(src: string, ext: string, filePath: string): Parse
       parsedDependencies: dependencies,
       parsedSegments: [{
         code: src,
+        endLine: src.split('\n').length,
         kind: 'file',
-        startLine: 1,
-        endLine: src.split('\n').length
+        startLine: 1
       }]
     }
   }
@@ -214,7 +214,7 @@ function parseWithTsMorph(src: string, filePath: string): ParsedFile {
 
   const importMap = new Map<string, string>()
 
-  forEach(sourceFile.getImportDeclarations(), (imp) => {
+  forEach(sourceFile.getImportDeclarations(), imp => {
     const module = imp.getModuleSpecifierValue()
 
     forEach(imp.getNamedImports(), named => importMap.set(named.getName(), module))
@@ -224,14 +224,14 @@ function parseWithTsMorph(src: string, filePath: string): ParsedFile {
 
     dependencies.push({ from: filePath, to: module, type: 'import' })
     segments.push({
-      kind: 'import',
       code: imp.getText(),
-      startLine: imp.getStartLineNumber(),
       endLine: imp.getEndLineNumber(),
+      kind: 'import',
+      startLine: imp.getStartLineNumber()
     })
   })
 
-  forEach(sourceFile.getClasses(), (cls) => {
+  forEach(sourceFile.getClasses(), cls => {
     const className = cls.getName()
     const decorators = cls.getDecorators().map(d => d.getText())
     const comment = cls.getJsDocs().map(doc => doc.getCommentText()).join('\n')
@@ -242,31 +242,95 @@ function parseWithTsMorph(src: string, filePath: string): ParsedFile {
     }
 
     segments.push({
-      kind: 'class',
-      name: className || 'anonymous',
       code: cls.getText(),
       comment,
       decorators,
-      startLine: cls.getStartLineNumber(),
       endLine: cls.getEndLineNumber(),
+      kind: 'class',
+      name: className || 'anonymous',
+      startLine: cls.getStartLineNumber()
+    })
+
+    forEach(cls.getMethods(), method => {
+      const methodName = method.getName()
+      const methodComment = method.getJsDocs().map(doc => doc.getCommentText()).join('\n')
+      const methodParams = method.getParameters().map(p => `${p.getName()}: ${p.getType().getText()}`)
+      const methodReturns = method.getReturnType().getText()
+      const methodDecorators = method.getDecorators().map(d => d.getText())
+
+      segments.push({
+        code: method.getText(),
+        comment: methodComment,
+        decorators: methodDecorators,
+        endLine: method.getEndLineNumber(),
+        kind: 'method' as SegmentKind,
+        name: `${className}.${methodName}`,
+        params: methodParams,
+        returnType: methodReturns,
+        startLine: method.getStartLineNumber()
+      })
     })
   })
 
-  forEach(sourceFile.getFunctions(), (fn) => {
+  forEach(sourceFile.getInterfaces(), intf => {
+    const name = intf.getName()
+    const comment = intf.getJsDocs().map(doc => doc.getCommentText()).join('\n')
+
+    segments.push({
+      code: intf.getText(),
+      comment,
+      endLine: intf.getEndLineNumber(),
+      kind: 'class',
+      name: name,
+      startLine: intf.getStartLineNumber()
+    })
+  })
+
+  forEach(sourceFile.getTypeAliases(), typeAlias => {
+    const name = typeAlias.getName()
+    const comment = typeAlias.getJsDocs().map(doc => doc.getCommentText()).join('\n')
+
+    segments.push({
+      code: typeAlias.getText(),
+      comment,
+      endLine: typeAlias.getEndLineNumber(),
+      kind: 'function',
+      name: name,
+      startLine: typeAlias.getStartLineNumber()
+    })
+  })
+
+  forEach(sourceFile.getVariableStatements(), stmt => {
+    const decls = stmt.getDeclarations()
+    const comment = stmt.getJsDocs().map(doc => doc.getCommentText()).join('\n')
+
+    decls.forEach(decl => {
+      segments.push({
+        code: stmt.getText(),
+        comment,
+        endLine: stmt.getEndLineNumber(),
+        kind: 'function',
+        name: decl.getName(),
+        startLine: stmt.getStartLineNumber()
+      })
+    })
+  })
+
+  forEach(sourceFile.getFunctions(), fn => {
     const name = fn.getName()
     const comment = fn.getJsDocs().map(doc => doc.getCommentText()).join('\n')
     const params = fn.getParameters().map(p => `${p.getName()}: ${p.getType().getText()}`)
     const returns = fn.getReturnType().getText()
 
     segments.push({
-      kind: 'function',
-      name: name || 'anonymous',
       code: fn.getText(),
       comment,
+      endLine: fn.getEndLineNumber(),
+      kind: 'function',
+      name: name || 'anonymous',
       params,
       returnType: returns,
-      startLine: fn.getStartLineNumber(),
-      endLine: fn.getEndLineNumber(),
+      startLine: fn.getStartLineNumber()
     })
   })
 

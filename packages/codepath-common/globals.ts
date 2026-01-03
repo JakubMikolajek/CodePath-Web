@@ -3,7 +3,8 @@ export enum SegmentKinds {
   IMPORT = 'import',
   FUNCTION = 'function',
   CLASS = 'class',
-  FILE = 'file'
+  FILE = 'file',
+  METHOD = 'method'
 }
 
 export enum DepentencyTypes {
