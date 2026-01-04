@@ -13,7 +13,8 @@ export const repos = pgTable('repos', {
   indexedAt: timestamp('indexed_at', { mode: 'string' }).defaultNow(),
   name: text().notNull(),
   path: text(),
-  userId: integer('user_id').notNull()
+  userId: integer('user_id').notNull(),
+  documentation: text('documentation')
 }, table => [
   foreignKey({
     columns: [table.userId],

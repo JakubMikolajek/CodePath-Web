@@ -3,7 +3,7 @@ import * as amqp from 'amqplib'
 import { eq } from 'drizzle-orm'
 
 import { DbService } from '../db/db.service'
-import { files } from '../db/schema'
+import { files, repos } from '../db/schema'
 import { QdrantService } from '../qdrant/qdrant.service'
 
 @Injectable()
@@ -17,33 +17,23 @@ export class DocsService {
     private readonly qdrantService: QdrantService
   ) { }
 
-  async generateDocumentation(repoId: number): Promise<string> {
-    const repoFiles = await this.dbService.dbClient.select()
-      .from(files)
-      .where(eq(files.repoId, repoId))
+  async generateDocumentation(repoId: number) {
+    this.channel.sendToQueue(
+      this.quque,
+      Buffer.from(JSON.stringify({ repoId })),
+      { persistent: true }
+    )
 
-    for (const file of repoFiles) {
-      const scrollResult = await this.qdrantService.scroll('embeddings', {
-        must: [
-          {
-            key: 'fileId',
-            match: {
-              value: file.id
-            }
-          }
-        ]
-      })
+    return { message: 'Documentation generation started' }
+  }
 
-      const fileEmbeddings = scrollResult.points.map(point => point.payload)
+  async getDocumentation(repoId: number) {
+    const [repo] = await this.dbService.dbClient.select()
+      .from(repos)
+      .where(eq(repos.id, repoId))
+      .limit(1)
 
-      this.channel.sendToQueue(
-        this.quque,
-        Buffer.from(JSON.stringify({ embeddings: fileEmbeddings })),
-        { persistent: true }
-      )
-    }
-
-    return 'TEST'
+    return repo?.documentation
   }
 
   async onModuleDestroy() {

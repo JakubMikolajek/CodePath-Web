@@ -1,13 +1,18 @@
-import { Controller, Get, Param, ParseIntPipe } from '@nestjs/common'
+import { Controller, Get, Param, ParseIntPipe, Post } from '@nestjs/common'
 
 import { DocsService } from './docs.service'
 
 @Controller('docs')
 export class DocsController {
-  constructor(private readonly docsService: DocsService) {}
+  constructor(private readonly docsService: DocsService) { }
 
-  @Get('generate/:repoId')
+  @Post('generate/:repoId')
   async generateDocumentation(@Param('repoId', ParseIntPipe) repoId: number) {
     return await this.docsService.generateDocumentation(repoId)
+  }
+
+  @Get(':repoId')
+  async getDocumentation(@Param('repoId', ParseIntPipe) repoId: number) {
+    return await this.docsService.getDocumentation(repoId)
   }
 }
