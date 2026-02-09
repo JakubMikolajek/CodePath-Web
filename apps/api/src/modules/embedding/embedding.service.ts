@@ -9,7 +9,7 @@ import { promises as fsp } from 'fs'
 import { slice } from 'lodash'
 
 import { buildMermaidGraph } from '../../utils/mermaidBuilder'
-import { parseSegments } from '../../utils/parser'
+import { parseSegments, resolveCodeLanguageFromExt } from '../../utils/parser'
 import { DbService } from '../db/db.service'
 import { dependencies, files, repos, SelectRepo } from '../db/schema'
 
@@ -39,7 +39,9 @@ export class EmbeddingService {
       }
 
       const src = await fsp.readFile(abs, 'utf8')
-      const { parsedDependencies, parsedSegments } = parseSegments(src, path.extname(file.path), file.path)
+      const fileExt = path.extname(file.path).toLowerCase()
+      const language = resolveCodeLanguageFromExt(fileExt)
+      const { parsedDependencies, parsedSegments } = parseSegments(src, fileExt, file.path)
 
       const graph = buildMermaidGraph(parsedDependencies)
 
@@ -60,9 +62,11 @@ export class EmbeddingService {
           content: s.code,
           decorators: s.decorators,
           endLine: s.endLine,
+          fileExt,
           fileId: file.id,
           filePath: file.path,
           jsDoc: s.jsDoc,
+          language,
           params: s.params,
           repoId: repo.id,
           returnType: s.returnType,
@@ -112,9 +116,11 @@ export class EmbeddingService {
     content: string
     decorators?: string[]
     endLine?: number
+    fileExt?: string
     fileId: number
     filePath?: string
     jsDoc?: string
+    language?: string
     params?: string[]
     returnType?: string
     startLine?: number
