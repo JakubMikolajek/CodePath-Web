@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<project version="4">
-  <component name="VcsDirectoryMappings">
-    <mapping directory="" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/../CodePath-AI" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/storage/repos/TTLOCK_ADMIN_PANEL" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/storage/repos/WSB_COMPUTATIONAL_GEOMETRY_SEM_I" vcs="Git" />
-  </component>
-</project>
