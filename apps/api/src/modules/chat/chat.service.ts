@@ -16,6 +16,7 @@ export class ChatService {
   private conn: amqp.ChannelModel
   private logger: Logger = new Logger(ChatService.name)
   private readonly queue = 'chat'
+  private readonly retryDelayMs = 5000
 
   constructor(
     private readonly embeddingService: EmbeddingService,
@@ -100,7 +101,30 @@ export class ChatService {
   async onModuleInit() {
     this.conn = await amqp.connect('amqp://admin:admin@127.0.0.1')
     this.channel = await this.conn.createChannel()
-    await this.channel.assertQueue(this.queue, { durable: true })
+    const dlx = `${this.queue}.dlx`
+    const dlq = `${this.queue}.dlq`
+    const retryQueue = `${this.queue}.retry`
+
+    await this.channel.assertExchange(dlx, 'direct', { durable: true })
+    await this.channel.assertQueue(dlq, { durable: true })
+    await this.channel.bindQueue(dlq, dlx, this.queue)
+
+    await this.channel.assertQueue(this.queue, {
+      arguments: {
+        'x-dead-letter-exchange': dlx,
+        'x-dead-letter-routing-key': this.queue
+      },
+      durable: true
+    })
+
+    await this.channel.assertQueue(retryQueue, {
+      arguments: {
+        'x-dead-letter-exchange': '',
+        'x-dead-letter-routing-key': this.queue,
+        'x-message-ttl': this.retryDelayMs
+      },
+      durable: true
+    })
   }
 
   private async publishChatJob(segments: {

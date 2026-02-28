@@ -32,6 +32,7 @@
     "zod": "^4.2.1"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.18",
     "@types/lodash": "^4.17.21",
     "@types/node": "^20",
     "@types/react": "^19.2.7",
@@ -39,7 +40,10 @@
     "@workspace/codepath-common": "workspace:*",
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
+    "autoprefixer": "^10.4.24",
     "eslint": "^9.39.2",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3"
   }
 }

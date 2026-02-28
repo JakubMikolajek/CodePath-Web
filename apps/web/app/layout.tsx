@@ -1,6 +1,6 @@
 'use server'
 
-import '@workspace/ui/globals.css'
+import '@workspace/ui/styles/globals.css'
 
 import { Geist, Geist_Mono } from 'next/font/google'
 import type { ReactNode } from 'react'
