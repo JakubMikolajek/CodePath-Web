@@ -8,10 +8,13 @@ import { eq } from 'drizzle-orm'
 import { promises as fsp } from 'fs'
 import { slice } from 'lodash'
 
+import { env } from '../../config/env'
+import { emitTelemetry } from '../../lib/telemetry'
 import { buildMermaidGraph } from '../../utils/mermaidBuilder'
 import { parseSegments, resolveCodeLanguageFromExt } from '../../utils/parser'
 import { DbService } from '../db/db.service'
 import { dependencies, files, repos, SelectRepo } from '../db/schema'
+import { ensureQueueTopology } from '../rabbitmq/topology'
 
 @Injectable()
 export class EmbeddingService {
@@ -19,7 +22,7 @@ export class EmbeddingService {
   private conn: amqp.ChannelModel
   private readonly logger: Logger = new Logger(EmbeddingService.name)
   private readonly queue = 'embedding'
-  private readonly retryDelayMs = 5000
+  private readonly retryDelayMs = env.rabbitRetryDelayMs
 
   constructor(
     private readonly dbService: DbService
@@ -27,6 +30,15 @@ export class EmbeddingService {
 
   async embedRepo(repo: SelectRepo) {
     const BATCH = 64
+    emitTelemetry({
+      component: 'embedding.service',
+      event: 'embedding_repo_processing_started',
+      level: 'info',
+      repoId: repo.id,
+      runtimeFamily: 'pipeline',
+      service: 'web-api',
+      status: 'ok'
+    })
 
     const allFiles = await this.dbService.dbClient.select()
       .from(files)
@@ -83,6 +95,15 @@ export class EmbeddingService {
     await this.dbService.dbClient.update(repos).set({
       embeddingStatus: 'embeded'
     }).where(eq(repos.id, repo.id))
+    emitTelemetry({
+      component: 'embedding.service',
+      event: 'embedding_repo_processing_finished',
+      level: 'info',
+      repoId: repo.id,
+      runtimeFamily: 'pipeline',
+      service: 'web-api',
+      status: 'ok'
+    })
 
     return { message: `Embeddings queued for repo ${repo.id}` }
   }
@@ -93,31 +114,13 @@ export class EmbeddingService {
   }
 
   async onModuleInit() {
-    this.conn = await amqp.connect('amqp://admin:admin@127.0.0.1')
+    this.conn = await amqp.connect(env.rabbitUrl)
     this.channel = await this.conn.createChannel()
-    const dlx = `${this.queue}.dlx`
-    const dlq = `${this.queue}.dlq`
-    const retryQueue = `${this.queue}.retry`
-
-    await this.channel.assertExchange(dlx, 'direct', { durable: true })
-    await this.channel.assertQueue(dlq, { durable: true })
-    await this.channel.bindQueue(dlq, dlx, this.queue)
-
-    await this.channel.assertQueue(this.queue, {
-      arguments: {
-        'x-dead-letter-exchange': dlx,
-        'x-dead-letter-routing-key': this.queue
-      },
-      durable: true
-    })
-
-    await this.channel.assertQueue(retryQueue, {
-      arguments: {
-        'x-dead-letter-exchange': '',
-        'x-dead-letter-routing-key': this.queue,
-        'x-message-ttl': this.retryDelayMs
-      },
-      durable: true
+    await ensureQueueTopology(this.channel, {
+      queueName: this.queue,
+      retryDelayMs: this.retryDelayMs
+    }, {
+      allowRecreateOnMismatch: env.rabbitAllowDestructiveMigration
     })
   }
 
@@ -157,5 +160,18 @@ export class EmbeddingService {
         JSON.stringify({ repoId, segments })
       ), { persistent: true }
     )
+    emitTelemetry({
+      component: 'embedding.service',
+      details: {
+        segmentCount: segments.length
+      },
+      event: 'embedding_job_published',
+      level: 'info',
+      queueName: this.queue,
+      repoId,
+      runtimeFamily: 'pipeline',
+      service: 'web-api',
+      status: 'ok'
+    })
   }
 }

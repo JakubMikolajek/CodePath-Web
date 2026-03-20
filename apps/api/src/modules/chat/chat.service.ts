@@ -5,9 +5,12 @@ import { and, desc, eq } from 'drizzle-orm'
 import { map } from 'lodash'
 import { v4 as uuidv4 } from 'uuid'
 
+import { env } from '../../config/env'
+import { emitTelemetry } from '../../lib/telemetry'
 import { DbService } from '../db/db.service'
 import { chatHistory, chatSessions } from '../db/schema'
 import { EmbeddingService } from '../embedding/embedding.service'
+import { ensureQueueTopology } from '../rabbitmq/topology'
 import { AskDto } from './dto/ask.dto'
 
 @Injectable()
@@ -16,7 +19,7 @@ export class ChatService {
   private conn: amqp.ChannelModel
   private logger: Logger = new Logger(ChatService.name)
   private readonly queue = 'chat'
-  private readonly retryDelayMs = 5000
+  private readonly retryDelayMs = env.rabbitRetryDelayMs
 
   constructor(
     private readonly embeddingService: EmbeddingService,
@@ -27,6 +30,15 @@ export class ChatService {
   async askAboutRepo(userId: number, repoId: number, body: AskDto) {
     const { question, sessionId } = body
     this.logger.log(`Repo: ${repoId}, Q: ${question}`)
+    emitTelemetry({
+      component: 'chat.service',
+      event: 'chat_request_received',
+      level: 'info',
+      repoId,
+      runtimeFamily: 'pipeline',
+      service: 'web-api',
+      status: 'ok'
+    })
 
     await this.dbService.dbClient.insert(chatHistory).values({
       content: question,
@@ -99,31 +111,13 @@ export class ChatService {
   }
 
   async onModuleInit() {
-    this.conn = await amqp.connect('amqp://admin:admin@127.0.0.1')
+    this.conn = await amqp.connect(env.rabbitUrl)
     this.channel = await this.conn.createChannel()
-    const dlx = `${this.queue}.dlx`
-    const dlq = `${this.queue}.dlq`
-    const retryQueue = `${this.queue}.retry`
-
-    await this.channel.assertExchange(dlx, 'direct', { durable: true })
-    await this.channel.assertQueue(dlq, { durable: true })
-    await this.channel.bindQueue(dlq, dlx, this.queue)
-
-    await this.channel.assertQueue(this.queue, {
-      arguments: {
-        'x-dead-letter-exchange': dlx,
-        'x-dead-letter-routing-key': this.queue
-      },
-      durable: true
-    })
-
-    await this.channel.assertQueue(retryQueue, {
-      arguments: {
-        'x-dead-letter-exchange': '',
-        'x-dead-letter-routing-key': this.queue,
-        'x-message-ttl': this.retryDelayMs
-      },
-      durable: true
+    await ensureQueueTopology(this.channel, {
+      queueName: this.queue,
+      retryDelayMs: this.retryDelayMs
+    }, {
+      allowRecreateOnMismatch: env.rabbitAllowDestructiveMigration
     })
   }
 
@@ -134,6 +128,7 @@ export class ChatService {
     return new Promise(async (resolve, reject) => {
       const correlationId = uuidv4()
       const timeoutMs = 60_000
+      const startedAt = Date.now()
 
       const { queue: replyTo } = await this.channel.assertQueue('', {
         autoDelete: true,
@@ -160,8 +155,31 @@ export class ChatService {
           }
 
           if (typeof answer !== 'string') {
+            emitTelemetry({
+              component: 'chat.rpc',
+              correlationId,
+              event: 'chat_rpc_invalid_payload',
+              level: 'error',
+              queueName: this.queue,
+              repoId: segments.repoId,
+              runtimeFamily: 'pipeline',
+              service: 'web-api',
+              status: 'error'
+            })
             return reject(new Error('Invalid response payload'))
           }
+          emitTelemetry({
+            component: 'chat.rpc',
+            correlationId,
+            durationMs: Date.now() - startedAt,
+            event: 'chat_rpc_response_received',
+            level: 'info',
+            queueName: this.queue,
+            repoId: segments.repoId,
+            runtimeFamily: 'pipeline',
+            service: 'web-api',
+            status: 'ok'
+          })
           resolve(answer)
         } catch (e) {
           this.channel.cancel(consumerTag).catch(() => {})
@@ -170,6 +188,17 @@ export class ChatService {
             clearTimeout(timer)
           }
 
+          emitTelemetry({
+            component: 'chat.rpc',
+            correlationId,
+            event: 'chat_rpc_response_parse_failed',
+            level: 'error',
+            queueName: this.queue,
+            repoId: segments.repoId,
+            runtimeFamily: 'pipeline',
+            service: 'web-api',
+            status: 'error'
+          })
           reject(e)
         }
       }
@@ -178,6 +207,18 @@ export class ChatService {
 
       timer = setTimeout(() => {
         this.channel.cancel(consumerTag).catch(() => {})
+        emitTelemetry({
+          component: 'chat.rpc',
+          correlationId,
+          durationMs: Date.now() - startedAt,
+          event: 'chat_rpc_timeout',
+          level: 'error',
+          queueName: this.queue,
+          repoId: segments.repoId,
+          runtimeFamily: 'pipeline',
+          service: 'web-api',
+          status: 'timeout'
+        })
         reject(new Error('RPC timeout'))
       }, timeoutMs)
 
@@ -191,6 +232,17 @@ export class ChatService {
           replyTo
         }
       )
+      emitTelemetry({
+        component: 'chat.rpc',
+        correlationId,
+        event: 'chat_rpc_request_published',
+        level: 'info',
+        queueName: this.queue,
+        repoId: segments.repoId,
+        runtimeFamily: 'pipeline',
+        service: 'web-api',
+        status: 'ok'
+      })
     })
   }
 }

@@ -29,6 +29,10 @@
     "./chat": {
       "types": "./chat.ts",
       "default": "./dist/chat.js"
+    },
+    "./telemetry": {
+      "types": "./telemetry.ts",
+      "default": "./dist/telemetry.js"
     }
   }
 }

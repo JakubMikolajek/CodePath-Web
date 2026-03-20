@@ -4,6 +4,7 @@ import { GenericNullable } from '@workspace/codepath-common/globals'
 import { eq } from 'drizzle-orm'
 import { ExtractJwt, Strategy } from 'passport-jwt'
 
+import { env } from '../../config/env'
 import { DbService } from '../db/db.service'
 import { SelectUser, users } from '../db/schema'
 
@@ -30,7 +31,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           return token
         }
       ]),
-      secretOrKey: 'supersecret'
+      secretOrKey: env.jwtSecret
     })
   }
 

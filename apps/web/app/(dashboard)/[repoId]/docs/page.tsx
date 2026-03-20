@@ -16,7 +16,7 @@ export default function Page() {
     if (params.repoId) {
       const data = await getRepoDocs(+params.repoId)
       console.log(data)
-      setText(data as string)
+      setText(typeof data === 'string' ? data : '')
     }
   }
 

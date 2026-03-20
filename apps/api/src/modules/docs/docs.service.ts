@@ -2,16 +2,19 @@ import { Injectable } from '@nestjs/common'
 import * as amqp from 'amqplib'
 import { eq } from 'drizzle-orm'
 
+import { env } from '../../config/env'
+import { emitTelemetry } from '../../lib/telemetry'
 import { DbService } from '../db/db.service'
-import { files, repos } from '../db/schema'
+import { repos } from '../db/schema'
 import { QdrantService } from '../qdrant/qdrant.service'
+import { ensureQueueTopology } from '../rabbitmq/topology'
 
 @Injectable()
 export class DocsService {
   private channel: amqp.Channel
   private conn: amqp.ChannelModel
-  private readonly quque = 'docs'
-  private readonly retryDelayMs = 5000
+  private readonly queue = 'docs'
+  private readonly retryDelayMs = env.rabbitRetryDelayMs
 
   constructor(
     private readonly dbService: DbService,
@@ -20,10 +23,20 @@ export class DocsService {
 
   async generateDocumentation(repoId: number) {
     this.channel.sendToQueue(
-      this.quque,
+      this.queue,
       Buffer.from(JSON.stringify({ repoId })),
       { persistent: true }
     )
+    emitTelemetry({
+      component: 'docs.service',
+      event: 'docs_job_published',
+      level: 'info',
+      queueName: this.queue,
+      repoId,
+      runtimeFamily: 'pipeline',
+      service: 'web-api',
+      status: 'ok'
+    })
 
     return { message: 'Documentation generation started' }
   }
@@ -43,31 +56,13 @@ export class DocsService {
   }
 
   async onModuleInit() {
-    this.conn = await amqp.connect('amqp://admin:admin@127.0.0.1')
+    this.conn = await amqp.connect(env.rabbitUrl)
     this.channel = await this.conn.createChannel()
-    const dlx = `${this.quque}.dlx`
-    const dlq = `${this.quque}.dlq`
-    const retryQueue = `${this.quque}.retry`
-
-    await this.channel.assertExchange(dlx, 'direct', { durable: true })
-    await this.channel.assertQueue(dlq, { durable: true })
-    await this.channel.bindQueue(dlq, dlx, this.quque)
-
-    await this.channel.assertQueue(this.quque, {
-      arguments: {
-        'x-dead-letter-exchange': dlx,
-        'x-dead-letter-routing-key': this.quque
-      },
-      durable: true
-    })
-
-    await this.channel.assertQueue(retryQueue, {
-      arguments: {
-        'x-dead-letter-exchange': '',
-        'x-dead-letter-routing-key': this.quque,
-        'x-message-ttl': this.retryDelayMs
-      },
-      durable: true
+    await ensureQueueTopology(this.channel, {
+      queueName: this.queue,
+      retryDelayMs: this.retryDelayMs
+    }, {
+      allowRecreateOnMismatch: env.rabbitAllowDestructiveMigration
     })
   }
 }

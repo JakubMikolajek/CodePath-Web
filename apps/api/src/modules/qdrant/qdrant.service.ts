@@ -1,6 +1,8 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import { QdrantClient } from '@qdrant/js-client-rest'
 
+import { env } from '../../config/env'
+
 @Injectable()
 export class QdrantService implements OnModuleInit {
   private client: QdrantClient
@@ -8,8 +10,8 @@ export class QdrantService implements OnModuleInit {
 
   async onModuleInit() {
     this.client = new QdrantClient({
-      host: '127.0.0.1',
-      port: 6333
+      host: env.qdrantHost,
+      port: env.qdrantPort
     })
 
     // Test connection

@@ -9,6 +9,7 @@ import { FastifyAdapter } from '@nestjs/platform-fastify'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 
 import { AppModule } from './app.module'
+import { env, resolveCorsOrigin } from './config/env'
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -47,7 +48,7 @@ async function bootstrap() {
   await app.register(cors, {
     allowedHeaders: ['Content-Type', 'Authorization'],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    origin: '*'
+    origin: resolveCorsOrigin()
   })
 
   app.enableShutdownHooks()
@@ -57,6 +58,6 @@ async function bootstrap() {
 
   SwaggerModule.setup('api/docs', app, document)
 
-  await app.listen(process.env.PORT ?? 3001)
+  await app.listen(env.port)
 }
 bootstrap()
