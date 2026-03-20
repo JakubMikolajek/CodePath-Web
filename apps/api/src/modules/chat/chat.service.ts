@@ -1,29 +1,21 @@
-import { HttpService } from '@nestjs/axios'
 import { Injectable, Logger } from '@nestjs/common'
-import * as amqp from 'amqplib'
 import { and, desc, eq } from 'drizzle-orm'
 import { map } from 'lodash'
 import { v4 as uuidv4 } from 'uuid'
 
-import { env } from '../../config/env'
+import { requestChatRpc, OrchestratorClientError } from '../../lib/orchestrator-client'
 import { emitTelemetry } from '../../lib/telemetry'
 import { DbService } from '../db/db.service'
 import { chatHistory, chatSessions } from '../db/schema'
 import { EmbeddingService } from '../embedding/embedding.service'
-import { ensureQueueTopology } from '../rabbitmq/topology'
 import { AskDto } from './dto/ask.dto'
 
 @Injectable()
 export class ChatService {
-  private channel: amqp.Channel
-  private conn: amqp.ChannelModel
   private logger: Logger = new Logger(ChatService.name)
-  private readonly queue = 'chat'
-  private readonly retryDelayMs = env.rabbitRetryDelayMs
 
   constructor(
     private readonly embeddingService: EmbeddingService,
-    private readonly httpService: HttpService,
     private readonly dbService: DbService
   ) { }
 
@@ -47,10 +39,7 @@ export class ChatService {
       userId
     })
 
-    const answer = await this.publishChatJob({
-      prompt: question,
-      repoId
-    })
+    const answer = await this.publishChatJob({ prompt: question, repoId })
 
     await this.dbService.dbClient.insert(chatHistory).values({
       content: answer,
@@ -105,144 +94,99 @@ export class ChatService {
     }))
   }
 
-  async onModuleDestroy() {
-    await this.channel?.close()
-    await this.conn?.close()
-  }
-
-  async onModuleInit() {
-    this.conn = await amqp.connect(env.rabbitUrl)
-    this.channel = await this.conn.createChannel()
-    await ensureQueueTopology(this.channel, {
-      queueName: this.queue,
-      retryDelayMs: this.retryDelayMs
-    }, {
-      allowRecreateOnMismatch: env.rabbitAllowDestructiveMigration
-    })
-  }
-
   private async publishChatJob(segments: {
     prompt: string
     repoId: number
   }): Promise<string> {
-    return new Promise(async (resolve, reject) => {
-      const correlationId = uuidv4()
-      const timeoutMs = 60_000
-      const startedAt = Date.now()
+    const correlationId = uuidv4()
+    const startedAt = Date.now()
 
-      const { queue: replyTo } = await this.channel.assertQueue('', {
-        autoDelete: true,
-        exclusive: true
+    try {
+      emitTelemetry({
+        component: 'chat.rpc',
+        correlationId,
+        event: 'chat_rpc_request_published',
+        level: 'info',
+        queueName: 'chat',
+        repoId: segments.repoId,
+        runtimeFamily: 'pipeline',
+        service: 'web-api',
+        status: 'ok'
       })
 
-      let timer: NodeJS.Timeout | undefined
+      const answer = await requestChatRpc(segments)
 
-      const onMessage = (msg: amqp.ConsumeMessage | null) => {
-        if (!msg) return
-        try {
-          if (msg.properties.correlationId !== correlationId) {
-            this.channel.ack(msg)
-            return
-          }
-          const data = JSON.parse(msg.content.toString())
-          const answer = data?.response
+      emitTelemetry({
+        component: 'chat.rpc',
+        correlationId,
+        durationMs: Date.now() - startedAt,
+        event: 'chat_rpc_response_received',
+        level: 'info',
+        queueName: 'chat',
+        repoId: segments.repoId,
+        runtimeFamily: 'pipeline',
+        service: 'web-api',
+        status: 'ok'
+      })
 
-          this.channel.ack(msg)
-          this.channel.cancel(consumerTag).catch(() => {})
-
-          if (timer) {
-            clearTimeout(timer)
-          }
-
-          if (typeof answer !== 'string') {
-            emitTelemetry({
-              component: 'chat.rpc',
-              correlationId,
-              event: 'chat_rpc_invalid_payload',
-              level: 'error',
-              queueName: this.queue,
-              repoId: segments.repoId,
-              runtimeFamily: 'pipeline',
-              service: 'web-api',
-              status: 'error'
-            })
-            return reject(new Error('Invalid response payload'))
-          }
-          emitTelemetry({
-            component: 'chat.rpc',
-            correlationId,
-            durationMs: Date.now() - startedAt,
-            event: 'chat_rpc_response_received',
-            level: 'info',
-            queueName: this.queue,
-            repoId: segments.repoId,
-            runtimeFamily: 'pipeline',
-            service: 'web-api',
-            status: 'ok'
-          })
-          resolve(answer)
-        } catch (e) {
-          this.channel.cancel(consumerTag).catch(() => {})
-
-          if (timer) {
-            clearTimeout(timer)
-          }
-
-          emitTelemetry({
-            component: 'chat.rpc',
-            correlationId,
-            event: 'chat_rpc_response_parse_failed',
-            level: 'error',
-            queueName: this.queue,
-            repoId: segments.repoId,
-            runtimeFamily: 'pipeline',
-            service: 'web-api',
-            status: 'error'
-          })
-          reject(e)
-        }
-      }
-
-      const { consumerTag } = await this.channel.consume(replyTo, onMessage, { noAck: false })
-
-      timer = setTimeout(() => {
-        this.channel.cancel(consumerTag).catch(() => {})
+      return answer
+    } catch (cause) {
+      if (cause instanceof OrchestratorClientError && cause.message === 'Orchestrator request timed out') {
         emitTelemetry({
           component: 'chat.rpc',
           correlationId,
           durationMs: Date.now() - startedAt,
           event: 'chat_rpc_timeout',
           level: 'error',
-          queueName: this.queue,
+          queueName: 'chat',
           repoId: segments.repoId,
           runtimeFamily: 'pipeline',
           service: 'web-api',
           status: 'timeout'
         })
-        reject(new Error('RPC timeout'))
-      }, timeoutMs)
-
-      this.channel.sendToQueue(
-        this.queue,
-        Buffer.from(JSON.stringify(segments)),
-        {
-          contentType: 'application/json',
+      } else if (cause instanceof OrchestratorClientError && cause.message === 'Orchestrator chat response payload was invalid') {
+        emitTelemetry({
+          component: 'chat.rpc',
           correlationId,
-          persistent: true,
-          replyTo
-        }
-      )
-      emitTelemetry({
-        component: 'chat.rpc',
-        correlationId,
-        event: 'chat_rpc_request_published',
-        level: 'info',
-        queueName: this.queue,
-        repoId: segments.repoId,
-        runtimeFamily: 'pipeline',
-        service: 'web-api',
-        status: 'ok'
-      })
-    })
+          event: 'chat_rpc_invalid_payload',
+          level: 'error',
+          queueName: 'chat',
+          repoId: segments.repoId,
+          runtimeFamily: 'pipeline',
+          service: 'web-api',
+          status: 'error'
+        })
+      } else if (cause instanceof OrchestratorClientError && cause.message === 'Orchestrator response body was not valid JSON') {
+        emitTelemetry({
+          component: 'chat.rpc',
+          correlationId,
+          event: 'chat_rpc_response_parse_failed',
+          level: 'error',
+          queueName: 'chat',
+          repoId: segments.repoId,
+          runtimeFamily: 'pipeline',
+          service: 'web-api',
+          status: 'error'
+        })
+      } else {
+        emitTelemetry({
+          component: 'chat.rpc',
+          correlationId,
+          details: {
+            errorMessage: cause instanceof Error ? cause.message : String(cause),
+            errorName: cause instanceof Error ? cause.name : 'UnknownError'
+          },
+          event: 'chat_rpc_request_failed',
+          level: 'error',
+          queueName: 'chat',
+          repoId: segments.repoId,
+          runtimeFamily: 'pipeline',
+          service: 'web-api',
+          status: 'error'
+        })
+      }
+
+      throw cause
+    }
   }
 }

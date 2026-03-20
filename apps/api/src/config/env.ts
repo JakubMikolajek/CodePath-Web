@@ -4,6 +4,7 @@ const DEFAULTS = {
   jwtExpiresInSeconds: 7 * 24 * 60 * 60,
   jwtSecret: 'supersecret',
   port: 3001,
+  orchestratorUrl: 'http://127.0.0.1:8080',
   qdrantHost: '127.0.0.1',
   qdrantPort: 6333,
   rabbitAllowDestructiveMigration: false,
@@ -58,6 +59,7 @@ export const env = {
   ),
   jwtSecret: process.env.JWT_SECRET ?? DEFAULTS.jwtSecret,
   port: parseInteger(process.env.PORT, DEFAULTS.port),
+  orchestratorUrl: process.env.ORCHESTRATOR_URL ?? DEFAULTS.orchestratorUrl,
   qdrantHost: process.env.QDRANT_HOST ?? DEFAULTS.qdrantHost,
   qdrantPort: parseInteger(process.env.QDRANT_PORT, DEFAULTS.qdrantPort),
   rabbitAllowDestructiveMigration: parseBoolean(

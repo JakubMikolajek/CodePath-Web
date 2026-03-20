@@ -3,26 +3,20 @@ import * as path from 'node:path'
 
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
-import * as amqp from 'amqplib'
 import { eq } from 'drizzle-orm'
 import { promises as fsp } from 'fs'
 import { slice } from 'lodash'
 
-import { env } from '../../config/env'
+import { enqueueEmbeddingJob } from '../../lib/orchestrator-client'
 import { emitTelemetry } from '../../lib/telemetry'
 import { buildMermaidGraph } from '../../utils/mermaidBuilder'
 import { parseSegments, resolveCodeLanguageFromExt } from '../../utils/parser'
 import { DbService } from '../db/db.service'
 import { dependencies, files, repos, SelectRepo } from '../db/schema'
-import { ensureQueueTopology } from '../rabbitmq/topology'
 
 @Injectable()
 export class EmbeddingService {
-  private channel: amqp.Channel
-  private conn: amqp.ChannelModel
   private readonly logger: Logger = new Logger(EmbeddingService.name)
-  private readonly queue = 'embedding'
-  private readonly retryDelayMs = env.rabbitRetryDelayMs
 
   constructor(
     private readonly dbService: DbService
@@ -88,7 +82,7 @@ export class EmbeddingService {
           symbolName: s.name
         }))
 
-        this.publishEmbeddingsJob(batchPayload, repo.id)
+        await this.enqueueEmbeddingsJob(batchPayload, repo.id)
       }
     }
 
@@ -108,22 +102,6 @@ export class EmbeddingService {
     return { message: `Embeddings queued for repo ${repo.id}` }
   }
 
-  async onModuleDestroy() {
-    await this.channel?.close()
-    await this.conn?.close()
-  }
-
-  async onModuleInit() {
-    this.conn = await amqp.connect(env.rabbitUrl)
-    this.channel = await this.conn.createChannel()
-    await ensureQueueTopology(this.channel, {
-      queueName: this.queue,
-      retryDelayMs: this.retryDelayMs
-    }, {
-      allowRecreateOnMismatch: env.rabbitAllowDestructiveMigration
-    })
-  }
-
   @Cron(CronExpression.EVERY_30_SECONDS)
   async poolFromPending() {
     const [repoToEmbedding] = await this.dbService.dbClient.select()
@@ -138,7 +116,7 @@ export class EmbeddingService {
     await this.embedRepo(repoToEmbedding)
   }
 
-  publishEmbeddingsJob(segments: {
+  private async enqueueEmbeddingsJob(segments: {
     comment?: string
     content: string
     decorators?: string[]
@@ -153,25 +131,39 @@ export class EmbeddingService {
     startLine?: number
     symbolKind: string
     symbolName?: string
-  }[], repoId: number): void {
-    this.channel.sendToQueue(
-      this.queue,
-      Buffer.from(
-        JSON.stringify({ repoId, segments })
-      ), { persistent: true }
-    )
-    emitTelemetry({
-      component: 'embedding.service',
-      details: {
-        segmentCount: segments.length
-      },
-      event: 'embedding_job_published',
-      level: 'info',
-      queueName: this.queue,
-      repoId,
-      runtimeFamily: 'pipeline',
-      service: 'web-api',
-      status: 'ok'
-    })
+  }[], repoId: number): Promise<void> {
+    try {
+      await enqueueEmbeddingJob({ repoId, segments })
+      emitTelemetry({
+        component: 'embedding.service',
+        details: {
+          segmentCount: segments.length
+        },
+        event: 'embedding_job_published',
+        level: 'info',
+        queueName: 'embedding',
+        repoId,
+        runtimeFamily: 'pipeline',
+        service: 'web-api',
+        status: 'ok'
+      })
+    } catch (cause) {
+      emitTelemetry({
+        component: 'embedding.service',
+        details: {
+          errorMessage: cause instanceof Error ? cause.message : String(cause),
+          errorName: cause instanceof Error ? cause.name : 'UnknownError',
+          segmentCount: segments.length
+        },
+        event: 'embedding_job_publish_failed',
+        level: 'error',
+        queueName: 'embedding',
+        repoId,
+        runtimeFamily: 'pipeline',
+        service: 'web-api',
+        status: 'error'
+      })
+      throw cause
+    }
   }
 }

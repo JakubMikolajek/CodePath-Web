@@ -1,42 +1,49 @@
 import { Injectable } from '@nestjs/common'
-import * as amqp from 'amqplib'
 import { eq } from 'drizzle-orm'
 
-import { env } from '../../config/env'
+import { enqueueDocsJob } from '../../lib/orchestrator-client'
 import { emitTelemetry } from '../../lib/telemetry'
 import { DbService } from '../db/db.service'
 import { repos } from '../db/schema'
 import { QdrantService } from '../qdrant/qdrant.service'
-import { ensureQueueTopology } from '../rabbitmq/topology'
 
 @Injectable()
 export class DocsService {
-  private channel: amqp.Channel
-  private conn: amqp.ChannelModel
-  private readonly queue = 'docs'
-  private readonly retryDelayMs = env.rabbitRetryDelayMs
-
   constructor(
     private readonly dbService: DbService,
     private readonly qdrantService: QdrantService
   ) { }
 
   async generateDocumentation(repoId: number) {
-    this.channel.sendToQueue(
-      this.queue,
-      Buffer.from(JSON.stringify({ repoId })),
-      { persistent: true }
-    )
-    emitTelemetry({
-      component: 'docs.service',
-      event: 'docs_job_published',
-      level: 'info',
-      queueName: this.queue,
-      repoId,
-      runtimeFamily: 'pipeline',
-      service: 'web-api',
-      status: 'ok'
-    })
+    try {
+      await enqueueDocsJob({ repoId })
+      emitTelemetry({
+        component: 'docs.service',
+        event: 'docs_job_published',
+        level: 'info',
+        queueName: 'docs',
+        repoId,
+        runtimeFamily: 'pipeline',
+        service: 'web-api',
+        status: 'ok'
+      })
+    } catch (cause) {
+      emitTelemetry({
+        component: 'docs.service',
+        details: {
+          errorMessage: cause instanceof Error ? cause.message : String(cause),
+          errorName: cause instanceof Error ? cause.name : 'UnknownError'
+        },
+        event: 'docs_job_publish_failed',
+        level: 'error',
+        queueName: 'docs',
+        repoId,
+        runtimeFamily: 'pipeline',
+        service: 'web-api',
+        status: 'error'
+      })
+      throw cause
+    }
 
     return { message: 'Documentation generation started' }
   }
@@ -48,21 +55,5 @@ export class DocsService {
       .limit(1)
 
     return repo?.documentation
-  }
-
-  async onModuleDestroy() {
-    await this.channel?.close()
-    await this.conn?.close()
-  }
-
-  async onModuleInit() {
-    this.conn = await amqp.connect(env.rabbitUrl)
-    this.channel = await this.conn.createChannel()
-    await ensureQueueTopology(this.channel, {
-      queueName: this.queue,
-      retryDelayMs: this.retryDelayMs
-    }, {
-      allowRecreateOnMismatch: env.rabbitAllowDestructiveMigration
-    })
   }
 }
