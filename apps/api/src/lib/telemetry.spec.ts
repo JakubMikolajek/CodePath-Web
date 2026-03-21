@@ -1,5 +1,14 @@
 import { Logger } from '@nestjs/common'
-import type { TelemetryEventV1 } from '@workspace/codepath-common/telemetry'
+import {
+  type TelemetryEventV1
+} from '@workspace/codepath-common/telemetry'
+import {
+  TELEMETRY_LEVELS,
+  TELEMETRY_RUNTIME_FAMILIES,
+  TELEMETRY_SCHEMA_V1,
+  TELEMETRY_SERVICES,
+  TELEMETRY_STATUSES
+} from '../../../../packages/codepath-common/telemetry'
 
 import { emitTelemetry } from './telemetry'
 
@@ -37,6 +46,14 @@ describe('emitTelemetry', () => {
     expect(payload.component).toBe('test.component')
     expect(payload.event).toBe('test_event')
     expect(payload.level).toBe('info')
+  })
+
+  it('matches telemetry contract enums from codepath-common', () => {
+    expect(TELEMETRY_SCHEMA_V1).toBe('codepath.telemetry.v1')
+    expect(TELEMETRY_LEVELS).toEqual(['info', 'warn', 'error'])
+    expect(TELEMETRY_RUNTIME_FAMILIES).toEqual(['pipeline', 'semantic'])
+    expect(TELEMETRY_SERVICES).toEqual(['web-api', 'ai-worker', 'desktop'])
+    expect(TELEMETRY_STATUSES).toEqual(['ok', 'retry', 'dlq', 'timeout', 'error'])
   })
 
   it('routes warn and error to proper logger levels', () => {
@@ -84,5 +101,40 @@ describe('emitTelemetry', () => {
     expect(payload.details?.validNumber).toBe(2)
     expect(payload.details?.validText).toBe('ok')
     expect(payload.details?.invalidObject).toBeUndefined()
+  })
+
+  it('emits payload keys compatible with telemetry v1 contract', () => {
+    const infoSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation()
+
+    emitTelemetry({
+      component: 'contract.component',
+      correlationId: 'corr-123',
+      details: { attempt: 1, reason: 'test' },
+      durationMs: 120,
+      event: 'contract_event',
+      level: 'info',
+      queueName: 'chat',
+      repoId: 17,
+      runtimeFamily: 'pipeline',
+      service: 'web-api',
+      status: 'ok'
+    })
+
+    const payload = parseSpyPayload(infoSpy.mock.calls[0] as unknown[])
+    expect(Object.keys(payload).sort()).toEqual([
+      'component',
+      'correlationId',
+      'details',
+      'durationMs',
+      'event',
+      'level',
+      'queueName',
+      'repoId',
+      'runtimeFamily',
+      'schema',
+      'service',
+      'status',
+      'timestamp'
+    ])
   })
 })
