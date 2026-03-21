@@ -29,6 +29,14 @@ export default function RepoItem({ item }: RepoItemProps) {
   const openRepoId = useAppSelector(state => state.collapsible.openRepoId)
 
   const isRepoOpen = openRepoId === item.id
+  const hasPipelineFailure = item.cloneStatus === 'failed'
+    || item.embeddingStatus === 'failed'
+    || item.docsStatus === 'failed'
+  const hasPipelineInProgress = item.cloneStatus === 'pending'
+    || item.cloneStatus === 'cloning'
+    || item.embeddingStatus === 'pending'
+    || item.embeddingStatus === 'processing'
+    || item.docsStatus === 'processing'
 
   const handleOpenChange = (open: boolean) => {
     dispatch(setOpenRepoId(open ? item.id : null))
@@ -52,8 +60,8 @@ export default function RepoItem({ item }: RepoItemProps) {
           <SidebarMenuButton tooltip={item.name}>
             <div className="flex flex-row gap-1 items-center">
               <span>{item.name}</span>
-              {item.embeddingStatus === 'pending' && (
-                <TriangleAlert color="orange" />
+              {(hasPipelineFailure || hasPipelineInProgress) && (
+                <TriangleAlert color={hasPipelineFailure ? 'red' : 'orange'} />
               )}
             </div>
             <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible-main:rotate-90" />

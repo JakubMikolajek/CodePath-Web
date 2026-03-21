@@ -81,6 +81,7 @@ export class RepoFetcherService {
       await this.dbService.dbClient.update(repos)
         .set({
           cloneStatus: 'cloned',
+          docsStatus: 'pending',
           documentation: null,
           embeddingStatus: 'pending',
           path: targetPath,

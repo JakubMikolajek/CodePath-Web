@@ -17,6 +17,15 @@ export class DocsController {
     return await this.docsService.generateDocumentation(req.user.id, repoId)
   }
 
+  @Get('status/:repoId')
+  @UseGuards(AuthGuard('jwt'))
+  async getDocumentationStatus(
+    @Req() req: { user: SelectUser },
+    @Param('repoId', ParseIntPipe) repoId: number
+  ) {
+    return await this.docsService.getDocumentationStatus(req.user.id, repoId)
+  }
+
   @Get(':repoId')
   @UseGuards(AuthGuard('jwt'))
   async getDocumentation(

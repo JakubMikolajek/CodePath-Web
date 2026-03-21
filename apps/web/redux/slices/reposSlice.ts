@@ -2,19 +2,25 @@ import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/tool
 import type { GenericNullable } from '@workspace/codepath-common/globals'
 import type { Repository } from '@workspace/codepath-common/repository'
 
-import { createRepo as createRepoApi } from '@/lib/repos/client'
+import { createRepo as createRepoApi, getRepos as getReposApi } from '@/lib/repos/client'
 import type { CreateRepoFormData } from '@/utils/validators/createRepoForm'
 
 interface ReposState {
   error: GenericNullable<string>
   loading: boolean
   repos: Repository[]
+  syncError: GenericNullable<string>
+  syncErrorNonce: number
+  syncing: boolean
 }
 
 const initialState: ReposState = {
   error: null,
   loading: false,
-  repos: []
+  repos: [],
+  syncError: null,
+  syncErrorNonce: 0,
+  syncing: false
 }
 
 export const createRepo = createAsyncThunk('repos/createRepo',
@@ -23,6 +29,16 @@ export const createRepo = createAsyncThunk('repos/createRepo',
       return await createRepoApi(repo)
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message ?? 'Cannot create repo')
+    }
+  }
+)
+
+export const getRepos = createAsyncThunk('repos/getRepos',
+  async (_, { rejectWithValue }) => {
+    try {
+      return await getReposApi()
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message ?? 'Cannot fetch repositories')
     }
   }
 )
@@ -40,11 +56,25 @@ const reposSlice = createSlice({
     }).addCase(createRepo.rejected, (state, action) => {
       state.loading = false
       state.error = action.payload as string
+    }).addCase(getRepos.pending, state => {
+      state.syncing = true
+    }).addCase(getRepos.fulfilled, (state, action) => {
+      state.syncing = false
+      state.repos = action.payload
+      state.error = null
+      state.syncError = null
+    }).addCase(getRepos.rejected, (state, action) => {
+      state.syncing = false
+      state.syncError = action.payload as string
+      state.syncErrorNonce += 1
     })
   },
   reducers: {
     clearError: state => {
       state.error = null
+    },
+    dismissSyncError: state => {
+      state.syncError = null
     },
     setRepos: (state, action: PayloadAction<Repository[]>) => {
       state.repos = action.payload
@@ -52,5 +82,5 @@ const reposSlice = createSlice({
   }
 })
 
-export const { clearError, setRepos } = reposSlice.actions
+export const { clearError, dismissSyncError, setRepos } = reposSlice.actions
 export default reposSlice.reducer

@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, ne } from 'drizzle-orm'
 
 import { enqueueDocsJob } from '../../lib/orchestrator-client'
 import { emitTelemetry } from '../../lib/telemetry'
@@ -15,8 +15,39 @@ export class DocsService {
   async generateDocumentation(userId: number, repoId: number) {
     const repo = await this.assertRepoOwnership(userId, repoId)
 
+    if (repo.cloneStatus !== 'cloned') {
+      throw new ConflictException('Repository clone is not ready for documentation generation')
+    }
+
     if (repo.embeddingStatus !== 'embedded') {
       throw new ConflictException('Embeddings are not ready for documentation generation')
+    }
+
+    if (repo.docsStatus === 'processing') {
+      return {
+        message: 'Documentation generation already in progress',
+        status: 'processing' as const
+      }
+    }
+
+    const [claimedRepo] = await this.dbService.dbClient.update(repos).set({
+      docsStatus: 'processing',
+      documentation: null
+    })
+      .where(and(
+        eq(repos.id, repoId),
+        eq(repos.userId, userId),
+        ne(repos.docsStatus, 'processing')
+      ))
+      .returning({
+        id: repos.id
+      })
+
+    if (!claimedRepo) {
+      return {
+        message: 'Documentation generation already in progress',
+        status: 'processing' as const
+      }
     }
 
     try {
@@ -32,6 +63,9 @@ export class DocsService {
         status: 'ok'
       })
     } catch (cause) {
+      await this.dbService.dbClient.update(repos).set({
+        docsStatus: 'failed'
+      }).where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
       emitTelemetry({
         component: 'docs.service',
         details: {
@@ -49,7 +83,10 @@ export class DocsService {
       throw cause
     }
 
-    return { message: 'Documentation generation started' }
+    return {
+      message: 'Documentation generation started',
+      status: 'processing' as const
+    }
   }
 
   async getDocumentation(userId: number, repoId: number) {
@@ -63,8 +100,28 @@ export class DocsService {
     return repo?.documentation
   }
 
+  async getDocumentationStatus(userId: number, repoId: number) {
+    const [repo] = await this.dbService.dbClient.select({
+      cloneStatus: repos.cloneStatus,
+      docsStatus: repos.docsStatus,
+      embeddingStatus: repos.embeddingStatus,
+      id: repos.id
+    })
+      .from(repos)
+      .where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
+      .limit(1)
+
+    if (!repo) {
+      throw new NotFoundException('Repository not found')
+    }
+
+    return repo
+  }
+
   private async assertRepoOwnership(userId: number, repoId: number) {
     const [repo] = await this.dbService.dbClient.select({
+      cloneStatus: repos.cloneStatus,
+      docsStatus: repos.docsStatus,
       embeddingStatus: repos.embeddingStatus,
       id: repos.id
     })

@@ -21,12 +21,13 @@ export class RepoService {
       userId
     }).returning()
 
-    return pick(createdRepo, ['id', 'name', 'cloneStatus', 'embeddingStatus'])
+    return pick(createdRepo, ['id', 'name', 'cloneStatus', 'embeddingStatus', 'docsStatus'])
   }
 
   async getUserRepos(userId: number) {
     const userRepos = await this.dbService.dbClient.select({
       cloneStatus: repos.cloneStatus,
+      docsStatus: repos.docsStatus,
       embeddingStatus: repos.embeddingStatus,
       id: repos.id,
       name: repos.name

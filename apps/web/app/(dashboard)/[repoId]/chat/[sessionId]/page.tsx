@@ -7,7 +7,7 @@ import { Input } from '@workspace/ui/components/input'
 import { Bot, Check, Copy, Send, User } from 'lucide-react'
 import { useParams } from 'next/navigation'
 import type React from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Markdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
@@ -15,24 +15,33 @@ import remarkGfm from 'remark-gfm'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { getSessionDetails, sendMessage } from '@/redux/slices/chatSlice'
 
+const getRouteParam = (param: string | string[] | undefined) => Array.isArray(param) ? param[0] : param
+
 export default function ChatPage() {
   const params = useParams()
   const dispatch = useAppDispatch()
   const sessionDetails = useAppSelector(state => state.chat.sessionDetails)
+  const repoId = useMemo(() => Number(getRouteParam(params.repoId)), [params.repoId])
+  const sessionId = useMemo(() => getRouteParam(params.sessionId) ?? '', [params.sessionId])
+  const hasValidRouteParams = Number.isFinite(repoId) && sessionId.length > 0
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [copiedId, setCopiedId] = useState<null | string>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!inputValue.trim()) return
+    if (!inputValue.trim() || !hasValidRouteParams) return
 
     setIsLoading(true)
     try {
       await dispatch(sendMessage({
         question: inputValue,
-        repoId: Number.parseFloat(params.repoId as string),
-        sessionId: params.sessionId as string
+        repoId,
+        sessionId
+      })).unwrap()
+      await dispatch(getSessionDetails({
+        repoId,
+        sessionId
       })).unwrap()
       setInputValue('')
     } catch (error) {
@@ -53,11 +62,15 @@ export default function ChatPage() {
   }
 
   useEffect(() => {
+    if (!hasValidRouteParams) {
+      return
+    }
+
     dispatch(getSessionDetails({
-      repoId: Number.parseFloat(params.repoId as string),
-      sessionId: params.sessionId as string
+      repoId,
+      sessionId
     }))
-  }, [params.sessionId])
+  }, [dispatch, hasValidRouteParams, repoId, sessionId])
 
   return (
     <div className="w-full relative bg-background">
@@ -196,7 +209,7 @@ export default function ChatPage() {
               <div className="flex-1">
                 <Input
                   className="min-h-11 resize-none"
-                  disabled={isLoading}
+                  disabled={isLoading || !hasValidRouteParams}
                   onChange={e => setInputValue(e.target.value)}
                   onKeyDown={async e => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -210,7 +223,7 @@ export default function ChatPage() {
               </div>
               <Button
                 className="h-11 w-11"
-                disabled={isLoading || !inputValue.trim()}
+                disabled={isLoading || !inputValue.trim() || !hasValidRouteParams}
                 size="icon"
                 type="submit"
               >
@@ -219,7 +232,9 @@ export default function ChatPage() {
               </Button>
             </form>
             <p className="text-xs text-muted-foreground mt-2 text-center">
-              Naciśnij Enter aby wysłać, Shift+Enter dla nowej linii
+              {hasValidRouteParams
+                ? 'Naciśnij Enter aby wysłać, Shift+Enter dla nowej linii'
+                : 'Nieprawidłowe parametry sesji czatu'}
             </p>
           </div>
         </div>

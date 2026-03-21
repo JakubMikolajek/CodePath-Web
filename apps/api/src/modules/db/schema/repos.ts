@@ -6,11 +6,13 @@ import { chatSessions, dependencies, files, users } from './index'
 
 export const repoCloneStatusEnum = pgEnum('repo_clone_status', ['pending', 'cloning', 'cloned', 'failed'])
 export const repoEmbeddingStatusEnum = pgEnum('repo_embedding_status', ['pending', 'processing', 'embedded', 'failed'])
+export const repoDocsStatusEnum = pgEnum('repo_docs_status', ['pending', 'processing', 'ready', 'failed'])
 export const repoStorageProviderEnum = pgEnum('repo_storage_provider', ['local', 'minio'])
 
 export const repos = pgTable('repos', {
   accessKey: text('access_key'),
   cloneStatus: repoCloneStatusEnum('clone_status').default('pending').notNull(),
+  docsStatus: repoDocsStatusEnum('docs_status').default('pending').notNull(),
   embeddingStatus: repoEmbeddingStatusEnum('embedding_status').default('pending').notNull(),
   gitUrl: text('git_url').notNull(),
   id: serial().primaryKey().notNull(),

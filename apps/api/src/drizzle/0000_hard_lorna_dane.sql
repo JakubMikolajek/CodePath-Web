@@ -1,6 +1,7 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TYPE "repo_clone_status" AS ENUM('pending', 'cloning', 'cloned', 'failed');--> statement-breakpoint
+CREATE TYPE "repo_docs_status" AS ENUM('pending', 'processing', 'ready', 'failed');--> statement-breakpoint
 CREATE TYPE "repo_embedding_status" AS ENUM('pending', 'processing', 'embedded', 'failed');--> statement-breakpoint
 CREATE TYPE "repo_storage_provider" AS ENUM('local', 'minio');--> statement-breakpoint
 
@@ -79,6 +80,7 @@ CREATE TABLE "repos" (
 	"git_url" text NOT NULL,
 	"access_key" text,
 	"clone_status" "repo_clone_status" DEFAULT 'pending' NOT NULL,
+	"docs_status" "repo_docs_status" DEFAULT 'pending' NOT NULL,
 	"embedding_status" "repo_embedding_status" DEFAULT 'pending' NOT NULL,
 	"indexed_at" timestamp DEFAULT now(),
 	"source_commit_sha" text,
@@ -114,5 +116,6 @@ CREATE INDEX "idx_dependencies_file_id" ON "dependencies" USING btree ("file_id"
 CREATE INDEX "idx_dependencies_repo_id" ON "dependencies" USING btree ("repo_id");--> statement-breakpoint
 CREATE INDEX "idx_files_repo_id" ON "files" USING btree ("repo_id");--> statement-breakpoint
 CREATE INDEX "idx_repos_clone_status" ON "repos" USING btree ("clone_status");--> statement-breakpoint
+CREATE INDEX "idx_repos_docs_status" ON "repos" USING btree ("docs_status");--> statement-breakpoint
 CREATE INDEX "idx_repos_embedding_status" ON "repos" USING btree ("embedding_status");--> statement-breakpoint
 CREATE INDEX "idx_embeddings_vector" ON "embeddings" USING ivfflat ("embedding" vector_cosine_ops) WITH (lists=100);
