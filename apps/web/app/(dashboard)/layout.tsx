@@ -5,7 +5,6 @@ import { cookies } from 'next/headers'
 import type { ReactNode } from 'react'
 
 import AppSidebar from '@/components/AppSideBar'
-import { createAxiosServer } from '@/lib/api/axiosServer'
 import { getCurrentUser } from '@/lib/auth/server'
 import { getRepos } from '@/lib/repos/server'
 
@@ -16,10 +15,9 @@ interface DashboardLayoutProps {
 export default async function DashboardLayout({ children }: Readonly<DashboardLayoutProps>) {
   const cookieStore = await cookies()
   const cookie = cookieStore.toString()
-  createAxiosServer(cookie)
 
-  const me = await getCurrentUser()
-  const repos = await getRepos()
+  const me = await getCurrentUser(cookie)
+  const repos = await getRepos(cookie)
 
   return (
     <SidebarProvider defaultOpen>

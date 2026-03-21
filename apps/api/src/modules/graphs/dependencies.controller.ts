@@ -1,5 +1,7 @@
-import { Controller, Get, Param, ParseIntPipe } from '@nestjs/common'
+import { Controller, Get, Param, ParseIntPipe, Req, UseGuards } from '@nestjs/common'
+import { AuthGuard } from '@nestjs/passport'
 
+import { SelectUser } from '../db/schema'
 import { DependenciesService } from './dependencies.service'
 
 @Controller('dependencies')
@@ -7,7 +9,11 @@ export class DependenciesController {
   constructor(private readonly dependenciesService: DependenciesService) {}
 
   @Get(':repoId')
-  async getRepoDependencies(@Param('repoId', ParseIntPipe) repoId: number) {
-    return await this.dependenciesService.getRepoDependencies(repoId)
+  @UseGuards(AuthGuard('jwt'))
+  async getRepoDependencies(
+    @Req() req: { user: SelectUser },
+    @Param('repoId', ParseIntPipe) repoId: number
+  ) {
+    return await this.dependenciesService.getRepoDependencies(req.user.id, repoId)
   }
 }

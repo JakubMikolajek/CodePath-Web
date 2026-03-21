@@ -7,6 +7,16 @@ const DEFAULTS = {
   orchestratorUrl: 'http://127.0.0.1:8080',
   qdrantHost: '127.0.0.1',
   qdrantPort: 6333,
+  repoStorageLocalPath: 'storage/repos',
+  repoStorageMinioAccessKey: 'minioadmin',
+  repoStorageMinioBucket: 'codepath-repos',
+  repoStorageMinioEndpoint: '127.0.0.1',
+  repoStorageMinioForcePathStyle: true,
+  repoStorageMinioPort: 9000,
+  repoStorageMinioRegion: 'us-east-1',
+  repoStorageMinioSecretKey: 'minioadmin',
+  repoStorageMinioUseSsl: false,
+  repoStorageProvider: 'local',
   rabbitAllowDestructiveMigration: false,
   rabbitRetryDelayMs: 5000,
   rabbitUrl: 'amqp://admin:admin@127.0.0.1'
@@ -50,6 +60,14 @@ function parseList(value: string | undefined, fallback: string): string[] {
     .filter(Boolean)
 }
 
+function parseStorageProvider(value: string | undefined): 'local' | 'minio' {
+  const normalized = (value ?? DEFAULTS.repoStorageProvider).trim().toLowerCase()
+  if (normalized === 'minio') {
+    return 'minio'
+  }
+  return 'local'
+}
+
 export const env = {
   corsAllowedOrigins: parseList(process.env.CORS_ALLOWED_ORIGINS, DEFAULTS.corsAllowedOrigins),
   databaseUrl: process.env.DATABASE_URL ?? DEFAULTS.databaseUrl,
@@ -62,6 +80,28 @@ export const env = {
   orchestratorUrl: process.env.ORCHESTRATOR_URL ?? DEFAULTS.orchestratorUrl,
   qdrantHost: process.env.QDRANT_HOST ?? DEFAULTS.qdrantHost,
   qdrantPort: parseInteger(process.env.QDRANT_PORT, DEFAULTS.qdrantPort),
+  repoStorageLocalPath: process.env.REPO_STORAGE_LOCAL_PATH ?? DEFAULTS.repoStorageLocalPath,
+  repoStorageMinioAccessKey:
+    process.env.REPO_STORAGE_MINIO_ACCESS_KEY ?? DEFAULTS.repoStorageMinioAccessKey,
+  repoStorageMinioBucket: process.env.REPO_STORAGE_MINIO_BUCKET ?? DEFAULTS.repoStorageMinioBucket,
+  repoStorageMinioEndpoint:
+    process.env.REPO_STORAGE_MINIO_ENDPOINT ?? DEFAULTS.repoStorageMinioEndpoint,
+  repoStorageMinioForcePathStyle: parseBoolean(
+    process.env.REPO_STORAGE_MINIO_FORCE_PATH_STYLE,
+    DEFAULTS.repoStorageMinioForcePathStyle
+  ),
+  repoStorageMinioPort: parseInteger(
+    process.env.REPO_STORAGE_MINIO_PORT,
+    DEFAULTS.repoStorageMinioPort
+  ),
+  repoStorageMinioRegion: process.env.REPO_STORAGE_MINIO_REGION ?? DEFAULTS.repoStorageMinioRegion,
+  repoStorageMinioSecretKey:
+    process.env.REPO_STORAGE_MINIO_SECRET_KEY ?? DEFAULTS.repoStorageMinioSecretKey,
+  repoStorageMinioUseSsl: parseBoolean(
+    process.env.REPO_STORAGE_MINIO_USE_SSL,
+    DEFAULTS.repoStorageMinioUseSsl
+  ),
+  repoStorageProvider: parseStorageProvider(process.env.REPO_STORAGE_PROVIDER),
   rabbitAllowDestructiveMigration: parseBoolean(
     process.env.RABBIT_ALLOW_DESTRUCTIVE_MIGRATION,
     DEFAULTS.rabbitAllowDestructiveMigration

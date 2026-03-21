@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { and, desc, eq } from 'drizzle-orm'
 import { map } from 'lodash'
 import { v4 as uuidv4 } from 'uuid'
@@ -6,8 +6,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { requestChatRpc, OrchestratorClientError } from '../../lib/orchestrator-client'
 import { emitTelemetry } from '../../lib/telemetry'
 import { DbService } from '../db/db.service'
-import { chatHistory, chatSessions } from '../db/schema'
-import { EmbeddingService } from '../embedding/embedding.service'
+import { chatHistory, chatSessions, repos } from '../db/schema'
 import { AskDto } from './dto/ask.dto'
 
 @Injectable()
@@ -15,12 +14,13 @@ export class ChatService {
   private logger: Logger = new Logger(ChatService.name)
 
   constructor(
-    private readonly embeddingService: EmbeddingService,
     private readonly dbService: DbService
   ) { }
 
   async askAboutRepo(userId: number, repoId: number, body: AskDto) {
     const { question, sessionId } = body
+    await this.assertSessionOwnership(userId, repoId, sessionId)
+
     this.logger.log(`Repo: ${repoId}, Q: ${question}`)
     emitTelemetry({
       component: 'chat.service',
@@ -52,6 +52,8 @@ export class ChatService {
   }
 
   async createSession(userId: number, repoId: number) {
+    await this.assertRepoOwnership(userId, repoId)
+
     await this.dbService.dbClient.insert(chatSessions).values({
       id: uuidv4(),
       name: `Session for repo ${repoId}`,
@@ -60,7 +62,9 @@ export class ChatService {
     })
   }
 
-  async getChatSessionDetails(userId: number, sessionId: string) {
+  async getChatSessionDetails(userId: number, repoId: number, sessionId: string) {
+    await this.assertSessionOwnership(userId, repoId, sessionId)
+
     const sessionDetails = await this.dbService.dbClient.select()
       .from(chatHistory)
       .where(
@@ -78,6 +82,8 @@ export class ChatService {
   }
 
   async getRepoChats(userId: number, repoId: number) {
+    await this.assertRepoOwnership(userId, repoId)
+
     const sessions = await this.dbService.dbClient.select()
       .from(chatSessions)
       .where(
@@ -92,6 +98,38 @@ export class ChatService {
       sessionId: session.id,
       sessionName: session.name
     }))
+  }
+
+  private async assertRepoOwnership(userId: number, repoId: number): Promise<void> {
+    const [repo] = await this.dbService.dbClient.select({
+      id: repos.id
+    })
+      .from(repos)
+      .where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
+      .limit(1)
+
+    if (!repo) {
+      throw new NotFoundException('Repository not found')
+    }
+  }
+
+  private async assertSessionOwnership(userId: number, repoId: number, sessionId: string): Promise<void> {
+    const [session] = await this.dbService.dbClient.select({
+      id: chatSessions.id
+    })
+      .from(chatSessions)
+      .where(
+        and(
+          eq(chatSessions.id, sessionId),
+          eq(chatSessions.repoId, repoId),
+          eq(chatSessions.userId, userId)
+        )
+      )
+      .limit(1)
+
+    if (!session) {
+      throw new NotFoundException('Session not found')
+    }
   }
 
   private async publishChatJob(segments: {

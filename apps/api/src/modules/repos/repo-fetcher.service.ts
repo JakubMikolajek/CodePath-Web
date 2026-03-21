@@ -2,10 +2,9 @@ import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { GenericNullable } from '@workspace/codepath-common/globals'
 import crypto from 'crypto'
-import { eq } from 'drizzle-orm'
-import { existsSync, rmSync } from 'fs'
-import { access, mkdir, readdir, readFile, stat, unlink, writeFile } from 'fs/promises'
-import { map, replace } from 'lodash'
+import { and, eq } from 'drizzle-orm'
+import { readdir, readFile, rm, stat, unlink, writeFile } from 'fs/promises'
+import { map } from 'lodash'
 import NodeRSA from 'node-rsa'
 import path from 'path'
 import simpleGit from 'simple-git'
@@ -13,22 +12,22 @@ import simpleGit from 'simple-git'
 import { IGNORED_DIRS, IGNORED_EXTENSIONS, IGNORED_FILES } from '../../utils/ignores'
 import { DbService } from '../db/db.service'
 import { files, InsertFile, repos, SelectRepo } from '../db/schema'
-
-const projectRoot = path.resolve(__dirname, '../../../../../../')
-const defaultReposPath = path.join(projectRoot, 'storage', 'repos')
+import { RepoStorageService } from '../repo-storage/repo-storage.service'
 
 @Injectable()
 export class RepoFetcherService {
   private logger: Logger = new Logger(RepoFetcherService.name)
 
-  private readonly REPOS_PATH = defaultReposPath
   constructor(
     private readonly dbService: DbService,
+    private readonly repoStorageService: RepoStorageService,
   ) { }
 
   @Cron(CronExpression.EVERY_10_SECONDS)
   async pollForPending() {
-    const [repoToClone] = await this.dbService.dbClient.select()
+    const [repoToClone] = await this.dbService.dbClient.select({
+      id: repos.id
+    })
       .from(repos)
       .where(eq(repos.cloneStatus, 'pending'))
       .limit(1)
@@ -37,33 +36,30 @@ export class RepoFetcherService {
       return
     }
 
-    await this.cloneRepo(repoToClone)
+    const [claimedRepo] = await this.dbService.dbClient.update(repos).set({
+      cloneStatus: 'cloning'
+    })
+      .where(and(eq(repos.id, repoToClone.id), eq(repos.cloneStatus, 'pending')))
+      .returning()
+
+    if (!claimedRepo) {
+      return
+    }
+
+    await this.cloneRepo(claimedRepo)
   }
 
   private async cloneRepo(repo: SelectRepo) {
     const git = simpleGit()
-    const sanitizedName = replace(repo.name, /[^a-zA-Z0-9_-]/g, '_')
-    const targetPath = path.join(this.REPOS_PATH, sanitizedName)
+    const targetPath = this.repoStorageService.getCloneWorkspacePath(repo.id, repo.name)
 
     this.logger.log(`Cloning: ${repo.gitUrl} -> ${targetPath}`)
 
+    let tmpKeyPath: GenericNullable<string> = null
+    const gitEnvBackup = process.env.GIT_SSH_COMMAND
     try {
-      await this.dbService.dbClient.update(repos)
-        .set({ cloneStatus: 'cloning' })
-        .where(eq(repos.id, repo.id))
-
-      if (existsSync(targetPath)) {
-        rmSync(targetPath, { recursive: true })
-      } else {
-        try {
-          await access(this.REPOS_PATH)
-        } catch {
-          await mkdir(this.REPOS_PATH, { recursive: true })
-        }
-      }
-
-      let tmpKeyPath: GenericNullable<string> = null
-      const gitEnvBackup = process.env.GIT_SSH_COMMAND
+      await this.repoStorageService.ensureLocalWorkspaceRoot()
+      await rm(targetPath, { force: true, recursive: true })
 
       if (repo.accessKey) {
         const key = new NodeRSA(repo.accessKey).exportKey('openssh-private')
@@ -74,11 +70,24 @@ export class RepoFetcherService {
 
       // await git.clone(repo.gitUrl, targetPath, ['--branch', 'develop', '--single-branch'])
       await git.clone(repo.gitUrl, targetPath)
+      const repoGit = simpleGit(targetPath)
+      const commitSha = (await repoGit.revparse(['HEAD'])).trim()
+      const snapshot = await this.repoStorageService.persistSnapshot({
+        commitSha,
+        repoId: repo.id,
+        sourceDir: targetPath
+      })
 
       await this.dbService.dbClient.update(repos)
         .set({
           cloneStatus: 'cloned',
-          path: targetPath
+          documentation: null,
+          embeddingStatus: 'pending',
+          path: targetPath,
+          sourceCommitSha: commitSha,
+          storageBucket: snapshot.bucket,
+          storageKey: snapshot.key,
+          storageProvider: snapshot.provider
         })
         .where(eq(repos.id, repo.id))
 
@@ -99,23 +108,26 @@ export class RepoFetcherService {
 
       )
 
+      await this.dbService.dbClient.delete(files).where(eq(files.repoId, repo.id))
       await this.dbService.dbClient.insert(files).values(filesData)
 
       this.logger.log(`✓ Cloned and indexed ${repo.name}`)
-
-      if (tmpKeyPath) {
-        await unlink(tmpKeyPath).catch(() => { })
-        process.env.GIT_SSH_COMMAND = gitEnvBackup
-      }
     } catch (error: any) {
       this.logger.error(`✗ Error cloning ${repo.name}: ${error.message}`)
-
-      repo.cloneStatus = 'failed'
 
       await this.dbService.dbClient.update(repos)
         .set({ cloneStatus: 'failed' })
         .where(eq(repos.id, repo.id))
       throw error
+    } finally {
+      if (tmpKeyPath) {
+        await unlink(tmpKeyPath).catch(() => { })
+      }
+      if (gitEnvBackup === undefined) {
+        delete process.env.GIT_SSH_COMMAND
+      } else {
+        process.env.GIT_SSH_COMMAND = gitEnvBackup
+      }
     }
   }
 

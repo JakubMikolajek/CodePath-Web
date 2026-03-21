@@ -3,7 +3,7 @@ import * as path from 'node:path'
 
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { promises as fsp } from 'fs'
 import { slice } from 'lodash'
 
@@ -13,13 +13,15 @@ import { buildMermaidGraph } from '../../utils/mermaidBuilder'
 import { parseSegments, resolveCodeLanguageFromExt } from '../../utils/parser'
 import { DbService } from '../db/db.service'
 import { dependencies, files, repos, SelectRepo } from '../db/schema'
+import { RepoStorageService } from '../repo-storage/repo-storage.service'
 
 @Injectable()
 export class EmbeddingService {
   private readonly logger: Logger = new Logger(EmbeddingService.name)
 
   constructor(
-    private readonly dbService: DbService
+    private readonly dbService: DbService,
+    private readonly repoStorageService: RepoStorageService
   ) { }
 
   async embedRepo(repo: SelectRepo) {
@@ -38,56 +40,63 @@ export class EmbeddingService {
       .from(files)
       .where(eq(files.repoId, repo.id))
 
-    for (const file of allFiles) {
-      const abs = path.join(repo.path ?? '', file.path ?? '')
+    await this.dbService.dbClient.delete(dependencies).where(eq(dependencies.repoId, repo.id))
 
-      if (!fs.existsSync(abs)) {
-        continue
+    const preparedWorkspace = await this.repoStorageService.prepareWorkspace(repo)
+    try {
+      for (const file of allFiles) {
+        const abs = path.join(preparedWorkspace.workspacePath, file.path ?? '')
+
+        if (!fs.existsSync(abs)) {
+          continue
+        }
+
+        const src = await fsp.readFile(abs, 'utf8')
+        const fileExt = path.extname(file.path).toLowerCase()
+        const language = resolveCodeLanguageFromExt(fileExt)
+        const { parsedDependencies, parsedSegments } = parseSegments(src, fileExt, file.path)
+
+        const graph = buildMermaidGraph(parsedDependencies)
+
+        if (graph) {
+          await this.dbService.dbClient.insert(dependencies).values({
+            fileId: file.id,
+            fileName: path.basename(file.path),
+            graph,
+            repoId: repo.id
+          })
+        }
+
+        for (let i = 0; i < parsedSegments.length; i += BATCH) {
+          const batch = slice(parsedSegments, i, i + BATCH)
+
+          const batchPayload = batch.map(s => ({
+            comment: s.comment,
+            content: s.code,
+            decorators: s.decorators,
+            endLine: s.endLine,
+            fileExt,
+            fileId: file.id,
+            filePath: file.path,
+            jsDoc: s.jsDoc,
+            language,
+            params: s.params,
+            repoId: repo.id,
+            returnType: s.returnType,
+            startLine: s.startLine,
+            symbolKind: s.kind,
+            symbolName: s.name
+          }))
+
+          await this.enqueueEmbeddingsJob(batchPayload, repo.id)
+        }
       }
-
-      const src = await fsp.readFile(abs, 'utf8')
-      const fileExt = path.extname(file.path).toLowerCase()
-      const language = resolveCodeLanguageFromExt(fileExt)
-      const { parsedDependencies, parsedSegments } = parseSegments(src, fileExt, file.path)
-
-      const graph = buildMermaidGraph(parsedDependencies)
-
-      if (graph) {
-        await this.dbService.dbClient.insert(dependencies).values({
-          fileId: file.id,
-          fileName: path.basename(file.path),
-          graph,
-          repoId: repo.id
-        })
-      }
-
-      for (let i = 0; i < parsedSegments.length; i += BATCH) {
-        const batch = slice(parsedSegments, i, i + BATCH)
-
-        const batchPayload = batch.map(s => ({
-          comment: s.comment,
-          content: s.code,
-          decorators: s.decorators,
-          endLine: s.endLine,
-          fileExt,
-          fileId: file.id,
-          filePath: file.path,
-          jsDoc: s.jsDoc,
-          language,
-          params: s.params,
-          repoId: repo.id,
-          returnType: s.returnType,
-          startLine: s.startLine,
-          symbolKind: s.kind,
-          symbolName: s.name
-        }))
-
-        await this.enqueueEmbeddingsJob(batchPayload, repo.id)
-      }
+    } finally {
+      await preparedWorkspace.cleanup()
     }
 
     await this.dbService.dbClient.update(repos).set({
-      embeddingStatus: 'embeded'
+      embeddingStatus: 'embedded'
     }).where(eq(repos.id, repo.id))
     emitTelemetry({
       component: 'embedding.service',
@@ -104,16 +113,35 @@ export class EmbeddingService {
 
   @Cron(CronExpression.EVERY_30_SECONDS)
   async poolFromPending() {
-    const [repoToEmbedding] = await this.dbService.dbClient.select()
+    const [repoToEmbedding] = await this.dbService.dbClient.select({
+      id: repos.id
+    })
       .from(repos)
-      .where(eq(repos.embeddingStatus, 'pending'))
+      .where(and(eq(repos.embeddingStatus, 'pending'), eq(repos.cloneStatus, 'cloned')))
       .limit(1)
 
     if (!repoToEmbedding) {
       return
     }
 
-    await this.embedRepo(repoToEmbedding)
+    const [claimedRepo] = await this.dbService.dbClient.update(repos).set({
+      embeddingStatus: 'processing'
+    })
+      .where(and(eq(repos.id, repoToEmbedding.id), eq(repos.embeddingStatus, 'pending')))
+      .returning()
+
+    if (!claimedRepo) {
+      return
+    }
+
+    try {
+      await this.embedRepo(claimedRepo)
+    } catch (error) {
+      await this.dbService.dbClient.update(repos).set({
+        embeddingStatus: 'failed'
+      }).where(eq(repos.id, claimedRepo.id))
+      throw error
+    }
   }
 
   private async enqueueEmbeddingsJob(segments: {

@@ -1,20 +1,24 @@
-import { Injectable } from '@nestjs/common'
-import { eq } from 'drizzle-orm'
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
+import { and, eq } from 'drizzle-orm'
 
 import { enqueueDocsJob } from '../../lib/orchestrator-client'
 import { emitTelemetry } from '../../lib/telemetry'
 import { DbService } from '../db/db.service'
 import { repos } from '../db/schema'
-import { QdrantService } from '../qdrant/qdrant.service'
 
 @Injectable()
 export class DocsService {
   constructor(
-    private readonly dbService: DbService,
-    private readonly qdrantService: QdrantService
+    private readonly dbService: DbService
   ) { }
 
-  async generateDocumentation(repoId: number) {
+  async generateDocumentation(userId: number, repoId: number) {
+    const repo = await this.assertRepoOwnership(userId, repoId)
+
+    if (repo.embeddingStatus !== 'embedded') {
+      throw new ConflictException('Embeddings are not ready for documentation generation')
+    }
+
     try {
       await enqueueDocsJob({ repoId })
       emitTelemetry({
@@ -48,12 +52,30 @@ export class DocsService {
     return { message: 'Documentation generation started' }
   }
 
-  async getDocumentation(repoId: number) {
+  async getDocumentation(userId: number, repoId: number) {
+    await this.assertRepoOwnership(userId, repoId)
+
     const [repo] = await this.dbService.dbClient.select()
       .from(repos)
-      .where(eq(repos.id, repoId))
+      .where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
       .limit(1)
 
     return repo?.documentation
+  }
+
+  private async assertRepoOwnership(userId: number, repoId: number) {
+    const [repo] = await this.dbService.dbClient.select({
+      embeddingStatus: repos.embeddingStatus,
+      id: repos.id
+    })
+      .from(repos)
+      .where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
+      .limit(1)
+
+    if (!repo) {
+      throw new NotFoundException('Repository not found')
+    }
+
+    return repo
   }
 }

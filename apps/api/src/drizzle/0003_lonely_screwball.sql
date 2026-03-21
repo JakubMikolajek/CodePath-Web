@@ -1,1 +1,1 @@
-ALTER TABLE "repos" ADD COLUMN "embedding_status" text DEFAULT 'pending';
+SELECT 1;

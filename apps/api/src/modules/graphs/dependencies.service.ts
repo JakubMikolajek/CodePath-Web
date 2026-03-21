@@ -1,9 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common'
-import { desc, eq } from 'drizzle-orm'
+import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { and, desc, eq } from 'drizzle-orm'
 import { map } from 'lodash'
 
 import { DbService } from '../db/db.service'
-import { dependencies } from '../db/schema'
+import { dependencies, repos } from '../db/schema'
 
 @Injectable()
 export class DependenciesService {
@@ -13,7 +13,18 @@ export class DependenciesService {
     private readonly dbService: DbService
   ) { }
 
-  async getRepoDependencies(repoId: number) {
+  async getRepoDependencies(userId: number, repoId: number) {
+    const [repo] = await this.dbService.dbClient.select({
+      id: repos.id
+    })
+      .from(repos)
+      .where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
+      .limit(1)
+
+    if (!repo) {
+      throw new NotFoundException('Repository not found')
+    }
+
     const allDependencies = await this.dbService.dbClient.select()
       .from(dependencies)
       .where(eq(dependencies.repoId, repoId))

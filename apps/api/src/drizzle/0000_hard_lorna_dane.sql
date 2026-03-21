@@ -1,5 +1,9 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 
+CREATE TYPE "repo_clone_status" AS ENUM('pending', 'cloning', 'cloned', 'failed');--> statement-breakpoint
+CREATE TYPE "repo_embedding_status" AS ENUM('pending', 'processing', 'embedded', 'failed');--> statement-breakpoint
+CREATE TYPE "repo_storage_provider" AS ENUM('local', 'minio');--> statement-breakpoint
+
 CREATE TABLE "chat_history" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" integer NOT NULL,
@@ -74,8 +78,14 @@ CREATE TABLE "repos" (
 	"path" text,
 	"git_url" text NOT NULL,
 	"access_key" text,
-	"clone_status" text DEFAULT 'pending',
-	"indexed_at" timestamp DEFAULT now()
+	"clone_status" "repo_clone_status" DEFAULT 'pending' NOT NULL,
+	"embedding_status" "repo_embedding_status" DEFAULT 'pending' NOT NULL,
+	"indexed_at" timestamp DEFAULT now(),
+	"source_commit_sha" text,
+	"storage_provider" "repo_storage_provider" DEFAULT 'local' NOT NULL,
+	"storage_bucket" text,
+	"storage_key" text,
+	"documentation" text
 );
 --> statement-breakpoint
 CREATE TABLE "users" (
@@ -102,4 +112,7 @@ CREATE INDEX "idx_chat_history_created_at" ON "chat_history" USING btree ("creat
 CREATE INDEX "idx_chat_history_user_session" ON "chat_history" USING btree ("user_id","session_id","created_at");--> statement-breakpoint
 CREATE INDEX "idx_dependencies_file_id" ON "dependencies" USING btree ("file_id");--> statement-breakpoint
 CREATE INDEX "idx_dependencies_repo_id" ON "dependencies" USING btree ("repo_id");--> statement-breakpoint
+CREATE INDEX "idx_files_repo_id" ON "files" USING btree ("repo_id");--> statement-breakpoint
+CREATE INDEX "idx_repos_clone_status" ON "repos" USING btree ("clone_status");--> statement-breakpoint
+CREATE INDEX "idx_repos_embedding_status" ON "repos" USING btree ("embedding_status");--> statement-breakpoint
 CREATE INDEX "idx_embeddings_vector" ON "embeddings" USING ivfflat ("embedding" vector_cosine_ops) WITH (lists=100);

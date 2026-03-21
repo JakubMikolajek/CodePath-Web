@@ -1,7 +1,7 @@
 import type { AxiosInstance, AxiosRequestConfig } from 'axios'
 
 import { axiosClient } from './axiosClient'
-import { getAxiosServerInstance } from './axiosServer'
+import { createAxiosServer } from './axiosServer'
 
 function createClient(client: AxiosInstance) {
   return {
@@ -22,7 +22,7 @@ function createClient(client: AxiosInstance) {
 
 export const apiClient = createClient(axiosClient)
 
-export const apiServer = () => {
-  const client = getAxiosServerInstance()
+export const apiServer = (cookie: string) => {
+  const client = createAxiosServer(cookie)
   return createClient(client)
 }
