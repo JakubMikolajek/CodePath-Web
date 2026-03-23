@@ -2,11 +2,11 @@
 
 import { useParams } from 'next/navigation'
 
-const getRouteParam = (param: string | string[] | undefined) => Array.isArray(param) ? param[0] : param
+import { getFirstRouteParam } from '@/lib/route-params'
 
 export default function Page() {
   const params = useParams()
-  const repoId = getRouteParam(params.repoId)
+  const repoId = getFirstRouteParam(params.repoId)
   return (
     <>
       <div className="flex items-center justify-between">

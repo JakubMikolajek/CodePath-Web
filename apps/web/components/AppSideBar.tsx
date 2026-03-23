@@ -49,10 +49,10 @@ export default function AppSidebar({ fetchedRepos, me }: AppSideBarProps) {
   }, [dispatch, fetchedRepos, me])
 
   useEffect(() => {
-    dispatch(getRepos())
+    void dispatch(getRepos())
 
     const interval = setInterval(() => {
-      dispatch(getRepos())
+      void dispatch(getRepos())
     }, REPOS_REFRESH_INTERVAL_MS)
 
     return () => clearInterval(interval)
@@ -125,7 +125,7 @@ export default function AppSidebar({ fetchedRepos, me }: AppSideBarProps) {
                 <button
                   className="rounded border border-red-300 px-2 py-1 text-xs text-red-700"
                   onClick={() => {
-                    dispatch(getRepos())
+                    void dispatch(getRepos())
                   }}
                   type="button"
                 >
@@ -134,7 +134,7 @@ export default function AppSidebar({ fetchedRepos, me }: AppSideBarProps) {
                 <button
                   className="rounded border border-red-300 px-2 py-1 text-xs text-red-700"
                   onClick={() => {
-                    dispatch(dismissSyncError())
+                    void dispatch(dismissSyncError())
                   }}
                   type="button"
                 >
@@ -146,7 +146,7 @@ export default function AppSidebar({ fetchedRepos, me }: AppSideBarProps) {
               aria-label="Close sync error notification"
               className="text-red-700"
               onClick={() => {
-                dispatch(dismissSyncError())
+                void dispatch(dismissSyncError())
               }}
               type="button"
             >

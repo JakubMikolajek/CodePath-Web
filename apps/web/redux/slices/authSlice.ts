@@ -2,6 +2,7 @@ import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/tool
 import type { GenericNullable } from '@workspace/codepath-common/globals'
 import type { IUser } from '@workspace/codepath-common/user'
 
+import { getApiErrorMessage } from '@/lib/api/error'
 import { login as loginApi, logout as logoutApi, register as registerApi } from '@/lib/auth/client'
 
 interface AuthState {
@@ -22,8 +23,8 @@ export const login = createAsyncThunk('auth/login',
       await loginApi(identifier, password)
       window.location.href = '/dashboard'
       return
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message ?? 'Login failed')
+    } catch (error: unknown) {
+      return rejectWithValue(getApiErrorMessage(error, 'Login failed'))
     }
   }
 )
@@ -33,9 +34,9 @@ export const logout = createAsyncThunk('auth/logout',
     try {
       await logoutApi()
       window.location.href = '/'
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Logout error:', error)
-      return rejectWithValue(error.message)
+      return rejectWithValue(getApiErrorMessage(error, 'Logout failed'))
     }
   })
 
@@ -44,8 +45,8 @@ export const register = createAsyncThunk('auth/register',
     try {
       await registerApi(email, login, password)
       return
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message ?? 'Registration failed')
+    } catch (error: unknown) {
+      return rejectWithValue(getApiErrorMessage(error, 'Registration failed'))
     }
   }
 )

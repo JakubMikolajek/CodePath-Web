@@ -21,6 +21,7 @@ interface LoginFormState {
 export default function LoginForm({ handleShowRegisterForm }: LoginFormProps) {
   const dispatch = useAppDispatch()
   const { error, loading } = useAppSelector(state => state.auth)
+  const [fallbackError, setFallbackError] = useState<null | string>(null)
   const [formData, setFormData] = useState<LoginFormState>({
     identifier: '',
     password: ''
@@ -28,6 +29,7 @@ export default function LoginForm({ handleShowRegisterForm }: LoginFormProps) {
 
   const handleInputChange = (field: keyof LoginFormState, value: string) => {
     if (error) dispatch(clearError())
+    if (fallbackError) setFallbackError(null)
     setFormData({ ...formData, [field]: value })
   }
 
@@ -38,8 +40,9 @@ export default function LoginForm({ handleShowRegisterForm }: LoginFormProps) {
         identifier: formData.identifier,
         password: formData.password
       })).unwrap()
-    } catch {
-      // TODO add error log
+    } catch (submitError: unknown) {
+      console.error('Login request failed', submitError)
+      if (!error) setFallbackError('Login failed')
     }
   }
 
@@ -55,6 +58,9 @@ export default function LoginForm({ handleShowRegisterForm }: LoginFormProps) {
             <div className="flex flex-col gap-6">
               {error && (
                 <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">{error}</div>
+              )}
+              {fallbackError && (
+                <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">{fallbackError}</div>
               )}
               <div className="grid gap-3">
                 <Label htmlFor="identifier">Email or Login</Label>

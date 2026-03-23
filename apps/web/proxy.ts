@@ -1,20 +1,19 @@
 import { some } from 'lodash'
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const token = request.cookies.get('access_token')?.value
   const { pathname } = request.nextUrl
 
   const protectedRoutes = ['/dashboard']
 
-  const isProtectedRoute = some(protectedRoutes, (route) => pathname.startsWith(route))
+  const isProtectedRoute = some(protectedRoutes, route => pathname.startsWith(route))
 
   if (isProtectedRoute && !token) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
-  if (token && pathname === '/' && !pathname.startsWith('/dashboard')) {
+  if (token && pathname === '/') {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
@@ -22,5 +21,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|.*\\.png$).*)'],
+  matcher: ['/((?!api|_next/static|_next/image|.*\\.png$).*)']
 }

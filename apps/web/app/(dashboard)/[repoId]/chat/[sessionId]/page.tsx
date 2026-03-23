@@ -12,17 +12,16 @@ import Markdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 
+import { getFirstRouteParam } from '@/lib/route-params'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { getSessionDetails, sendMessage } from '@/redux/slices/chatSlice'
-
-const getRouteParam = (param: string | string[] | undefined) => Array.isArray(param) ? param[0] : param
 
 export default function ChatPage() {
   const params = useParams()
   const dispatch = useAppDispatch()
   const sessionDetails = useAppSelector(state => state.chat.sessionDetails)
-  const repoId = useMemo(() => Number(getRouteParam(params.repoId)), [params.repoId])
-  const sessionId = useMemo(() => getRouteParam(params.sessionId) ?? '', [params.sessionId])
+  const repoId = useMemo(() => Number(getFirstRouteParam(params.repoId)), [params.repoId])
+  const sessionId = useMemo(() => getFirstRouteParam(params.sessionId) ?? '', [params.sessionId])
   const hasValidRouteParams = Number.isFinite(repoId) && sessionId.length > 0
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -66,7 +65,7 @@ export default function ChatPage() {
       return
     }
 
-    dispatch(getSessionDetails({
+    void dispatch(getSessionDetails({
       repoId,
       sessionId
     }))

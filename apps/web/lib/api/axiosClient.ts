@@ -1,5 +1,7 @@
 import axios from 'axios'
 
+import { isUnauthorizedError, toError } from '@/lib/api/error'
+
 export const axiosClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? '/api',
   withCredentials: true
@@ -8,7 +10,7 @@ export const axiosClient = axios.create({
 axiosClient.interceptors.response.use(
   response => response,
   error => {
-    if (error.response?.status === 401) {
+    if (isUnauthorizedError(error)) {
       if (typeof document !== 'undefined') {
         document.cookie = 'access_token=; Max-Age=0; path=/; SameSite=strict'
       }
@@ -17,6 +19,6 @@ axiosClient.interceptors.response.use(
         window.location.assign('/')
       }
     }
-    return Promise.reject(error)
+    return Promise.reject(toError(error, 'Client request failed'))
   }
 )

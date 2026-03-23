@@ -15,13 +15,13 @@ interface GenerateRepoDocsResponse {
 }
 
 export async function getRepoDocs(repoId: number) {
-  return await apiClient.get<string | null>(`/docs/${repoId}`)
+  return apiClient.get<null | string>(`/docs/${repoId}`)
 }
 
 export async function getRepoDocsStatus(repoId: number) {
-  return await apiClient.get<RepoDocsStatusResponse>(`/docs/status/${repoId}`)
+  return apiClient.get<RepoDocsStatusResponse>(`/docs/status/${repoId}`)
 }
 
 export async function generateRepoDocs(repoId: number) {
-  return await apiClient.post<GenerateRepoDocsResponse, Record<string, never>>(`/docs/generate/${repoId}`, {})
+  return apiClient.post<GenerateRepoDocsResponse, Record<string, never>>(`/docs/generate/${repoId}`, {})
 }

@@ -9,7 +9,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: 'line',
   use: {
-    baseURL: `http://127.0.0.1:${port}`,
+    baseURL: `http://localhost:${port}`,
     trace: 'on-first-retry'
   },
   projects: [
@@ -22,6 +22,6 @@ export default defineConfig({
     command: `bun run dev -- --port ${port}`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
-    url: `http://127.0.0.1:${port}`
+    url: `http://localhost:${port}`
   }
 })

@@ -6,16 +6,15 @@ import { useParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 
 import MermaidGraph from '@/components/MermaidGraph'
+import { getFirstRouteParam } from '@/lib/route-params'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { getGraphs } from '@/redux/slices/graphsSlice'
-
-const getRouteParam = (param: string | string[] | undefined) => Array.isArray(param) ? param[0] : param
 
 export default function Page() {
   const params = useParams()
   const dispatch = useAppDispatch()
-  const repoId = useMemo(() => Number(getRouteParam(params.repoId)), [params.repoId])
-  const graphId = useMemo(() => Number(getRouteParam(params.graphId)), [params.graphId])
+  const repoId = useMemo(() => Number(getFirstRouteParam(params.repoId)), [params.repoId])
+  const graphId = useMemo(() => Number(getFirstRouteParam(params.graphId)), [params.graphId])
   const [activeGraph, setActiveGraph] = useState<GenericNullable<Graph>>(null)
 
   const graphs = useAppSelector(state => state.graphs.graphs)
@@ -26,7 +25,7 @@ export default function Page() {
       return
     }
 
-    dispatch(getGraphs(repoId))
+    void dispatch(getGraphs(repoId))
   }, [dispatch, repoId])
 
   useEffect(() => {

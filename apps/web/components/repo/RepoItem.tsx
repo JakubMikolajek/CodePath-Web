@@ -39,11 +39,11 @@ export default function RepoItem({ item }: RepoItemProps) {
     || item.docsStatus === 'processing'
 
   const handleOpenChange = (open: boolean) => {
-    dispatch(setOpenRepoId(open ? item.id : null))
+    void dispatch(setOpenRepoId(open ? item.id : null))
 
     if (open) {
-      dispatch(getChatSessions(item.id))
-      dispatch(getGraphs(item.id))
+      void dispatch(getChatSessions(item.id))
+      void dispatch(getGraphs(item.id))
     }
   }
 
@@ -79,7 +79,10 @@ export default function RepoItem({ item }: RepoItemProps) {
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <SidebarMenuSub>
-                    <SidebarMenuButton asChild onClick={() => dispatch(createSession(item.id))}>
+                    <SidebarMenuButton asChild onClick={() => {
+                      void dispatch(createSession(item.id))
+                    }}
+                    >
                       <span>New chat</span>
                       {/*<LucideMessagesSquare className="ml-auto h-4 w-4" />*/}
                     </SidebarMenuButton>

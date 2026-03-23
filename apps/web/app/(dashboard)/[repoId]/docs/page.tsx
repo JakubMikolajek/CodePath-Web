@@ -7,10 +7,9 @@ import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 
 import { generateRepoDocs, getRepoDocs, getRepoDocsStatus, type RepoDocsStatusResponse } from '@/lib/docs'
+import { getFirstRouteParam } from '@/lib/route-params'
 
 const DOCS_STATUS_POLL_MS = 5_000
-
-const getRouteParam = (param: string | string[] | undefined) => Array.isArray(param) ? param[0] : param
 
 const resolveErrorMessage = (error: unknown) => {
   if (typeof error === 'object' && error !== null && 'response' in error) {
@@ -36,12 +35,12 @@ const formatStatus = (status: string) => status.replaceAll('_', ' ')
 
 export default function Page() {
   const params = useParams()
-  const repoId = useMemo(() => Number(getRouteParam(params.repoId)), [params.repoId])
+  const repoId = useMemo(() => Number(getFirstRouteParam(params.repoId)), [params.repoId])
   const [text, setText] = useState('')
-  const [status, setStatus] = useState<RepoDocsStatusResponse | null>(null)
+  const [status, setStatus] = useState<null | RepoDocsStatusResponse>(null)
   const [loading, setLoading] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<null | string>(null)
 
   const fetchDocs = useCallback(async () => {
     if (!Number.isFinite(repoId)) {
@@ -107,7 +106,7 @@ export default function Page() {
   }
 
   useEffect(() => {
-    loadPageState()
+    void loadPageState()
   }, [loadPageState])
 
   useEffect(() => {
@@ -115,15 +114,17 @@ export default function Page() {
       return
     }
 
-    const interval = setInterval(async () => {
-      try {
-        const nextStatus = await fetchStatus()
-        if (nextStatus?.docsStatus === 'ready') {
-          await fetchDocs()
+    const interval = setInterval(() => {
+      void (async () => {
+        try {
+          const nextStatus = await fetchStatus()
+          if (nextStatus?.docsStatus === 'ready') {
+            await fetchDocs()
+          }
+        } catch (nextError) {
+          setError(resolveErrorMessage(nextError))
         }
-      } catch (nextError) {
-        setError(resolveErrorMessage(nextError))
-      }
+      })()
     }, DOCS_STATUS_POLL_MS)
 
     return () => clearInterval(interval)
@@ -141,7 +142,9 @@ export default function Page() {
     <div className="flex items-center justify-between">
       <div className="w-full">
         <h1 className="text-2xl font-semibold text-foreground">Docs</h1>
-        <p className="text-muted-foreground">Repo: {Number.isFinite(repoId) ? repoId : String(getRouteParam(params.repoId))}</p>
+        <p className="text-muted-foreground">
+          Repo: {Number.isFinite(repoId) ? repoId : String(getFirstRouteParam(params.repoId))}
+        </p>
         <p className="text-sm text-muted-foreground mt-1">Pipeline status: {statusLabel}</p>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -191,7 +194,7 @@ export default function Page() {
                   {children}
                 </blockquote>
               ),
-              code: ({ children, className, node, ...props }) => {
+              code: ({ children, className, ...props }) => {
                 const match = /language-(\w+)/.exec(className || '')
                 return match ? (
                   <div className="relative">

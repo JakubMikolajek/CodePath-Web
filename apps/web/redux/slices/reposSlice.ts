@@ -2,6 +2,7 @@ import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/tool
 import type { GenericNullable } from '@workspace/codepath-common/globals'
 import type { Repository } from '@workspace/codepath-common/repository'
 
+import { getApiErrorMessage } from '@/lib/api/error'
 import { createRepo as createRepoApi, getRepos as getReposApi } from '@/lib/repos/client'
 import type { CreateRepoFormData } from '@/utils/validators/createRepoForm'
 
@@ -27,8 +28,8 @@ export const createRepo = createAsyncThunk('repos/createRepo',
   async (repo: CreateRepoFormData, { rejectWithValue }) => {
     try {
       return await createRepoApi(repo)
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message ?? 'Cannot create repo')
+    } catch (error: unknown) {
+      return rejectWithValue(getApiErrorMessage(error, 'Cannot create repo'))
     }
   }
 )
@@ -37,8 +38,8 @@ export const getRepos = createAsyncThunk('repos/getRepos',
   async (_, { rejectWithValue }) => {
     try {
       return await getReposApi()
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message ?? 'Cannot fetch repositories')
+    } catch (error: unknown) {
+      return rejectWithValue(getApiErrorMessage(error, 'Cannot fetch repositories'))
     }
   }
 )

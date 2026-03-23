@@ -22,6 +22,7 @@ interface RegisterFormState {
 export default function RegisterForm({ handleShowRegisterForm }: RegisterFormProps) {
   const dispatch = useAppDispatch()
   const { error, loading } = useAppSelector(state => state.auth)
+  const [fallbackError, setFallbackError] = useState<null | string>(null)
   const [formData, setFormData] = useState<RegisterFormState>({
     email: '',
     login: '',
@@ -31,12 +32,14 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
 
   const handleInputChange = (field: keyof RegisterFormState, value: string) => {
     if (error) dispatch(clearError())
+    if (fallbackError) setFallbackError(null)
     setFormData({ ...formData, [field]: value })
   }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setSuccess(false)
+    setFallbackError(null)
 
     try {
       await dispatch(register({
@@ -48,8 +51,9 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
       setTimeout(() => {
         handleShowRegisterForm(false)
       }, 1500)
-    } catch {
-      // TODO add error handling
+    } catch (submitError: unknown) {
+      console.error('Registration request failed', submitError)
+      if (!error) setFallbackError('Registration failed')
     }
   }
 
@@ -65,6 +69,9 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
             <div className="flex flex-col gap-6">
               {error && (
                 <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">{error}</div>
+              )}
+              {fallbackError && (
+                <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">{fallbackError}</div>
               )}
               {success && (
                 <div className="p-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md">
