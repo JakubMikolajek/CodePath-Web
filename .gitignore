@@ -41,3 +41,5 @@ npm-debug.log*
 
 /storage
 CodePath-Web.iml
+
+.codex
