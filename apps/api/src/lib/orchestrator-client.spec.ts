@@ -1,4 +1,4 @@
-import { requestChatRpc } from './orchestrator-client'
+import { enqueueIngestJob, requestChatRpc } from './orchestrator-client'
 
 describe('orchestrator client', () => {
   const originalFetch = global.fetch
@@ -60,5 +60,74 @@ describe('orchestrator client', () => {
         repoId: 2
       })
     ).resolves.toBe('ok')
+  })
+
+  it('rejects ingest publish when producer payload is invalid', async () => {
+    const fetchMock = jest.fn()
+    global.fetch = fetchMock as typeof fetch
+
+    await expect(enqueueIngestJob({
+      contractVersion: 'ingest.v1',
+      correlationId: '',
+      messageType: 'ingest.job.request',
+      payload: {
+        parseOptions: {
+          includeConfigFiles: true,
+          includeDocumentationFiles: true,
+          maxFileBytes: 5000,
+          maxSegmentChars: 1000
+        },
+        snapshot: {
+          bucket: 'codepath-repos',
+          key: 'repos/1/snapshot.tar.gz',
+          provider: 'minio',
+          sourceCommitSha: 'abcdef'
+        }
+      },
+      producedAt: new Date().toISOString(),
+      producer: 'web-api',
+      repoId: 1
+    } as never)).rejects.toMatchObject({
+      message: 'Ingest job payload failed producer-side contract validation',
+      name: 'OrchestratorClientError'
+    })
+
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('publishes ingest job when producer payload is valid', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 202,
+      text: async () => ''
+    } as Response)
+    global.fetch = fetchMock as typeof fetch
+
+    await expect(enqueueIngestJob({
+      contractVersion: 'ingest.v1',
+      correlationId: 'corr-1',
+      messageType: 'ingest.job.request',
+      payload: {
+        parseOptions: {
+          includeConfigFiles: true,
+          includeDocumentationFiles: true,
+          maxFileBytes: 5000,
+          maxSegmentChars: 1000
+        },
+        snapshot: {
+          bucket: 'codepath-repos',
+          key: 'repos/1/snapshot.tar.gz',
+          provider: 'minio',
+          sourceCommitSha: 'abcdef'
+        }
+      },
+      producedAt: new Date().toISOString(),
+      producer: 'web-api',
+      repoId: 1
+    } as never)).resolves.toBeUndefined()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url] = fetchMock.mock.calls[0]
+    expect(String(url)).toContain('/v1/jobs/ingest')
   })
 })

@@ -1,6 +1,10 @@
 const DEFAULTS = {
   corsAllowedOrigins: '*',
   databaseUrl: 'postgres://postgres:postgres@127.0.0.1:5432/codepath',
+  ingestIncludeConfigFiles: true,
+  ingestIncludeDocumentationFiles: true,
+  ingestMaxFileBytes: 5_000_000,
+  ingestMaxSegmentChars: 4_000,
   jwtExpiresInSeconds: 7 * 24 * 60 * 60,
   jwtSecret: 'supersecret',
   port: 3001,
@@ -71,6 +75,22 @@ function parseStorageProvider(value: string | undefined): 'local' | 'minio' {
 export const env = {
   corsAllowedOrigins: parseList(process.env.CORS_ALLOWED_ORIGINS, DEFAULTS.corsAllowedOrigins),
   databaseUrl: process.env.DATABASE_URL ?? DEFAULTS.databaseUrl,
+  ingestIncludeConfigFiles: parseBoolean(
+    process.env.INGEST_INCLUDE_CONFIG_FILES,
+    DEFAULTS.ingestIncludeConfigFiles
+  ),
+  ingestIncludeDocumentationFiles: parseBoolean(
+    process.env.INGEST_INCLUDE_DOCUMENTATION_FILES,
+    DEFAULTS.ingestIncludeDocumentationFiles
+  ),
+  ingestMaxFileBytes: parseInteger(
+    process.env.INGEST_MAX_FILE_BYTES,
+    DEFAULTS.ingestMaxFileBytes
+  ),
+  ingestMaxSegmentChars: parseInteger(
+    process.env.INGEST_MAX_SEGMENT_CHARS,
+    DEFAULTS.ingestMaxSegmentChars
+  ),
   jwtExpiresInSeconds: parseInteger(
     process.env.JWT_EXPIRES_IN_SECONDS,
     parseInteger(process.env.JWT_EXPIRES_IN, DEFAULTS.jwtExpiresInSeconds)

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
-import { GenericNullable } from '@workspace/codepath-common/globals'
+import type { GenericNullable } from '@workspace/codepath-common/globals'
+import type { IngestJobRequestV1 } from '@workspace/codepath-common/ingest'
 import crypto from 'crypto'
 import { and, eq } from 'drizzle-orm'
 import { readdir, readFile, rm, stat, unlink, writeFile } from 'fs/promises'
@@ -9,6 +10,9 @@ import NodeRSA from 'node-rsa'
 import path from 'path'
 import simpleGit from 'simple-git'
 
+import { env } from '../../config/env'
+import { enqueueIngestJob } from '../../lib/orchestrator-client'
+import { emitTelemetry } from '../../lib/telemetry'
 import { IGNORED_DIRS, IGNORED_EXTENSIONS, IGNORED_FILES } from '../../utils/ignores'
 import { DbService } from '../db/db.service'
 import { files, InsertFile, repos, SelectRepo } from '../db/schema'
@@ -112,6 +116,40 @@ export class RepoFetcherService {
       await this.dbService.dbClient.delete(files).where(eq(files.repoId, repo.id))
       await this.dbService.dbClient.insert(files).values(filesData)
 
+      try {
+        const ingestMessage = this.buildIngestJobRequest(repo.id, commitSha, snapshot)
+        await enqueueIngestJob(ingestMessage)
+        emitTelemetry({
+          component: 'repo-fetcher.service',
+          details: {
+            bucket: ingestMessage.payload.snapshot.bucket,
+            key: ingestMessage.payload.snapshot.key
+          },
+          event: 'ingest_job_request_published',
+          level: 'info',
+          queueName: 'ingest',
+          repoId: repo.id,
+          runtimeFamily: 'pipeline',
+          service: 'web-api',
+          status: 'ok'
+        })
+      } catch (cause) {
+        emitTelemetry({
+          component: 'repo-fetcher.service',
+          details: {
+            errorMessage: cause instanceof Error ? cause.message : String(cause),
+            errorName: cause instanceof Error ? cause.name : 'UnknownError'
+          },
+          event: 'ingest_job_request_publish_failed',
+          level: 'error',
+          queueName: 'ingest',
+          repoId: repo.id,
+          runtimeFamily: 'pipeline',
+          service: 'web-api',
+          status: 'error'
+        })
+      }
+
       this.logger.log(`✓ Cloned and indexed ${repo.name}`)
     } catch (error: any) {
       this.logger.error(`✗ Error cloning ${repo.name}: ${error.message}`)
@@ -161,5 +199,40 @@ export class RepoFetcherService {
   private async hashFile(filePath: string): Promise<string> {
     const content = await readFile(filePath)
     return crypto.createHash('sha256').update(content).digest('hex')
+  }
+
+  private buildIngestJobRequest(
+    repoId: number,
+    commitSha: string,
+    snapshot: { bucket: null | string, key: null | string, provider: 'local' | 'minio' }
+  ): IngestJobRequestV1 {
+    if (snapshot.provider !== 'minio' || !snapshot.bucket || !snapshot.key) {
+      throw new Error(
+        'Ingest contract requires MinIO snapshot location. Configure REPO_STORAGE_PROVIDER=minio and ensure snapshot upload succeeded.'
+      )
+    }
+
+    return {
+      contractVersion: 'ingest.v1',
+      correlationId: `ingest-${repoId}-${crypto.randomUUID()}`,
+      messageType: 'ingest.job.request' as IngestJobRequestV1['messageType'],
+      payload: {
+        parseOptions: {
+          includeConfigFiles: env.ingestIncludeConfigFiles,
+          includeDocumentationFiles: env.ingestIncludeDocumentationFiles,
+          maxFileBytes: env.ingestMaxFileBytes,
+          maxSegmentChars: env.ingestMaxSegmentChars
+        },
+        snapshot: {
+          bucket: snapshot.bucket,
+          key: snapshot.key,
+          provider: 'minio',
+          sourceCommitSha: commitSha
+        }
+      },
+      producedAt: new Date().toISOString(),
+      producer: 'web-api' as IngestJobRequestV1['producer'],
+      repoId
+    }
   }
 }

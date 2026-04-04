@@ -1,4 +1,6 @@
 import { env } from '../config/env'
+import { assertValidIngestJobRequestFromWeb } from './ingest-message'
+import type { IngestJobRequestV1 } from '@workspace/codepath-common/ingest'
 
 const ORCHESTRATOR_TIMEOUT_MS = 60_000
 
@@ -101,4 +103,14 @@ export async function enqueueDocsJob(input: { repoId: number }): Promise<void> {
 
 export async function enqueueEmbeddingJob(input: OrchestratorEmbeddingJobInput): Promise<void> {
   await postJson<void>('/v1/jobs/embedding', input)
+}
+
+export async function enqueueIngestJob(input: IngestJobRequestV1): Promise<void> {
+  try {
+    assertValidIngestJobRequestFromWeb(input)
+  } catch (cause) {
+    throw new OrchestratorClientError('Ingest job payload failed producer-side contract validation', cause)
+  }
+
+  await postJson<void>('/v1/jobs/ingest', input)
 }
