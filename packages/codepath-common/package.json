@@ -33,6 +33,10 @@
     "./telemetry": {
       "types": "./telemetry.ts",
       "default": "./dist/telemetry.js"
+    },
+    "./ingest": {
+      "types": "./ingest.ts",
+      "default": "./dist/ingest.js"
     }
   }
 }
