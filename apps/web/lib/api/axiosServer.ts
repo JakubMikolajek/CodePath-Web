@@ -6,7 +6,10 @@ import { isUnauthorizedError, toError } from '@/lib/api/error'
 
 export const createAxiosServer = (cookie: string): AxiosInstance => {
   const instance = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api',
+    baseURL:
+      process.env.INTERNAL_API_URL ??
+      process.env.NEXT_PUBLIC_API_URL ??
+      'http://localhost:3001/api',
     headers: {
       Cookie: cookie
     }
