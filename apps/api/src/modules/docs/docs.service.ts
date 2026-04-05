@@ -16,11 +16,25 @@ export class DocsService {
     const repo = await this.assertRepoOwnership(userId, repoId)
 
     if (repo.cloneStatus !== 'cloned') {
-      throw new ConflictException('Repository clone is not ready for documentation generation')
+      throw new ConflictException(
+        `Repository clone is not ready for documentation generation (cloneStatus=${repo.cloneStatus})`
+      )
     }
 
     if (repo.embeddingStatus !== 'embedded') {
-      throw new ConflictException('Embeddings are not ready for documentation generation')
+      emitTelemetry({
+        component: 'docs.service',
+        details: {
+          embeddingStatus: repo.embeddingStatus
+        },
+        event: 'docs_job_blocked_embedding_not_ready',
+        level: 'warn',
+        repoId: repoId,
+        runtimeFamily: 'pipeline',
+        service: 'web-api',
+        status: 'error'
+      })
+      throw new ConflictException(this.embeddingStatusGateMessage(repo.embeddingStatus))
     }
 
     if (repo.docsStatus === 'processing') {
@@ -134,5 +148,18 @@ export class DocsService {
     }
 
     return repo
+  }
+
+  private embeddingStatusGateMessage(status: 'embedded' | 'failed' | 'pending' | 'processing') {
+    switch (status) {
+      case 'failed':
+        return 'Embeddings failed. Re-run embedding before generating documentation.'
+      case 'pending':
+        return 'Embeddings are pending. Start embedding before generating documentation.'
+      case 'processing':
+        return 'Embeddings are still processing. Wait for completion before generating documentation.'
+      case 'embedded':
+        return 'Embeddings are ready for documentation generation.'
+    }
   }
 }

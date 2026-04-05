@@ -103,6 +103,38 @@ describe('DocsService', () => {
     expect(enqueueDocsJobMock).not.toHaveBeenCalled()
   })
 
+  it('throws actionable message when embeddings are still processing', async () => {
+    const repoState: RepoState = {
+      cloneStatus: 'cloned',
+      docsStatus: 'pending',
+      embeddingStatus: 'processing',
+      id: 25
+    }
+    const { dbService } = createDbMocks([[repoState]])
+    const service = new DocsService(dbService as never)
+
+    await expect(service.generateDocumentation(2, 25)).rejects.toThrow(
+      'Embeddings are still processing. Wait for completion before generating documentation.'
+    )
+    expect(enqueueDocsJobMock).not.toHaveBeenCalled()
+  })
+
+  it('throws actionable message when embeddings failed', async () => {
+    const repoState: RepoState = {
+      cloneStatus: 'cloned',
+      docsStatus: 'pending',
+      embeddingStatus: 'failed',
+      id: 26
+    }
+    const { dbService } = createDbMocks([[repoState]])
+    const service = new DocsService(dbService as never)
+
+    await expect(service.generateDocumentation(2, 26)).rejects.toThrow(
+      'Embeddings failed. Re-run embedding before generating documentation.'
+    )
+    expect(enqueueDocsJobMock).not.toHaveBeenCalled()
+  })
+
   it('claims docs processing and publishes docs job', async () => {
     const repoState: RepoState = {
       cloneStatus: 'cloned',
