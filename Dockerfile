@@ -15,6 +15,9 @@ RUN bun run --cwd apps/api build
 
 FROM oven/bun:1.3.5 AS api-runtime
 WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git openssh-client ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=api-build /app /app
 EXPOSE 3001
 CMD ["bun", "run", "--cwd", "apps/api", "start:prod"]
