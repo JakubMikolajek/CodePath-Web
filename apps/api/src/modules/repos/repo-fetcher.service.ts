@@ -53,6 +53,41 @@ export class RepoFetcherService {
     await this.cloneRepo(claimedRepo)
   }
 
+  private buildIngestJobRequest(
+    repoId: number,
+    commitSha: string,
+    snapshot: { bucket: null | string, key: null | string, provider: 'local' | 'minio' }
+  ): IngestJobRequestV1 {
+    if (snapshot.provider !== 'minio' || !snapshot.bucket || !snapshot.key) {
+      throw new Error(
+        'Ingest contract requires MinIO snapshot location. Configure REPO_STORAGE_PROVIDER=minio and ensure snapshot upload succeeded.'
+      )
+    }
+
+    return {
+      contractVersion: 'ingest.v1',
+      correlationId: `ingest-${repoId}-${crypto.randomUUID()}`,
+      messageType: 'ingest.job.request' as IngestJobRequestV1['messageType'],
+      payload: {
+        parseOptions: {
+          includeConfigFiles: env.ingestIncludeConfigFiles,
+          includeDocumentationFiles: env.ingestIncludeDocumentationFiles,
+          maxFileBytes: env.ingestMaxFileBytes,
+          maxSegmentChars: env.ingestMaxSegmentChars
+        },
+        snapshot: {
+          bucket: snapshot.bucket,
+          key: snapshot.key,
+          provider: 'minio',
+          sourceCommitSha: commitSha
+        }
+      },
+      producedAt: new Date().toISOString(),
+      producer: 'web-api' as IngestJobRequestV1['producer'],
+      repoId
+    }
+  }
+
   private async cloneRepo(repo: SelectRepo) {
     const git = simpleGit()
     const targetPath = this.repoStorageService.getCloneWorkspacePath(repo.id, repo.name)
@@ -72,8 +107,8 @@ export class RepoFetcherService {
         process.env.GIT_SSH_COMMAND = `ssh -i ${tmpKeyPath} -o StrictHostKeyChecking=no`
       }
 
-      // await git.clone(repo.gitUrl, targetPath, ['--branch', 'develop', '--single-branch'])
-      await git.clone(repo.gitUrl, targetPath)
+      await git.clone(repo.gitUrl, targetPath, ['--branch', 'develop', '--single-branch'])
+      // await git.clone(repo.gitUrl, targetPath)
       const repoGit = simpleGit(targetPath)
       const commitSha = (await repoGit.revparse(['HEAD'])).trim()
       const snapshot = await this.repoStorageService.persistSnapshot({
@@ -206,40 +241,5 @@ export class RepoFetcherService {
   private async hashFile(filePath: string): Promise<string> {
     const content = await readFile(filePath)
     return crypto.createHash('sha256').update(content).digest('hex')
-  }
-
-  private buildIngestJobRequest(
-    repoId: number,
-    commitSha: string,
-    snapshot: { bucket: null | string, key: null | string, provider: 'local' | 'minio' }
-  ): IngestJobRequestV1 {
-    if (snapshot.provider !== 'minio' || !snapshot.bucket || !snapshot.key) {
-      throw new Error(
-        'Ingest contract requires MinIO snapshot location. Configure REPO_STORAGE_PROVIDER=minio and ensure snapshot upload succeeded.'
-      )
-    }
-
-    return {
-      contractVersion: 'ingest.v1',
-      correlationId: `ingest-${repoId}-${crypto.randomUUID()}`,
-      messageType: 'ingest.job.request' as IngestJobRequestV1['messageType'],
-      payload: {
-        parseOptions: {
-          includeConfigFiles: env.ingestIncludeConfigFiles,
-          includeDocumentationFiles: env.ingestIncludeDocumentationFiles,
-          maxFileBytes: env.ingestMaxFileBytes,
-          maxSegmentChars: env.ingestMaxSegmentChars
-        },
-        snapshot: {
-          bucket: snapshot.bucket,
-          key: snapshot.key,
-          provider: 'minio',
-          sourceCommitSha: commitSha
-        }
-      },
-      producedAt: new Date().toISOString(),
-      producer: 'web-api' as IngestJobRequestV1['producer'],
-      repoId
-    }
   }
 }
