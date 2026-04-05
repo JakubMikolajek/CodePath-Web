@@ -20,7 +20,7 @@ const DEFAULTS = {
   repoStorageMinioRegion: 'us-east-1',
   repoStorageMinioSecretKey: 'minioadmin',
   repoStorageMinioUseSsl: false,
-  repoStorageProvider: 'local',
+  repoStorageProvider: 'minio',
   rabbitAllowDestructiveMigration: false,
   rabbitRetryDelayMs: 5000,
   rabbitUrl: 'amqp://admin:admin@127.0.0.1'

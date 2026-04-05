@@ -13,7 +13,7 @@ export const chatHistory = pgTable('chat_history', {
   userId: integer('user_id').notNull()
 }, table => [
   index('idx_chat_history_created_at').using('btree', table.createdAt.asc().nullsLast().op('timestamp_ops')),
-  index('idx_chat_history_user_session').using('btree', table.userId.asc().nullsLast().op('text_ops'), table.sessionId.asc().nullsLast().op('int4_ops'), table.createdAt.asc().nullsLast().op('text_ops')),
+  index('idx_chat_history_user_session').using('btree', table.userId.asc().nullsLast().op('int4_ops'), table.sessionId.asc().nullsLast().op('text_ops'), table.createdAt.asc().nullsLast().op('timestamp_ops')),
   foreignKey({
     columns: [table.userId],
     foreignColumns: [users.id],

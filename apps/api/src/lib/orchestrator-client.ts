@@ -9,28 +9,6 @@ export interface OrchestratorChatRpcInput {
   repoId: number
 }
 
-export interface OrchestratorEmbeddingSegment {
-  comment?: string
-  content: string
-  decorators?: string[]
-  endLine?: number
-  fileExt?: string
-  fileId: number
-  filePath?: string
-  jsDoc?: string
-  language?: string
-  params?: string[]
-  returnType?: string
-  startLine?: number
-  symbolKind: string
-  symbolName?: string
-}
-
-export interface OrchestratorEmbeddingJobInput {
-  repoId: number
-  segments: OrchestratorEmbeddingSegment[]
-}
-
 export class OrchestratorClientError extends Error {
   constructor(message: string, public readonly cause?: unknown) {
     super(message)
@@ -99,10 +77,6 @@ export async function requestChatRpc(input: OrchestratorChatRpcInput): Promise<s
 
 export async function enqueueDocsJob(input: { repoId: number }): Promise<void> {
   await postJson<void>('/v1/jobs/docs', input)
-}
-
-export async function enqueueEmbeddingJob(input: OrchestratorEmbeddingJobInput): Promise<void> {
-  await postJson<void>('/v1/jobs/embedding', input)
 }
 
 export async function enqueueIngestJob(input: IngestJobRequestV1): Promise<void> {

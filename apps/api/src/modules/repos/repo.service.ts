@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { eq } from 'drizzle-orm'
 import { pick } from 'lodash'
 
+import { env } from '../../config/env'
 import { DbService } from '../db/db.service'
 import { InsertRepo, repos } from '../db/schema'
 
@@ -18,6 +19,7 @@ export class RepoService {
       accessKey,
       gitUrl,
       name,
+      storageProvider: env.repoStorageProvider,
       userId
     }).returning()
 

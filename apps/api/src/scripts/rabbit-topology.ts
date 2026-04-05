@@ -22,7 +22,9 @@ function topologyConfigs(): QueueTopologyConfig[] {
   return [
     { queueName: 'chat', retryDelayMs: env.rabbitRetryDelayMs },
     { queueName: 'docs', retryDelayMs: env.rabbitRetryDelayMs },
-    { queueName: 'embedding', retryDelayMs: env.rabbitRetryDelayMs }
+    { queueName: 'embedding', retryDelayMs: env.rabbitRetryDelayMs },
+    { queueName: 'ingest', retryDelayMs: env.rabbitRetryDelayMs },
+    { queueName: 'ingest-status', retryDelayMs: env.rabbitRetryDelayMs }
   ]
 }
 

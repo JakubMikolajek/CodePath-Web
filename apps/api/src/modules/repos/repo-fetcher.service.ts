@@ -133,7 +133,15 @@ export class RepoFetcherService {
           service: 'web-api',
           status: 'ok'
         })
+        this.logger.log(`✓ Cloned, indexed, and queued ingest for ${repo.name}`)
       } catch (cause) {
+        await this.dbService.dbClient.update(repos)
+          .set({
+            docsStatus: 'failed',
+            embeddingStatus: 'failed'
+          })
+          .where(eq(repos.id, repo.id))
+
         emitTelemetry({
           component: 'repo-fetcher.service',
           details: {
@@ -148,9 +156,8 @@ export class RepoFetcherService {
           service: 'web-api',
           status: 'error'
         })
+        this.logger.error(`✗ Failed to enqueue ingest for ${repo.name}: ${cause instanceof Error ? cause.message : String(cause)}`)
       }
-
-      this.logger.log(`✓ Cloned and indexed ${repo.name}`)
     } catch (error: any) {
       this.logger.error(`✗ Error cloning ${repo.name}: ${error.message}`)
 
