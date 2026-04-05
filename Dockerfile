@@ -8,7 +8,7 @@ RUN apt-get update \
 
 COPY . .
 
-RUN bun install --frozen-lockfile
+RUN rm -f bun.lock && bun install
 
 FROM base AS api-build
 RUN bun run --cwd apps/api build
