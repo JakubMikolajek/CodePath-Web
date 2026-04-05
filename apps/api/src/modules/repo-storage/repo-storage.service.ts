@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
-import { createReadStream, createWriteStream } from 'node:fs'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { createWriteStream } from 'node:fs'
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import * as path from 'node:path'
 import { pipeline } from 'node:stream/promises'
@@ -69,9 +69,14 @@ export class RepoStorageService {
     const archivePath = await this.createArchive(input.sourceDir)
 
     try {
+      const archiveBytes = await readFile(archivePath)
+      this.logger.log(
+        `Uploading snapshot to MinIO: repo=${input.repoId} key=${key} size=${archiveBytes.byteLength}B`
+      )
       await this.s3Client.send(new PutObjectCommand({
-        Body: createReadStream(archivePath),
+        Body: archiveBytes,
         Bucket: this.minioBucket,
+        ContentLength: archiveBytes.byteLength,
         ContentType: 'application/gzip',
         Key: key
       }))
