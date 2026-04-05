@@ -2,8 +2,6 @@ import { env } from '../config/env'
 import { assertValidIngestJobRequestFromWeb } from './ingest-message'
 import type { IngestJobRequestV1 } from '@workspace/codepath-common/ingest'
 
-const ORCHESTRATOR_TIMEOUT_MS = 60_000
-
 export interface OrchestratorChatRpcInput {
   prompt: string
   repoId: number
@@ -18,7 +16,10 @@ export class OrchestratorClientError extends Error {
 
 async function postJson<TResponse>(path: string, body: unknown): Promise<TResponse> {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(new Error('Orchestrator request timed out')), ORCHESTRATOR_TIMEOUT_MS)
+  const timeout = setTimeout(
+    () => controller.abort(new Error('Orchestrator request timed out')),
+    env.orchestratorTimeoutMs
+  )
   if (typeof timeout === 'object' && timeout && 'unref' in timeout && typeof timeout.unref === 'function') {
     timeout.unref()
   }
