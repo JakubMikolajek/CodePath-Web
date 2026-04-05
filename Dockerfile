@@ -20,6 +20,8 @@ EXPOSE 3001
 CMD ["bun", "run", "--cwd", "apps/api", "start:prod"]
 
 FROM base AS web-build
+ARG INTERNAL_API_BASE_URL=http://codepath-web-api:3001
+ENV INTERNAL_API_BASE_URL=${INTERNAL_API_BASE_URL}
 RUN bun run --cwd apps/web build -- --webpack
 
 FROM oven/bun:1.3.5 AS web-runtime
