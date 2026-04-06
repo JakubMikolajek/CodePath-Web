@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common'
 import {
   type TelemetryEventV1
 } from '@workspace/codepath-common/telemetry'
+
 import {
   TELEMETRY_LEVELS,
   TELEMETRY_RUNTIME_FAMILIES,
@@ -9,7 +10,6 @@ import {
   TELEMETRY_SERVICES,
   TELEMETRY_STATUSES
 } from '../../../../packages/codepath-common/telemetry'
-
 import { emitTelemetry } from './telemetry'
 
 function parseSpyPayload(call: unknown[]): TelemetryEventV1 {

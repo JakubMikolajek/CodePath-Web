@@ -13,6 +13,7 @@ export const repos = pgTable('repos', {
   accessKey: text('access_key'),
   cloneStatus: repoCloneStatusEnum('clone_status').default('pending').notNull(),
   docsStatus: repoDocsStatusEnum('docs_status').default('pending').notNull(),
+  documentation: text('documentation'),
   embeddingStatus: repoEmbeddingStatusEnum('embedding_status').default('pending').notNull(),
   gitUrl: text('git_url').notNull(),
   id: serial().primaryKey().notNull(),
@@ -23,8 +24,7 @@ export const repos = pgTable('repos', {
   storageBucket: text('storage_bucket'),
   storageKey: text('storage_key'),
   storageProvider: repoStorageProviderEnum('storage_provider').default('local').notNull(),
-  userId: integer('user_id').notNull(),
-  documentation: text('documentation')
+  userId: integer('user_id').notNull()
 }, table => [
   foreignKey({
     columns: [table.userId],

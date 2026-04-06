@@ -1,6 +1,7 @@
+import type { IngestJobRequestV1 } from '@workspace/codepath-common/ingest'
+
 import { env } from '../config/env'
 import { assertValidIngestJobRequestFromWeb } from './ingest-message'
-import type { IngestJobRequestV1 } from '@workspace/codepath-common/ingest'
 
 export interface OrchestratorChatRpcInput {
   prompt: string

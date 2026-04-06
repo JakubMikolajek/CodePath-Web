@@ -14,9 +14,9 @@ import {
   S3Client
 } from '@aws-sdk/client-s3'
 import { Injectable, Logger } from '@nestjs/common'
-import { SelectRepo } from '../db/schema'
 
 import { env } from '../../config/env'
+import { SelectRepo } from '../db/schema'
 
 const execFileAsync = promisify(execFile)
 const projectRoot = path.resolve(__dirname, '../../../../../../')
@@ -40,14 +40,19 @@ interface PreparedWorkspace {
 
 @Injectable()
 export class RepoStorageService {
-  private readonly logger = new Logger(RepoStorageService.name)
   private readonly localReposPath = path.resolve(projectRoot, env.repoStorageLocalPath)
-  private readonly provider = env.repoStorageProvider
+  private readonly logger = new Logger(RepoStorageService.name)
   private readonly minioBucket = env.repoStorageMinioBucket
+  private readonly provider = env.repoStorageProvider
   private readonly s3Client: null | S3Client = this.buildS3Client()
 
   async ensureLocalWorkspaceRoot(): Promise<void> {
     await mkdir(this.localReposPath, { recursive: true })
+  }
+
+  getCloneWorkspacePath(repoId: number, repoName: string): string {
+    const sanitized = repoName.replace(/[^a-zA-Z0-9_-]/g, '_')
+    return path.join(this.localReposPath, `${repoId}-${sanitized}`)
   }
 
   async persistSnapshot(input: PersistSnapshotInput): Promise<SnapshotLocation> {
@@ -139,11 +144,6 @@ export class RepoStorageService {
     }
   }
 
-  getCloneWorkspacePath(repoId: number, repoName: string): string {
-    const sanitized = repoName.replace(/[^a-zA-Z0-9_-]/g, '_')
-    return path.join(this.localReposPath, `${repoId}-${sanitized}`)
-  }
-
   private buildS3Client(): null | S3Client {
     if (this.provider !== 'minio') {
       return null
@@ -163,6 +163,19 @@ export class RepoStorageService {
     })
   }
 
+  private buildSnapshotKey(repoId: number, commitSha: string): string {
+    const normalizedCommitSha = commitSha.trim().slice(0, 40) || 'unknown'
+    return `repos/${repoId}/${normalizedCommitSha}.tar.gz`
+  }
+
+  private async createArchive(sourceDir: string): Promise<string> {
+    const tempDir = await mkdtemp(path.join(tmpdir(), 'codepath-snapshot-'))
+    const archivePath = path.join(tempDir, 'snapshot.tar.gz')
+
+    await execFileAsync('tar', ['-czf', archivePath, '-C', sourceDir, '.'])
+    return archivePath
+  }
+
   private async ensureMinioBucket(): Promise<void> {
     if (!this.s3Client) {
       return
@@ -176,19 +189,6 @@ export class RepoStorageService {
     }
 
     await this.s3Client.send(new CreateBucketCommand({ Bucket: this.minioBucket }))
-  }
-
-  private buildSnapshotKey(repoId: number, commitSha: string): string {
-    const normalizedCommitSha = commitSha.trim().slice(0, 40) || 'unknown'
-    return `repos/${repoId}/${normalizedCommitSha}.tar.gz`
-  }
-
-  private async createArchive(sourceDir: string): Promise<string> {
-    const tempDir = await mkdtemp(path.join(tmpdir(), 'codepath-snapshot-'))
-    const archivePath = path.join(tempDir, 'snapshot.tar.gz')
-
-    await execFileAsync('tar', ['-czf', archivePath, '-C', sourceDir, '.'])
-    return archivePath
   }
 
   private async extractArchive(archivePath: string, targetDir: string): Promise<void> {
