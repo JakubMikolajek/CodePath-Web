@@ -1,27 +1,26 @@
 import {
   Body,
   Controller,
-  Get, Logger,
+  Get,
   Post,
-  Req, Res,
+  Req,
+  Res,
   UseGuards
 } from '@nestjs/common'
-import { AuthGuard } from '@nestjs/passport'
 import { FastifyReply } from 'fastify'
 
 import { SelectUser } from '../db/schema'
 import { AuthService } from './auth.service'
+import { LoginDto } from './dto/login.dto'
 import { RegisterDto } from './dto/register.dto'
-import { LocalAuthGuard } from './local-auth.guard'
-
-const logger = new Logger('AUTH')
+import { SessionAuthGuard } from './session-auth.guard'
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) { }
 
   @Get('me')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(SessionAuthGuard)
   getMe(@Req() req: { user: SelectUser }) {
     const { email, id, login } = req.user
 
@@ -29,16 +28,19 @@ export class AuthController {
   }
 
   @Post('login')
-  @UseGuards(LocalAuthGuard)
-  login(
-    @Req() req: { user: SelectUser },
+  async login(
+    @Body() body: LoginDto,
     @Res({ passthrough: true }) res: FastifyReply
   ) {
-    const { access_token } = this.authService.login(req.user)
+    const { access_token, expires_in } = await this.authService.loginWithCredentials(
+      body.identifier,
+      body.password
+    )
+    const maxAgeInSeconds = expires_in ?? 7 * 24 * 60 * 60
 
     res.cookie('access_token', access_token, {
       httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60,
+      maxAge: maxAgeInSeconds,
       path: '/',
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production'
@@ -48,7 +50,7 @@ export class AuthController {
   }
 
   @Get('logout')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(SessionAuthGuard)
   logout(@Res({ passthrough: true }) res: FastifyReply) {
     res.cookie('access_token', '', {
       httpOnly: true,

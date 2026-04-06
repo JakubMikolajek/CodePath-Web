@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Post, Req, UseGuards } from '@nestjs/common'
-import { AuthGuard } from '@nestjs/passport'
 
+import { SessionAuthGuard } from '../auth/session-auth.guard'
 import { SelectUser } from '../db/schema'
 import { ChatService } from './chat.service'
 import { AskDto } from './dto/ask.dto'
@@ -10,7 +10,7 @@ export class ChatController {
   constructor(private readonly chatService: ChatService) { }
 
   @Post(':repoId')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(SessionAuthGuard)
   async ask(
     @Req() req: { user: SelectUser },
     @Param('repoId', ParseIntPipe) repoId: number,
@@ -20,7 +20,7 @@ export class ChatController {
   }
 
   @Get(':repoId/createSession')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(SessionAuthGuard)
   async createSession(
     @Req() req: { user: SelectUser },
     @Param('repoId', ParseIntPipe) repoId: number,
@@ -29,7 +29,7 @@ export class ChatController {
   }
 
   @Get(':repoId/:sessionId')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(SessionAuthGuard)
   async getChatSessionDetails(
     @Req() req: { user: SelectUser },
     @Param('repoId', ParseIntPipe) repoId: number,
@@ -38,7 +38,7 @@ export class ChatController {
   }
 
   @Get(':repoId')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(SessionAuthGuard)
   async getRepoChats(
     @Req() req: { user: SelectUser },
     @Param('repoId', ParseIntPipe) repoId: number,

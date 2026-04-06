@@ -1,6 +1,6 @@
 import { Controller, Get, Param, ParseIntPipe, Post, Req, UseGuards } from '@nestjs/common'
-import { AuthGuard } from '@nestjs/passport'
 
+import { SessionAuthGuard } from '../auth/session-auth.guard'
 import { SelectUser } from '../db/schema'
 import { DocsService } from './docs.service'
 
@@ -9,7 +9,7 @@ export class DocsController {
   constructor(private readonly docsService: DocsService) { }
 
   @Post('generate/:repoId')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(SessionAuthGuard)
   async generateDocumentation(
     @Req() req: { user: SelectUser },
     @Param('repoId', ParseIntPipe) repoId: number
@@ -17,21 +17,21 @@ export class DocsController {
     return await this.docsService.generateDocumentation(req.user.id, repoId)
   }
 
-  @Get('status/:repoId')
-  @UseGuards(AuthGuard('jwt'))
-  async getDocumentationStatus(
-    @Req() req: { user: SelectUser },
-    @Param('repoId', ParseIntPipe) repoId: number
-  ) {
-    return await this.docsService.getDocumentationStatus(req.user.id, repoId)
-  }
-
   @Get(':repoId')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(SessionAuthGuard)
   async getDocumentation(
     @Req() req: { user: SelectUser },
     @Param('repoId', ParseIntPipe) repoId: number
   ) {
     return await this.docsService.getDocumentation(req.user.id, repoId)
+  }
+
+  @Get('status/:repoId')
+  @UseGuards(SessionAuthGuard)
+  async getDocumentationStatus(
+    @Req() req: { user: SelectUser },
+    @Param('repoId', ParseIntPipe) repoId: number
+  ) {
+    return await this.docsService.getDocumentationStatus(req.user.id, repoId)
   }
 }

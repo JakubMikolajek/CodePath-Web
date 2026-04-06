@@ -1,6 +1,6 @@
 import { Controller, Get, Param, ParseIntPipe, Req, UseGuards } from '@nestjs/common'
-import { AuthGuard } from '@nestjs/passport'
 
+import { SessionAuthGuard } from '../auth/session-auth.guard'
 import { SelectUser } from '../db/schema'
 import { DependenciesService } from './dependencies.service'
 
@@ -9,7 +9,7 @@ export class DependenciesController {
   constructor(private readonly dependenciesService: DependenciesService) {}
 
   @Get(':repoId')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(SessionAuthGuard)
   async getRepoDependencies(
     @Req() req: { user: SelectUser },
     @Param('repoId', ParseIntPipe) repoId: number
