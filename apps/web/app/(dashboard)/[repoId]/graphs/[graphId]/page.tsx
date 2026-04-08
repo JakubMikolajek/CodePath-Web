@@ -1,6 +1,6 @@
 'use client'
 
-import type { GenericNullable } from '@workspace/codepath-common/globals'
+import type { Nullable } from '@workspace/codepath-common/globals'
 import type { Graph } from '@workspace/codepath-common/graph'
 import { useParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
@@ -15,7 +15,7 @@ export default function Page() {
   const dispatch = useAppDispatch()
   const repoId = useMemo(() => Number(getFirstRouteParam(params.repoId)), [params.repoId])
   const graphId = useMemo(() => Number(getFirstRouteParam(params.graphId)), [params.graphId])
-  const [activeGraph, setActiveGraph] = useState<GenericNullable<Graph>>(null)
+  const [activeGraph, setActiveGraph] = useState<Nullable<Graph>>(null)
 
   const graphs = useAppSelector(state => state.graphs.graphs)
   const loading = useAppSelector(state => state.graphs.loading)

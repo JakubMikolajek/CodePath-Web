@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { URLSearchParams } from 'node:url'
 
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common'
-import { GenericNullable } from '@workspace/codepath-common/globals'
+import { Nullable } from '@workspace/codepath-common/globals'
 import axios from 'axios'
 import * as bcrypt from 'bcrypt'
 import { eq, or } from 'drizzle-orm'
@@ -57,7 +57,7 @@ export class AuthService {
     return { id: user.id, login: user.login, message: 'User registered' }
   }
 
-  async validateKeycloakAccessToken(accessToken: string): Promise<GenericNullable<SelectUser>> {
+  async validateKeycloakAccessToken(accessToken: string): Promise<Nullable<SelectUser>> {
     try {
       const { data } = await axios.get<KeycloakUserInfo>(this.keycloakUserInfoUrl(), {
         headers: {
@@ -79,7 +79,7 @@ export class AuthService {
     }
   }
 
-  async validateUser(identifier: string, password: string): Promise<GenericNullable<SelectUser>> {
+  async validateUser(identifier: string, password: string): Promise<Nullable<SelectUser>> {
     const user = await this.getUserByIdentifier(identifier, identifier)
 
     if (!user) {

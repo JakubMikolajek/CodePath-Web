@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { PassportStrategy } from '@nestjs/passport'
-import { GenericNullable } from '@workspace/codepath-common/globals'
+import { Nullable } from '@workspace/codepath-common/globals'
 import { eq } from 'drizzle-orm'
 import { ExtractJwt, Strategy } from 'passport-jwt'
 
@@ -35,7 +35,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     })
   }
 
-  async validate(payload: JWTPayload): Promise<GenericNullable<SelectUser>> {
+  async validate(payload: JWTPayload): Promise<Nullable<SelectUser>> {
     const [user] = await this.dbService.dbClient.select()
       .from(users)
       .where(eq(users.id, payload.sub))

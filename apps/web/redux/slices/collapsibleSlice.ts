@@ -1,8 +1,8 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
-import type { GenericNullable } from '@workspace/codepath-common/globals'
+import type { Nullable } from '@workspace/codepath-common/globals'
 
 interface CollapsibleState {
-  openRepoId: GenericNullable<number>
+  openRepoId: Nullable<number>
 }
 
 const initialState: CollapsibleState = {
@@ -13,7 +13,7 @@ const collapsibleSlice = createSlice({
   initialState,
   name: 'collapsible',
   reducers: {
-    setOpenRepoId: (state, action: PayloadAction<GenericNullable<number>>) => {
+    setOpenRepoId: (state, action: PayloadAction<Nullable<number>>) => {
       state.openRepoId = action.payload
     },
     toggleRepo: (state, action: PayloadAction<number>) => {

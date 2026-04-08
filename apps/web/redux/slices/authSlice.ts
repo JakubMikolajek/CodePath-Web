@@ -1,14 +1,14 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit'
-import type { GenericNullable } from '@workspace/codepath-common/globals'
+import type { Nullable } from '@workspace/codepath-common/globals'
 import type { IUser } from '@workspace/codepath-common/user'
 
 import { getApiErrorMessage } from '@/lib/api/error'
 import { login as loginApi, logout as logoutApi, register as registerApi } from '@/lib/auth/client'
 
 interface AuthState {
-  error: GenericNullable<string>
+  error: Nullable<string>
   loading: boolean
-  user: GenericNullable<IUser>
+  user: Nullable<IUser>
 }
 
 const initialState: AuthState = {

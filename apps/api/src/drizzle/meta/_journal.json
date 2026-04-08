@@ -36,6 +36,13 @@
       "when": 1766922511268,
       "tag": "0004_handy_ink",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1775491367188,
+      "tag": "0005_low_switch",
+      "breakpoints": true
     }
   ]
 }

@@ -1,10 +1,10 @@
-import type { GenericNullable } from '@workspace/codepath-common/globals'
+import type { Nullable } from '@workspace/codepath-common/globals'
 import { isEmpty, join } from 'lodash'
 
 import { sanitizeString } from './helpers'
 import type { DepEdge } from './parser-types'
 
-export function buildMermaidGraph(deps: DepEdge[]): GenericNullable<string> {
+export function buildMermaidGraph(deps: DepEdge[]): Nullable<string> {
   if (isEmpty(deps)) {
     return null
   }

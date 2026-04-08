@@ -14,7 +14,7 @@ export enum DepentencyTypes {
 }
 
 // TYPES
-export type GenericNullable<T> = T | null
+export type Nullable<T> = T | null
 
 export type SegmentKind = `${SegmentKinds}`
 

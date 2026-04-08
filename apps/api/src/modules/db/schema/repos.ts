@@ -8,13 +8,18 @@ export const repoCloneStatusEnum = pgEnum('repo_clone_status', ['pending', 'clon
 export const repoEmbeddingStatusEnum = pgEnum('repo_embedding_status', ['pending', 'processing', 'embedded', 'failed'])
 export const repoDocsStatusEnum = pgEnum('repo_docs_status', ['pending', 'processing', 'ready', 'failed'])
 export const repoStorageProviderEnum = pgEnum('repo_storage_provider', ['local', 'minio'])
+export const repoGitAuthTypeEnum = pgEnum('repo_git_auth_type', ['none', 'https_token', 'ssh_key'])
 
 export const repos = pgTable('repos', {
   accessKey: text('access_key'),
   cloneStatus: repoCloneStatusEnum('clone_status').default('pending').notNull(),
+  defaultBranch: text('default_branch'),
   docsStatus: repoDocsStatusEnum('docs_status').default('pending').notNull(),
   documentation: text('documentation'),
   embeddingStatus: repoEmbeddingStatusEnum('embedding_status').default('pending').notNull(),
+  gitAuthSecret: text('git_auth_secret'),
+  gitAuthType: repoGitAuthTypeEnum('git_auth_type').default('none').notNull(),
+  gitAuthUsername: text('git_auth_username'),
   gitUrl: text('git_url').notNull(),
   id: serial().primaryKey().notNull(),
   indexedAt: timestamp('indexed_at', { mode: 'string' }).defaultNow(),

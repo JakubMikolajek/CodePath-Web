@@ -42,10 +42,15 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
     resolver: zodResolver(createRepoFormSchema),
     defaultValues: {
       accessKey: '',
+      authSecret: '',
+      authType: 'https_token',
+      authUsername: 'oauth2',
+      branch: '',
       gitUrl: '',
       name: ''
     }
   })
+  const authType = form.watch('authType')
 
   const handleSubmit = async (data: CreateRepoFormData) => {
     try {
@@ -103,7 +108,7 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
                 <FormItem>
                   <FormLabel>Git URL</FormLabel>
                   <FormControl>
-                    <Input placeholder="git@github.com/username/repo.git" {...field} />
+                    <Input placeholder="https://github.com/organization/repository.git" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -112,17 +117,72 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
 
             <FormField
               control={form.control}
-              name="accessKey"
+              name="branch"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Access Key</FormLabel>
+                  <FormLabel>Branch (optional)</FormLabel>
                   <FormControl>
-                    <Textarea className="max-h-40" placeholder="Enter access key" {...field} />
+                    <Input placeholder="develop / main / master" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name="authType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Auth Method</FormLabel>
+                  <FormControl>
+                    <select
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+                      {...field}
+                    >
+                      <option value="https_token">HTTPS Token (recommended)</option>
+                      <option value="ssh_key">SSH Private Key (legacy)</option>
+                      <option value="none">No auth (public repository)</option>
+                    </select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {authType === 'https_token' && (
+              <FormField
+                control={form.control}
+                name="authUsername"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Auth Username</FormLabel>
+                    <FormControl>
+                      <Input placeholder="oauth2 / x-access-token / your-user" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {authType !== 'none' && (
+              <FormField
+                control={form.control}
+                name="authSecret"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{authType === 'ssh_key' ? 'SSH Private Key' : 'Deploy Token / PAT'}</FormLabel>
+                    <FormControl>
+                      {authType === 'ssh_key'
+                        ? <Textarea className="max-h-40" placeholder="-----BEGIN ... PRIVATE KEY-----" {...field} />
+                        : <Input placeholder="Enter token" type="password" {...field} />}
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <DialogFooter>
               <Button disabled={isSubmitting} onClick={() => setDialogOpen(false)} type="button" variant="outline">

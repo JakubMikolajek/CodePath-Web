@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit'
-import type { GenericNullable } from '@workspace/codepath-common/globals'
+import type { Nullable } from '@workspace/codepath-common/globals'
 import type { Repository } from '@workspace/codepath-common/repository'
 
 import { getApiErrorMessage } from '@/lib/api/error'
@@ -7,10 +7,10 @@ import { createRepo as createRepoApi, getRepos as getReposApi } from '@/lib/repo
 import type { CreateRepoFormData } from '@/utils/validators/createRepoForm'
 
 interface ReposState {
-  error: GenericNullable<string>
+  error: Nullable<string>
   loading: boolean
   repos: Repository[]
-  syncError: GenericNullable<string>
+  syncError: Nullable<string>
   syncErrorNonce: number
   syncing: boolean
 }
