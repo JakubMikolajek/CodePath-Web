@@ -1,3 +1,5 @@
+import { posix as pathPosix } from 'node:path'
+
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import type {
   RepoGraphEdge,
@@ -6,17 +8,16 @@ import type {
   RepoInteractiveGraph
 } from '@workspace/codepath-common/graph'
 import { and, desc, eq } from 'drizzle-orm'
-import { posix as pathPosix } from 'node:path'
 
 import { env } from '../../config/env'
 import { DbService } from '../db/db.service'
+import { dependencies, repos } from '../db/schema'
+import { QdrantService } from '../qdrant/qdrant.service'
 import {
   RepoTopologyDetector,
   type RepoTopologyFileInput,
   type RepoTopologyMode
 } from './repo-topology.detector'
-import { dependencies, repos } from '../db/schema'
-import { QdrantService } from '../qdrant/qdrant.service'
 
 interface InteractiveGraphQuery {
   depth?: string
@@ -212,12 +213,12 @@ export class DependenciesService {
     const metadata: RepoInteractiveGraph['metadata'] = {
       availableEdgeTypes,
       edgeCount: limitedGraph.edges.length,
-      includedSymbols: includeSymbols,
       importResolution: {
         ratio: canonicalGraph.importResolutionCoverage.ratio,
         resolved: canonicalGraph.importResolutionCoverage.resolved,
         total: canonicalGraph.importResolutionCoverage.total
       },
+      includedSymbols: includeSymbols,
       nodeCount: limitedGraph.nodes.length,
       repoId: repo.id,
       repoName: repo.name,
@@ -238,6 +239,166 @@ export class DependenciesService {
       metadata,
       nodes: limitedGraph.nodes
     }
+  }
+
+  private addEdge(edgesByKey: Map<string, RepoGraphEdge>, edge: RepoGraphEdge) {
+    const key = `${edge.source}|${edge.type}|${edge.target}`
+    if (edgesByKey.has(key)) {
+      return
+    }
+
+    edgesByKey.set(key, edge)
+  }
+
+  private addNode(nodesById: Map<string, RepoGraphNode>, node: RepoGraphNode) {
+    if (nodesById.has(node.id)) {
+      return
+    }
+
+    nodesById.set(node.id, node)
+  }
+
+  private applyGraphScaleLimits(nodes: RepoGraphNode[], edges: RepoGraphEdge[]) {
+    let truncated = false
+    let truncationReason: string | undefined = undefined
+    let limitedNodes = nodes
+    let limitedEdges = edges
+
+    if (limitedNodes.length > MAX_RETURN_NODES) {
+      truncated = true
+      truncationReason = 'node_cap'
+      const typePriority: Record<RepoGraphNode['type'], number> = {
+        external_package: 3,
+        file: 2,
+        module: 1,
+        repo: 0,
+        symbol: 4
+      }
+
+      const sortedNodes = [...limitedNodes].sort((a, b) => {
+        const byType = typePriority[a.type] - typePriority[b.type]
+        if (byType !== 0) {
+          return byType
+        }
+        return a.label.localeCompare(b.label)
+      })
+
+      limitedNodes = sortedNodes.slice(0, MAX_RETURN_NODES)
+      const keptNodeIds = new Set(limitedNodes.map(node => node.id))
+      limitedEdges = limitedEdges.filter(edge => keptNodeIds.has(edge.source) && keptNodeIds.has(edge.target))
+    }
+
+    if (limitedEdges.length > MAX_RETURN_EDGES) {
+      truncated = true
+      truncationReason = truncationReason ? `${truncationReason}+edge_cap` : 'edge_cap'
+      const edgePriority: Record<RepoGraphEdgeType, number> = {
+        calls: 3,
+        consumes: 5,
+        depends_on: 0,
+        imports: 1,
+        owns: 2,
+        produces: 4
+      }
+
+      const sortedEdges = [...limitedEdges].sort((a, b) => {
+        const byType = edgePriority[a.type] - edgePriority[b.type]
+        if (byType !== 0) {
+          return byType
+        }
+        return a.id.localeCompare(b.id)
+      })
+
+      limitedEdges = sortedEdges.slice(0, MAX_RETURN_EDGES)
+      const referencedNodeIds = new Set<string>()
+      for (const edge of limitedEdges) {
+        referencedNodeIds.add(edge.source)
+        referencedNodeIds.add(edge.target)
+      }
+
+      limitedNodes = limitedNodes.filter(node => node.type === 'repo' || referencedNodeIds.has(node.id))
+    }
+
+    return {
+      edges: limitedEdges,
+      nodes: limitedNodes,
+      truncated,
+      truncationReason
+    }
+  }
+
+  private async assertRepoOwnership(userId: number, repoId: number): Promise<RepoOwnership> {
+    const [repo] = await this.dbService.dbClient.select({
+      id: repos.id,
+      name: repos.name
+    })
+      .from(repos)
+      .where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
+      .limit(1)
+
+    if (!repo) {
+      throw new NotFoundException('Repository not found')
+    }
+
+    return repo
+  }
+
+  private availableEdgeTypes(edges: RepoGraphEdge[]) {
+    const available = new Set<RepoGraphEdgeType>()
+    for (const edge of edges) {
+      available.add(edge.type)
+    }
+
+    return SUPPORTED_RELATION_TYPES.filter(type => available.has(type))
+  }
+
+  private buildCanonicalFiles(segments: IngestSegmentPayload[]) {
+    const files = new Map<string, CanonicalFile>()
+
+    for (const segment of segments) {
+      const normalizedPath = this.normalizeFilePath(segment.file_path)
+      if (!normalizedPath) {
+        continue
+      }
+
+      const existing = files.get(normalizedPath) ?? {
+        content: '',
+        fileExt: this.safeString(segment.file_ext) ?? pathPosix.extname(normalizedPath),
+        filePath: normalizedPath,
+        language: this.safeString(segment.language) ?? 'unknown',
+        segmentCount: 0,
+        symbolNames: new Set<string>()
+      }
+
+      const content = this.safeString(segment.content)
+      if (
+        content
+        && existing.segmentCount < MAX_SEGMENTS_PER_FILE
+        && existing.content.length < MAX_CONTENT_PER_FILE
+      ) {
+        const remaining = MAX_CONTENT_PER_FILE - existing.content.length
+        if (remaining > 0) {
+          const nextChunk = content.slice(0, remaining)
+          existing.content = existing.content.length > 0
+            ? `${existing.content}\n${nextChunk}`
+            : nextChunk
+        }
+      }
+      existing.segmentCount += 1
+
+      const symbolName = this.safeString(segment.symbol_name)
+      const baseName = pathPosix.basename(normalizedPath)
+      if (
+        symbolName
+        && symbolName !== baseName
+        && existing.symbolNames.size < MAX_SYMBOLS_PER_FILE
+      ) {
+        existing.symbolNames.add(symbolName)
+      }
+
+      files.set(normalizedPath, existing)
+    }
+
+    return files
   }
 
   private async buildCanonicalGraphFromQdrant(
@@ -568,82 +729,6 @@ export class DependenciesService {
     }
   }
 
-  private addEdge(edgesByKey: Map<string, RepoGraphEdge>, edge: RepoGraphEdge) {
-    const key = `${edge.source}|${edge.type}|${edge.target}`
-    if (edgesByKey.has(key)) {
-      return
-    }
-
-    edgesByKey.set(key, edge)
-  }
-
-  private addNode(nodesById: Map<string, RepoGraphNode>, node: RepoGraphNode) {
-    if (nodesById.has(node.id)) {
-      return
-    }
-
-    nodesById.set(node.id, node)
-  }
-
-  private availableEdgeTypes(edges: RepoGraphEdge[]) {
-    const available = new Set<RepoGraphEdgeType>()
-    for (const edge of edges) {
-      available.add(edge.type)
-    }
-
-    return SUPPORTED_RELATION_TYPES.filter(type => available.has(type))
-  }
-
-  private buildCanonicalFiles(segments: IngestSegmentPayload[]) {
-    const files = new Map<string, CanonicalFile>()
-
-    for (const segment of segments) {
-      const normalizedPath = this.normalizeFilePath(segment.file_path)
-      if (!normalizedPath) {
-        continue
-      }
-
-      const existing = files.get(normalizedPath) ?? {
-        content: '',
-        fileExt: this.safeString(segment.file_ext) ?? pathPosix.extname(normalizedPath),
-        filePath: normalizedPath,
-        language: this.safeString(segment.language) ?? 'unknown',
-        segmentCount: 0,
-        symbolNames: new Set<string>()
-      }
-
-      const content = this.safeString(segment.content)
-      if (
-        content
-        && existing.segmentCount < MAX_SEGMENTS_PER_FILE
-        && existing.content.length < MAX_CONTENT_PER_FILE
-      ) {
-        const remaining = MAX_CONTENT_PER_FILE - existing.content.length
-        if (remaining > 0) {
-          const nextChunk = content.slice(0, remaining)
-          existing.content = existing.content.length > 0
-            ? `${existing.content}\n${nextChunk}`
-            : nextChunk
-        }
-      }
-      existing.segmentCount += 1
-
-      const symbolName = this.safeString(segment.symbol_name)
-      const baseName = pathPosix.basename(normalizedPath)
-      if (
-        symbolName
-        && symbolName !== baseName
-        && existing.symbolNames.size < MAX_SYMBOLS_PER_FILE
-      ) {
-        existing.symbolNames.add(symbolName)
-      }
-
-      files.set(normalizedPath, existing)
-    }
-
-    return files
-  }
-
   private collectNodeIdsWithinDepth(focusNodeId: string, edges: RepoGraphEdge[], depth: number) {
     const adjacency = new Map<string, Set<string>>()
 
@@ -683,55 +768,6 @@ export class DependenciesService {
     }
 
     return visited
-  }
-
-  private extractImportSpecifiers(content: string, language: string, fileExt: string) {
-    const importSpecifiers = new Set<string>()
-    if (!content.trim()) {
-      return importSpecifiers
-    }
-
-    const addSpecifier = (specifier: null | string) => {
-      if (!specifier) {
-        return
-      }
-
-      const trimmed = specifier.trim()
-      if (!trimmed || trimmed.length > 256) {
-        return
-      }
-
-      importSpecifiers.add(trimmed)
-    }
-
-    const applyPattern = (pattern: RegExp, pickIndex = 1) => {
-      for (const match of content.matchAll(pattern)) {
-        addSpecifier(match[pickIndex] ?? null)
-      }
-    }
-
-    applyPattern(/^\s*import\s+[^'"]*?\s+from\s+['"]([^'"]+)['"]/gm)
-    applyPattern(/^\s*import\s+['"]([^'"]+)['"]/gm)
-    applyPattern(/^\s*export\s+[^'"]*?\s+from\s+['"]([^'"]+)['"]/gm)
-    applyPattern(/\brequire\(\s*['"]([^'"]+)['"]\s*\)/g)
-    applyPattern(/\bimport\(\s*['"]([^'"]+)['"]\s*\)/g)
-    applyPattern(/^\s*from\s+([A-Za-z0-9_.]+)\s+import\s+/gm)
-    applyPattern(/^\s*use\s+([A-Za-z0-9_:]+)\s*;/gm)
-    applyPattern(/^\s*import\s+([A-Za-z0-9_.*]+)\s*;/gm)
-    applyPattern(/^\s*import\s*(?:\(\s*)?["'`]([^"'`]+)["'`]/gm)
-
-    if (language === 'python' || fileExt === '.py') {
-      for (const match of content.matchAll(/^\s*import\s+([A-Za-z0-9_.,\s]+)/gm)) {
-        const modules = (match[1] ?? '').split(',')
-          .map(moduleName => moduleName.trim().split(/\s+as\s+/i)[0]?.trim())
-          .filter(Boolean)
-        for (const moduleName of modules) {
-          addSpecifier(moduleName ?? null)
-        }
-      }
-    }
-
-    return importSpecifiers
   }
 
   private extractCallIdentifiers(content: string, language: string, fileExt: string) {
@@ -813,6 +849,60 @@ export class DependenciesService {
     }
 
     return names
+  }
+
+  private extractImportSpecifiers(content: string, language: string, fileExt: string) {
+    const importSpecifiers = new Set<string>()
+    if (!content.trim()) {
+      return importSpecifiers
+    }
+
+    const addSpecifier = (specifier: null | string) => {
+      if (!specifier) {
+        return
+      }
+
+      const trimmed = specifier.trim()
+      if (!trimmed || trimmed.length > 256) {
+        return
+      }
+
+      importSpecifiers.add(trimmed)
+    }
+
+    const applyPattern = (pattern: RegExp, pickIndex = 1) => {
+      for (const match of content.matchAll(pattern)) {
+        addSpecifier(match[pickIndex] ?? null)
+      }
+    }
+
+    applyPattern(/^\s*import\s+[^'"]*?\s+from\s+['"]([^'"]+)['"]/gm)
+    applyPattern(/^\s*import\s+['"]([^'"]+)['"]/gm)
+    applyPattern(/^\s*export\s+[^'"]*?\s+from\s+['"]([^'"]+)['"]/gm)
+    applyPattern(/\brequire\(\s*['"]([^'"]+)['"]\s*\)/g)
+    applyPattern(/\bimport\(\s*['"]([^'"]+)['"]\s*\)/g)
+    applyPattern(/^\s*from\s+([A-Za-z0-9_.]+)\s+import\s+/gm)
+    applyPattern(/^\s*use\s+([A-Za-z0-9_:]+)\s*;/gm)
+    applyPattern(/^\s*import\s+([A-Za-z0-9_.*]+)\s*;/gm)
+    applyPattern(/^\s*import\s*(?:\(\s*)?["'`]([^"'`]+)["'`]/gm)
+
+    if (language === 'python' || fileExt === '.py') {
+      for (const match of content.matchAll(/^\s*import\s+([A-Za-z0-9_.,\s]+)/gm)) {
+        const modules = (match[1] ?? '').split(',')
+          .map(moduleName => moduleName.trim().split(/\s+as\s+/i)[0]?.trim())
+          .filter(Boolean)
+        for (const moduleName of modules) {
+          addSpecifier(moduleName ?? null)
+        }
+      }
+    }
+
+    return importSpecifiers
+  }
+
+  private fallbackModuleLabel(filePath: string) {
+    const directory = pathPosix.dirname(filePath)
+    return directory === '.' ? 'root' : directory
   }
 
   private async fetchRepoSegmentsFromQdrant(repoId: number): Promise<IngestSegmentPayload[]> {
@@ -904,6 +994,10 @@ export class DependenciesService {
     return normalized
   }
 
+  private normalizeSymbolName(symbolName: string) {
+    return symbolName.trim().toLowerCase()
+  }
+
   private parseDepth(depth?: string) {
     const parsedDepth = Number(depth)
     if (!Number.isFinite(parsedDepth)) {
@@ -943,78 +1037,6 @@ export class DependenciesService {
     return Array.from(new Set(requestedTypes))
   }
 
-  private applyGraphScaleLimits(nodes: RepoGraphNode[], edges: RepoGraphEdge[]) {
-    let truncated = false
-    let truncationReason: string | undefined = undefined
-    let limitedNodes = nodes
-    let limitedEdges = edges
-
-    if (limitedNodes.length > MAX_RETURN_NODES) {
-      truncated = true
-      truncationReason = 'node_cap'
-      const typePriority: Record<RepoGraphNode['type'], number> = {
-        repo: 0,
-        module: 1,
-        file: 2,
-        external_package: 3,
-        symbol: 4
-      }
-
-      const sortedNodes = [...limitedNodes].sort((a, b) => {
-        const byType = typePriority[a.type] - typePriority[b.type]
-        if (byType !== 0) {
-          return byType
-        }
-        return a.label.localeCompare(b.label)
-      })
-
-      limitedNodes = sortedNodes.slice(0, MAX_RETURN_NODES)
-      const keptNodeIds = new Set(limitedNodes.map(node => node.id))
-      limitedEdges = limitedEdges.filter(edge => keptNodeIds.has(edge.source) && keptNodeIds.has(edge.target))
-    }
-
-    if (limitedEdges.length > MAX_RETURN_EDGES) {
-      truncated = true
-      truncationReason = truncationReason ? `${truncationReason}+edge_cap` : 'edge_cap'
-      const edgePriority: Record<RepoGraphEdgeType, number> = {
-        depends_on: 0,
-        imports: 1,
-        owns: 2,
-        calls: 3,
-        produces: 4,
-        consumes: 5
-      }
-
-      const sortedEdges = [...limitedEdges].sort((a, b) => {
-        const byType = edgePriority[a.type] - edgePriority[b.type]
-        if (byType !== 0) {
-          return byType
-        }
-        return a.id.localeCompare(b.id)
-      })
-
-      limitedEdges = sortedEdges.slice(0, MAX_RETURN_EDGES)
-      const referencedNodeIds = new Set<string>()
-      for (const edge of limitedEdges) {
-        referencedNodeIds.add(edge.source)
-        referencedNodeIds.add(edge.target)
-      }
-
-      limitedNodes = limitedNodes.filter(node => node.type === 'repo' || referencedNodeIds.has(node.id))
-    }
-
-    return {
-      edges: limitedEdges,
-      nodes: limitedNodes,
-      truncated,
-      truncationReason
-    }
-  }
-
-  private normalizeSymbolName(symbolName: string) {
-    return symbolName.trim().toLowerCase()
-  }
-
   private safeString(value: unknown) {
     if (typeof value !== 'string') {
       return null
@@ -1024,17 +1046,12 @@ export class DependenciesService {
     return normalized.length > 0 ? normalized : null
   }
 
-  private toExternalNodeId(specifier: string) {
-    return `external:${specifier}`
-  }
-
   private toEventNodeId(eventName: string) {
     return `external:event:${eventName.toLowerCase()}`
   }
 
-  private fallbackModuleLabel(filePath: string) {
-    const directory = pathPosix.dirname(filePath)
-    return directory === '.' ? 'root' : directory
+  private toExternalNodeId(specifier: string) {
+    return `external:${specifier}`
   }
 
   private toFileNodeId(filePath: string) {
@@ -1047,21 +1064,5 @@ export class DependenciesService {
 
   private toSymbolNodeId(filePath: string, symbolName: string) {
     return `symbol:${filePath}:${symbolName}`
-  }
-
-  private async assertRepoOwnership(userId: number, repoId: number): Promise<RepoOwnership> {
-    const [repo] = await this.dbService.dbClient.select({
-      id: repos.id,
-      name: repos.name
-    })
-      .from(repos)
-      .where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
-      .limit(1)
-
-    if (!repo) {
-      throw new NotFoundException('Repository not found')
-    }
-
-    return repo
   }
 }

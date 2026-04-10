@@ -20,20 +20,20 @@ export interface RepoTopologyResolutionStats {
 }
 
 export interface RepoTopologyImportResolution {
-  kind: RepoImportResolutionKind | null
-  resolvedPath: string | null
+  kind: null | RepoImportResolutionKind
+  resolvedPath: null | string
 }
 
 export interface RepoTopologyContext {
+  getResolutionStats: () => RepoTopologyResolutionStats
   moduleIdByFilePath: Map<string, string>
   moduleLabelByFilePath: Map<string, string>
-  topologyMode: RepoTopologyMode
-  getResolutionStats: () => RepoTopologyResolutionStats
   resolveImport: (
     sourceFilePath: string,
     specifier: string,
     knownFilePaths: Set<string>
   ) => RepoTopologyImportResolution
+  topologyMode: RepoTopologyMode
 }
 
 interface CandidateBoundary {
@@ -41,7 +41,7 @@ interface CandidateBoundary {
   label: string
   moduleId: string
   packageName?: string
-  source: 'package' | 'workspace' | 'path'
+  source: 'package' | 'path' | 'workspace'
   workspaceRootDir?: string
 }
 
@@ -186,6 +186,14 @@ export class RepoTopologyDetector {
     }
   }
 
+  private applyAliasCapture(target: string, capture: string) {
+    if (!target.includes('*')) {
+      return target
+    }
+
+    return target.replace(/\*/g, capture)
+  }
+
   private buildPackageRegistry(packageManifests: PackageManifest[]) {
     return packageManifests
       .filter(manifest => manifest.name)
@@ -196,6 +204,23 @@ export class RepoTopologyDetector {
         name: manifest.name as string
       }))
       .sort((left, right) => right.name.length - left.name.length)
+  }
+
+  private collectCandidateDirectories(filePaths: Iterable<string>) {
+    const directories = new Set<string>()
+    for (const filePath of filePaths) {
+      let currentDir = pathPosix.dirname(filePath)
+      while (currentDir && currentDir !== '.') {
+        directories.add(currentDir)
+        const nextDir = pathPosix.dirname(currentDir)
+        if (nextDir === currentDir) {
+          break
+        }
+        currentDir = nextDir
+      }
+    }
+
+    return [...directories].sort((left, right) => right.length - left.length)
   }
 
   private detectBoundaries(
@@ -286,301 +311,21 @@ export class RepoTopologyDetector {
     return roots
   }
 
-  private findBoundaryForFile(filePath: string, boundaries: CandidateBoundary[]) {
-    for (const boundary of boundaries) {
-      if (boundary.dir === filePath) {
-        return boundary
-      }
-
-      if (this.isAncestorPath(boundary.dir, filePath)) {
-        return boundary
-      }
-    }
-
-    return null
+  private displayDir(dir: string) {
+    return dir === '.' ? 'root' : dir
   }
 
-  private fallbackPathGroup(filePath: string) {
-    const segments = filePath.split('/').filter(Boolean)
-    if (segments.length <= 1) {
-      return segments[0] ?? 'root'
-    }
-
-    const first = segments[0] ?? 'root'
-    const second = segments[1]
-
-    if (first === 'apps' || first === 'packages' || first === 'services' || first === 'libs' || first === 'modules') {
-      return second ? `${first}/${second}` : first
-    }
-
-    if (first === 'src' || first === 'app' || first === 'lib' || first === 'components' || first === 'features') {
-      return second ? `${first}/${second}` : first
-    }
-
-    return second ? `${first}/${second}` : first
+  private escapeRegex(value: string) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   }
 
-  private parsePackageManifests(files: Map<string, RepoTopologyFileInput>) {
-    const manifests: PackageManifest[] = []
-
-    for (const [filePath, file] of files.entries()) {
-      if (pathPosix.basename(filePath) !== 'package.json') {
-        continue
-      }
-
-      const content = this.safeJsonParse(file.content)
-      if (!content) {
-        continue
-      }
-
-      const dir = pathPosix.dirname(filePath)
-      const workspacePatterns = this.extractWorkspacePatterns(content, files, dir)
-      manifests.push({
-        content,
-        dir,
-        filePath,
-        isWorkspaceRoot: workspacePatterns.length > 0,
-        name: typeof content.name === 'string' ? content.name.trim() : undefined,
-        workspacePatterns
-      })
+  private exportPatternMatches(pattern: string, requestedSubpath: string) {
+    if (!pattern.includes('*')) {
+      return pattern === requestedSubpath || pattern === `./${requestedSubpath}`
     }
 
-    return manifests
-  }
-
-  private parseTsConfigScopes(files: Map<string, RepoTopologyFileInput>) {
-    const scopes: TsConfigScope[] = []
-
-    for (const [filePath, file] of files.entries()) {
-      const baseName = pathPosix.basename(filePath)
-      if (!baseName.startsWith('tsconfig') && !baseName.startsWith('jsconfig')) {
-        continue
-      }
-
-      const parsedScopes = this.resolveTsConfigChain(filePath, files, new Set<string>())
-      scopes.push(...parsedScopes)
-    }
-
-    return scopes
-  }
-
-  private resolveTsConfigChain(
-    filePath: string,
-    files: Map<string, RepoTopologyFileInput>,
-    visited: Set<string>
-  ): TsConfigScope[] {
-    const normalizedPath = this.normalizePath(filePath)
-    if (!normalizedPath || visited.has(normalizedPath)) {
-      return []
-    }
-
-    visited.add(normalizedPath)
-    const file = files.get(normalizedPath)
-    if (!file) {
-      return []
-    }
-
-    const content = this.safeJsonParse(file.content)
-    if (!content) {
-      return []
-    }
-
-    const parentScopes = typeof content.extends === 'string' && this.isLocalConfigExtends(normalizedPath, content.extends)
-      ? this.resolveTsConfigChain(this.resolveConfigExtendsPath(normalizedPath, content.extends), files, visited)
-      : []
-
-    const compilerOptions = this.normalizeCompilerOptions(content.compilerOptions)
-    const scope: TsConfigScope = {
-      baseUrl: compilerOptions.baseUrl ?? pathPosix.dirname(normalizedPath),
-      dir: pathPosix.dirname(normalizedPath),
-      filePath: normalizedPath,
-      paths: compilerOptions.paths
-    }
-
-    return [...parentScopes, scope]
-  }
-
-  private normalizeCompilerOptions(compilerOptions: unknown) {
-    if (!compilerOptions || typeof compilerOptions !== 'object') {
-      return {
-        paths: [] as Array<{ pattern: string, targets: string[] }>,
-        baseUrl: null as null | string
-      }
-    }
-
-    const typedOptions = compilerOptions as Record<string, unknown>
-    const baseUrl = typeof typedOptions.baseUrl === 'string' && typedOptions.baseUrl.trim().length > 0
-      ? typedOptions.baseUrl.trim()
-      : null
-
-    const paths: Array<{ pattern: string, targets: string[] }> = []
-    const rawPaths = typedOptions.paths
-    if (rawPaths && typeof rawPaths === 'object' && !Array.isArray(rawPaths)) {
-      for (const [pattern, value] of Object.entries(rawPaths as Record<string, unknown>)) {
-        if (!Array.isArray(value)) {
-          continue
-        }
-
-        const targets = value
-          .filter((entry): entry is string => typeof entry === 'string')
-          .map(entry => entry.trim())
-          .filter(Boolean)
-
-        if (pattern.trim().length > 0 && targets.length > 0) {
-          paths.push({
-            pattern: pattern.trim(),
-            targets
-          })
-        }
-      }
-    }
-
-    return {
-      baseUrl,
-      paths
-    }
-  }
-
-  private resolveRelativeImport(
-    sourceFilePath: string,
-    specifier: string,
-    knownFilePaths: Set<string>
-  ): RepoTopologyImportResolution {
-    const isRelative = specifier.startsWith('./') || specifier.startsWith('../') || specifier.startsWith('/')
-    if (!isRelative) {
-      return {
-        kind: null,
-        resolvedPath: null
-      }
-    }
-
-    const baseDir = pathPosix.dirname(sourceFilePath)
-    const resolvedPath = specifier.startsWith('/')
-      ? pathPosix.normalize(specifier.slice(1))
-      : pathPosix.normalize(pathPosix.join(baseDir, specifier))
-
-    const resolved = this.resolveKnownPathCandidate(resolvedPath, knownFilePaths)
-    if (resolved) {
-      return {
-        kind: 'relative',
-        resolvedPath: resolved
-      }
-    }
-
-    return {
-      kind: null,
-      resolvedPath: null
-    }
-  }
-
-  private resolveAliasImport(
-    sourceFilePath: string,
-    specifier: string,
-    knownFilePaths: Set<string>,
-    scopes: TsConfigScope[]
-  ): RepoTopologyImportResolution {
-    if (specifier.startsWith('./') || specifier.startsWith('../') || specifier.startsWith('/')) {
-      return {
-        kind: null,
-        resolvedPath: null
-      }
-    }
-
-    const orderedScopes = scopes
-      .filter(scope => this.isAncestorPath(scope.dir, sourceFilePath))
-      .sort((left, right) => right.dir.length - left.dir.length)
-    const fallbackScopes = [...scopes].sort((left, right) => right.dir.length - left.dir.length)
-
-    for (const scope of orderedScopes.length > 0 ? orderedScopes : fallbackScopes) {
-      for (const alias of scope.paths) {
-        const matches = this.matchAliasPattern(alias.pattern, specifier)
-        if (!matches) {
-          continue
-        }
-
-        for (const target of alias.targets) {
-          const substitutedTarget = this.applyAliasCapture(target, matches.capture)
-          const baseDir = pathPosix.normalize(pathPosix.join(scope.dir, scope.baseUrl))
-          const candidate = this.resolveCandidateFromBase(baseDir, substitutedTarget, knownFilePaths)
-          if (candidate) {
-            return {
-              kind: 'alias',
-              resolvedPath: candidate
-            }
-          }
-        }
-      }
-    }
-
-    return {
-      kind: null,
-      resolvedPath: null
-    }
-  }
-
-  private resolvePackageImport(
-    specifier: string,
-    knownFilePaths: Set<string>,
-    packageRegistry: PackageRegistryEntry[]
-  ): RepoTopologyImportResolution {
-    const exactMatch = packageRegistry.find(entry => specifier === entry.name)
-    const prefixMatch = packageRegistry.find(entry => specifier.startsWith(`${entry.name}/`))
-    const packageEntry = exactMatch ?? prefixMatch
-    if (!packageEntry) {
-      return {
-        kind: null,
-        resolvedPath: null
-      }
-    }
-
-    const subpath = specifier === packageEntry.name
-      ? ''
-      : specifier.slice(packageEntry.name.length + 1)
-
-    const candidatePaths: string[] = []
-    if (subpath.length > 0) {
-      candidatePaths.push(pathPosix.join(packageEntry.dir, subpath))
-      candidatePaths.push(pathPosix.join(packageEntry.dir, 'src', subpath))
-      candidatePaths.push(pathPosix.join(packageEntry.dir, 'lib', subpath))
-    } else {
-      candidatePaths.push(...this.packageEntryCandidates(packageEntry))
-    }
-
-    const resolved = this.resolveCandidates(candidatePaths, knownFilePaths)
-    if (resolved) {
-      return {
-        kind: 'package',
-        resolvedPath: resolved
-      }
-    }
-
-    return {
-      kind: null,
-      resolvedPath: null
-    }
-  }
-
-  private packageEntryCandidates(packageEntry: PackageRegistryEntry) {
-    const candidates: string[] = []
-    const exportsField = packageEntry.manifest.exports
-    const packageMain = this.readStringManifestField(packageEntry.manifest, ['main', 'module', 'source', 'types'])
-
-    const exactExportTargets = this.extractExportTargets(exportsField, '.')
-    candidates.push(...exactExportTargets.map(target => pathPosix.join(packageEntry.dir, target)))
-
-    if (packageMain) {
-      candidates.push(pathPosix.join(packageEntry.dir, packageMain))
-    }
-
-    candidates.push(
-      pathPosix.join(packageEntry.dir, 'index'),
-      pathPosix.join(packageEntry.dir, 'src', 'index'),
-      pathPosix.join(packageEntry.dir, 'src', 'main'),
-      pathPosix.join(packageEntry.dir, 'src', 'index.ts'),
-      pathPosix.join(packageEntry.dir, 'src', 'index.tsx')
-    )
-
-    return candidates
+    const regex = new RegExp(`^${this.escapeRegex(pattern).replace(/\\\*/g, '(.*)')}$`)
+    return regex.test(requestedSubpath) || regex.test(`./${requestedSubpath}`)
   }
 
   private extractExportTargets(exportsField: unknown, requestedSubpath: string) {
@@ -636,86 +381,6 @@ export class RepoTopologyDetector {
     return targets
   }
 
-  private exportPatternMatches(pattern: string, requestedSubpath: string) {
-    if (!pattern.includes('*')) {
-      return pattern === requestedSubpath || pattern === `./${requestedSubpath}`
-    }
-
-    const regex = new RegExp(`^${this.escapeRegex(pattern).replace(/\\\*/g, '(.*)')}$`)
-    return regex.test(requestedSubpath) || regex.test(`./${requestedSubpath}`)
-  }
-
-  private resolveCandidateFromBase(
-    baseDir: string,
-    relativeCandidate: string,
-    knownFilePaths: Set<string>
-  ) {
-    const normalized = pathPosix.normalize(pathPosix.join(baseDir, relativeCandidate))
-    return this.resolveKnownPathCandidate(normalized, knownFilePaths)
-  }
-
-  private resolveKnownPathCandidate(candidatePath: string, knownFilePaths: Set<string>) {
-    if (knownFilePaths.has(candidatePath)) {
-      return candidatePath
-    }
-
-    const hasExtension = pathPosix.extname(candidatePath) !== ''
-    const extensions = hasExtension
-      ? ['']
-      : DEFAULT_CODE_EXTENSIONS
-
-    for (const extension of extensions) {
-      const withExtension = `${candidatePath}${extension}`
-      if (knownFilePaths.has(withExtension)) {
-        return withExtension
-      }
-
-      const indexFile = pathPosix.join(candidatePath, `index${extension}`)
-      if (knownFilePaths.has(indexFile)) {
-        return indexFile
-      }
-    }
-
-    return null
-  }
-
-  private resolveCandidates(candidatePaths: string[], knownFilePaths: Set<string>) {
-    for (const candidatePath of candidatePaths) {
-      const resolved = this.resolveKnownPathCandidate(candidatePath, knownFilePaths)
-      if (resolved) {
-        return resolved
-      }
-    }
-
-    return null
-  }
-
-  private matchAliasPattern(pattern: string, specifier: string) {
-    if (!pattern.includes('*')) {
-      return pattern === specifier
-        ? { capture: '' }
-        : null
-    }
-
-    const regex = new RegExp(`^${this.escapeRegex(pattern).replace(/\\\*/g, '(.*)')}$`)
-    const match = specifier.match(regex)
-    if (!match) {
-      return null
-    }
-
-    return {
-      capture: match[1] ?? ''
-    }
-  }
-
-  private applyAliasCapture(target: string, capture: string) {
-    if (!target.includes('*')) {
-      return target
-    }
-
-    return target.replace(/\*/g, capture)
-  }
-
   private extractWorkspacePatterns(
     content: Record<string, unknown>,
     files: Map<string, RepoTopologyFileInput>,
@@ -740,6 +405,186 @@ export class RepoTopologyDetector {
     }
 
     return []
+  }
+
+  private fallbackPathGroup(filePath: string) {
+    const segments = filePath.split('/').filter(Boolean)
+    if (segments.length <= 1) {
+      return segments[0] ?? 'root'
+    }
+
+    const first = segments[0] ?? 'root'
+    const second = segments[1]
+
+    if (first === 'apps' || first === 'packages' || first === 'services' || first === 'libs' || first === 'modules') {
+      return second ? `${first}/${second}` : first
+    }
+
+    if (first === 'src' || first === 'app' || first === 'lib' || first === 'components' || first === 'features') {
+      return second ? `${first}/${second}` : first
+    }
+
+    return second ? `${first}/${second}` : first
+  }
+
+  private findBoundaryForFile(filePath: string, boundaries: CandidateBoundary[]) {
+    for (const boundary of boundaries) {
+      if (boundary.dir === filePath) {
+        return boundary
+      }
+
+      if (this.isAncestorPath(boundary.dir, filePath)) {
+        return boundary
+      }
+    }
+
+    return null
+  }
+
+  private isAncestorPath(ancestor: string, descendant: string) {
+    if (ancestor === '.') {
+      return true
+    }
+
+    return descendant === ancestor || descendant.startsWith(`${ancestor}/`)
+  }
+
+  private isLocalConfigExtends(configPath: string, extendsValue: string) {
+    if (!extendsValue.startsWith('.')) {
+      return false
+    }
+
+    const resolved = this.resolveConfigExtendsPath(configPath, extendsValue)
+    return resolved.length > 0
+  }
+
+  private matchAliasPattern(pattern: string, specifier: string) {
+    if (!pattern.includes('*')) {
+      return pattern === specifier
+        ? { capture: '' }
+        : null
+    }
+
+    const regex = new RegExp(`^${this.escapeRegex(pattern).replace(/\\\*/g, '(.*)')}$`)
+    const match = specifier.match(regex)
+    if (!match) {
+      return null
+    }
+
+    return {
+      capture: match[1] ?? ''
+    }
+  }
+
+  private matchesAnyWorkspacePattern(relativeDir: string, patterns: string[]) {
+    for (const pattern of patterns) {
+      if (this.workspacePatternToRegExp(pattern).test(relativeDir)) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  private normalizeCompilerOptions(compilerOptions: unknown) {
+    if (!compilerOptions || typeof compilerOptions !== 'object') {
+      return {
+        baseUrl: null as null | string,
+        paths: [] as Array<{ pattern: string, targets: string[] }>
+      }
+    }
+
+    const typedOptions = compilerOptions as Record<string, unknown>
+    const baseUrl = typeof typedOptions.baseUrl === 'string' && typedOptions.baseUrl.trim().length > 0
+      ? typedOptions.baseUrl.trim()
+      : null
+
+    const paths: Array<{ pattern: string, targets: string[] }> = []
+    const rawPaths = typedOptions.paths
+    if (rawPaths && typeof rawPaths === 'object' && !Array.isArray(rawPaths)) {
+      for (const [pattern, value] of Object.entries(rawPaths as Record<string, unknown>)) {
+        if (!Array.isArray(value)) {
+          continue
+        }
+
+        const targets = value
+          .filter((entry): entry is string => typeof entry === 'string')
+          .map(entry => entry.trim())
+          .filter(Boolean)
+
+        if (pattern.trim().length > 0 && targets.length > 0) {
+          paths.push({
+            pattern: pattern.trim(),
+            targets
+          })
+        }
+      }
+    }
+
+    return {
+      baseUrl,
+      paths
+    }
+  }
+
+  private normalizePath(value: string) {
+    const normalized = value.trim().replaceAll('\\', '/').replace(/^\.\/+/, '').replace(/\/{2,}/g, '/')
+    return normalized.length > 0 ? normalized : null
+  }
+
+  private normalizePathSeparatorForMatch(value: string) {
+    return value.replaceAll('\\', '/')
+  }
+
+  private packageEntryCandidates(packageEntry: PackageRegistryEntry) {
+    const candidates: string[] = []
+    const exportsField = packageEntry.manifest.exports
+    const packageMain = this.readStringManifestField(packageEntry.manifest, ['main', 'module', 'source', 'types'])
+
+    const exactExportTargets = this.extractExportTargets(exportsField, '.')
+    candidates.push(...exactExportTargets.map(target => pathPosix.join(packageEntry.dir, target)))
+
+    if (packageMain) {
+      candidates.push(pathPosix.join(packageEntry.dir, packageMain))
+    }
+
+    candidates.push(
+      pathPosix.join(packageEntry.dir, 'index'),
+      pathPosix.join(packageEntry.dir, 'src', 'index'),
+      pathPosix.join(packageEntry.dir, 'src', 'main'),
+      pathPosix.join(packageEntry.dir, 'src', 'index.ts'),
+      pathPosix.join(packageEntry.dir, 'src', 'index.tsx')
+    )
+
+    return candidates
+  }
+
+  private parsePackageManifests(files: Map<string, RepoTopologyFileInput>) {
+    const manifests: PackageManifest[] = []
+
+    for (const [filePath, file] of files.entries()) {
+      if (pathPosix.basename(filePath) !== 'package.json') {
+        continue
+      }
+
+      const content = this.safeJsonParse(file.content)
+      if (!content) {
+        continue
+      }
+
+      const dir = pathPosix.dirname(filePath)
+      const workspacePatterns = this.extractWorkspacePatterns(content, files, dir)
+      manifests.push({
+        content,
+        dir,
+        filePath,
+        isWorkspaceRoot: workspacePatterns.length > 0,
+        name: typeof content.name === 'string' ? content.name.trim() : undefined,
+        workspacePatterns
+      })
+    }
+
+    return manifests
   }
 
   private parsePnpmWorkspacePatterns(content: string) {
@@ -771,39 +616,20 @@ export class RepoTopologyDetector {
     return patterns
   }
 
-  private collectCandidateDirectories(filePaths: Iterable<string>) {
-    const directories = new Set<string>()
-    for (const filePath of filePaths) {
-      let currentDir = pathPosix.dirname(filePath)
-      while (currentDir && currentDir !== '.') {
-        directories.add(currentDir)
-        const nextDir = pathPosix.dirname(currentDir)
-        if (nextDir === currentDir) {
-          break
-        }
-        currentDir = nextDir
+  private parseTsConfigScopes(files: Map<string, RepoTopologyFileInput>) {
+    const scopes: TsConfigScope[] = []
+
+    for (const [filePath, file] of files.entries()) {
+      const baseName = pathPosix.basename(filePath)
+      if (!baseName.startsWith('tsconfig') && !baseName.startsWith('jsconfig')) {
+        continue
       }
+
+      const parsedScopes = this.resolveTsConfigChain(filePath, files, new Set<string>())
+      scopes.push(...parsedScopes)
     }
 
-    return [...directories].sort((left, right) => right.length - left.length)
-  }
-
-  private matchesAnyWorkspacePattern(relativeDir: string, patterns: string[]) {
-    for (const pattern of patterns) {
-      if (this.workspacePatternToRegExp(pattern).test(relativeDir)) {
-        return true
-      }
-    }
-
-    return false
-  }
-
-  private workspacePatternToRegExp(pattern: string) {
-    const normalized = pattern.trim().replace(/^\.\//, '')
-    const escaped = this.escapeRegex(normalized)
-      .replace(/\\\*\\\*/g, '.*')
-      .replace(/\\\*/g, '[^/]+')
-    return new RegExp(`^${escaped}$`)
+    return scopes
   }
 
   private readStringManifestField(manifest: Record<string, unknown>, keys: string[]) {
@@ -815,50 +641,6 @@ export class RepoTopologyDetector {
     }
 
     return null
-  }
-
-  private isLocalConfigExtends(configPath: string, extendsValue: string) {
-    if (!extendsValue.startsWith('.')) {
-      return false
-    }
-
-    const resolved = this.resolveConfigExtendsPath(configPath, extendsValue)
-    return resolved.length > 0
-  }
-
-  private resolveConfigExtendsPath(configPath: string, extendsValue: string) {
-    const resolved = pathPosix.normalize(pathPosix.join(pathPosix.dirname(configPath), extendsValue))
-    if (pathPosix.extname(resolved) !== '.json') {
-      return `${resolved}.json`
-    }
-
-    return resolved
-  }
-
-  private safeJsonParse(content: string) {
-    try {
-      const parsed = JSON.parse(content)
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>
-      }
-    } catch {
-      return null
-    }
-
-    return null
-  }
-
-  private normalizePath(value: string) {
-    const normalized = value.trim().replaceAll('\\', '/').replace(/^\.\/+/, '').replace(/\/{2,}/g, '/')
-    return normalized.length > 0 ? normalized : null
-  }
-
-  private isAncestorPath(ancestor: string, descendant: string) {
-    if (ancestor === '.') {
-      return true
-    }
-
-    return descendant === ancestor || descendant.startsWith(`${ancestor}/`)
   }
 
   private relativeToAncestor(ancestor: string, descendant: string) {
@@ -874,15 +656,233 @@ export class RepoTopologyDetector {
     return relative.length > 0 ? relative : null
   }
 
-  private displayDir(dir: string) {
-    return dir === '.' ? 'root' : dir
+  private resolveAliasImport(
+    sourceFilePath: string,
+    specifier: string,
+    knownFilePaths: Set<string>,
+    scopes: TsConfigScope[]
+  ): RepoTopologyImportResolution {
+    if (specifier.startsWith('./') || specifier.startsWith('../') || specifier.startsWith('/')) {
+      return {
+        kind: null,
+        resolvedPath: null
+      }
+    }
+
+    const orderedScopes = scopes
+      .filter(scope => this.isAncestorPath(scope.dir, sourceFilePath))
+      .sort((left, right) => right.dir.length - left.dir.length)
+    const fallbackScopes = [...scopes].sort((left, right) => right.dir.length - left.dir.length)
+
+    for (const scope of orderedScopes.length > 0 ? orderedScopes : fallbackScopes) {
+      for (const alias of scope.paths) {
+        const matches = this.matchAliasPattern(alias.pattern, specifier)
+        if (!matches) {
+          continue
+        }
+
+        for (const target of alias.targets) {
+          const substitutedTarget = this.applyAliasCapture(target, matches.capture)
+          const baseDir = pathPosix.normalize(pathPosix.join(scope.dir, scope.baseUrl))
+          const candidate = this.resolveCandidateFromBase(baseDir, substitutedTarget, knownFilePaths)
+          if (candidate) {
+            return {
+              kind: 'alias',
+              resolvedPath: candidate
+            }
+          }
+        }
+      }
+    }
+
+    return {
+      kind: null,
+      resolvedPath: null
+    }
   }
 
-  private escapeRegex(value: string) {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  private resolveCandidateFromBase(
+    baseDir: string,
+    relativeCandidate: string,
+    knownFilePaths: Set<string>
+  ) {
+    const normalized = pathPosix.normalize(pathPosix.join(baseDir, relativeCandidate))
+    return this.resolveKnownPathCandidate(normalized, knownFilePaths)
   }
 
-  private normalizePathSeparatorForMatch(value: string) {
-    return value.replaceAll('\\', '/')
+  private resolveCandidates(candidatePaths: string[], knownFilePaths: Set<string>) {
+    for (const candidatePath of candidatePaths) {
+      const resolved = this.resolveKnownPathCandidate(candidatePath, knownFilePaths)
+      if (resolved) {
+        return resolved
+      }
+    }
+
+    return null
+  }
+
+  private resolveConfigExtendsPath(configPath: string, extendsValue: string) {
+    const resolved = pathPosix.normalize(pathPosix.join(pathPosix.dirname(configPath), extendsValue))
+    if (pathPosix.extname(resolved) !== '.json') {
+      return `${resolved}.json`
+    }
+
+    return resolved
+  }
+
+  private resolveKnownPathCandidate(candidatePath: string, knownFilePaths: Set<string>) {
+    if (knownFilePaths.has(candidatePath)) {
+      return candidatePath
+    }
+
+    const hasExtension = pathPosix.extname(candidatePath) !== ''
+    const extensions = hasExtension
+      ? ['']
+      : DEFAULT_CODE_EXTENSIONS
+
+    for (const extension of extensions) {
+      const withExtension = `${candidatePath}${extension}`
+      if (knownFilePaths.has(withExtension)) {
+        return withExtension
+      }
+
+      const indexFile = pathPosix.join(candidatePath, `index${extension}`)
+      if (knownFilePaths.has(indexFile)) {
+        return indexFile
+      }
+    }
+
+    return null
+  }
+
+  private resolvePackageImport(
+    specifier: string,
+    knownFilePaths: Set<string>,
+    packageRegistry: PackageRegistryEntry[]
+  ): RepoTopologyImportResolution {
+    const exactMatch = packageRegistry.find(entry => specifier === entry.name)
+    const prefixMatch = packageRegistry.find(entry => specifier.startsWith(`${entry.name}/`))
+    const packageEntry = exactMatch ?? prefixMatch
+    if (!packageEntry) {
+      return {
+        kind: null,
+        resolvedPath: null
+      }
+    }
+
+    const subpath = specifier === packageEntry.name
+      ? ''
+      : specifier.slice(packageEntry.name.length + 1)
+
+    const candidatePaths: string[] = []
+    if (subpath.length > 0) {
+      candidatePaths.push(pathPosix.join(packageEntry.dir, subpath))
+      candidatePaths.push(pathPosix.join(packageEntry.dir, 'src', subpath))
+      candidatePaths.push(pathPosix.join(packageEntry.dir, 'lib', subpath))
+    } else {
+      candidatePaths.push(...this.packageEntryCandidates(packageEntry))
+    }
+
+    const resolved = this.resolveCandidates(candidatePaths, knownFilePaths)
+    if (resolved) {
+      return {
+        kind: 'package',
+        resolvedPath: resolved
+      }
+    }
+
+    return {
+      kind: null,
+      resolvedPath: null
+    }
+  }
+
+  private resolveRelativeImport(
+    sourceFilePath: string,
+    specifier: string,
+    knownFilePaths: Set<string>
+  ): RepoTopologyImportResolution {
+    const isRelative = specifier.startsWith('./') || specifier.startsWith('../') || specifier.startsWith('/')
+    if (!isRelative) {
+      return {
+        kind: null,
+        resolvedPath: null
+      }
+    }
+
+    const baseDir = pathPosix.dirname(sourceFilePath)
+    const resolvedPath = specifier.startsWith('/')
+      ? pathPosix.normalize(specifier.slice(1))
+      : pathPosix.normalize(pathPosix.join(baseDir, specifier))
+
+    const resolved = this.resolveKnownPathCandidate(resolvedPath, knownFilePaths)
+    if (resolved) {
+      return {
+        kind: 'relative',
+        resolvedPath: resolved
+      }
+    }
+
+    return {
+      kind: null,
+      resolvedPath: null
+    }
+  }
+
+  private resolveTsConfigChain(
+    filePath: string,
+    files: Map<string, RepoTopologyFileInput>,
+    visited: Set<string>
+  ): TsConfigScope[] {
+    const normalizedPath = this.normalizePath(filePath)
+    if (!normalizedPath || visited.has(normalizedPath)) {
+      return []
+    }
+
+    visited.add(normalizedPath)
+    const file = files.get(normalizedPath)
+    if (!file) {
+      return []
+    }
+
+    const content = this.safeJsonParse(file.content)
+    if (!content) {
+      return []
+    }
+
+    const parentScopes = typeof content.extends === 'string' && this.isLocalConfigExtends(normalizedPath, content.extends)
+      ? this.resolveTsConfigChain(this.resolveConfigExtendsPath(normalizedPath, content.extends), files, visited)
+      : []
+
+    const compilerOptions = this.normalizeCompilerOptions(content.compilerOptions)
+    const scope: TsConfigScope = {
+      baseUrl: compilerOptions.baseUrl ?? pathPosix.dirname(normalizedPath),
+      dir: pathPosix.dirname(normalizedPath),
+      filePath: normalizedPath,
+      paths: compilerOptions.paths
+    }
+
+    return [...parentScopes, scope]
+  }
+
+  private safeJsonParse(content: string) {
+    try {
+      const parsed = JSON.parse(content)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>
+      }
+    } catch {
+      return null
+    }
+
+    return null
+  }
+
+  private workspacePatternToRegExp(pattern: string) {
+    const normalized = pattern.trim().replace(/^\.\//, '')
+    const escaped = this.escapeRegex(normalized)
+      .replace(/\\\*\\\*/g, '.*')
+      .replace(/\\\*/g, '[^/]+')
+    return new RegExp(`^${escaped}$`)
   }
 }

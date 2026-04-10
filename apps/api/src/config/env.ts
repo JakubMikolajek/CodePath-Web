@@ -19,9 +19,9 @@ const DEFAULTS = {
   orchestratorTimeoutMs: 60_000,
   orchestratorUrl: 'http://127.0.0.1:8080',
   port: 3001,
+  qdrantEmbeddingsCollectionName: 'embeddings_embeddinggemma',
   qdrantHost: '127.0.0.1',
   qdrantPort: 6333,
-  qdrantEmbeddingsCollectionName: 'embeddings_embeddinggemma',
   rabbitAllowDestructiveMigration: false,
   rabbitRetryDelayMs: 5000,
   rabbitUrl: 'amqp://admin:admin@127.0.0.1',
@@ -133,9 +133,9 @@ export const env = {
   ),
   orchestratorUrl: process.env.ORCHESTRATOR_URL ?? DEFAULTS.orchestratorUrl,
   port: parseInteger(process.env.PORT, DEFAULTS.port),
-  qdrantHost: process.env.QDRANT_HOST ?? DEFAULTS.qdrantHost,
   qdrantEmbeddingsCollectionName:
     process.env.QDRANT_EMBEDDINGS_COLLECTION_NAME ?? DEFAULTS.qdrantEmbeddingsCollectionName,
+  qdrantHost: process.env.QDRANT_HOST ?? DEFAULTS.qdrantHost,
   qdrantPort: parseInteger(process.env.QDRANT_PORT, DEFAULTS.qdrantPort),
   rabbitAllowDestructiveMigration: parseBoolean(
     process.env.RABBIT_ALLOW_DESTRUCTIVE_MIGRATION,
