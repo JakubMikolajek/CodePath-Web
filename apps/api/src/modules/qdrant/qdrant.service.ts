@@ -1,7 +1,15 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
-import { QdrantClient } from '@qdrant/js-client-rest'
+import { QdrantClient, type Schemas } from '@qdrant/js-client-rest'
 
 import { env } from '../../config/env'
+
+interface ScrollOptions {
+  filter?: Schemas['Filter']
+  limit?: number
+  offset?: Schemas['ExtendedPointId']
+  withPayload?: Schemas['WithPayloadInterface']
+  withVector?: Schemas['WithVector']
+}
 
 @Injectable()
 export class QdrantService implements OnModuleInit {
@@ -23,16 +31,25 @@ export class QdrantService implements OnModuleInit {
     }
   }
 
-  async scroll(collectionName: string, filter?: any) {
+  async scroll(collectionName: string, options?: ScrollOptions) {
+    const {
+      filter,
+      limit = 1000,
+      offset,
+      withPayload = true,
+      withVector = false
+    } = options ?? {}
+
     return await this.client.scroll(collectionName, {
       filter,
-      limit: 1000, // Adjust limit as needed or implement pagination
-      with_payload: true,
-      with_vector: true
+      limit,
+      offset,
+      with_payload: withPayload,
+      with_vector: withVector
     })
   }
 
-  async search(collectionName: string, vector: number[], filter?: any, limit = 5) {
+  async search(collectionName: string, vector: number[], filter?: Schemas['Filter'], limit = 5) {
     return await this.client.search(collectionName, {
       filter,
       limit,

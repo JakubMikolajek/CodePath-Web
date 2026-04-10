@@ -123,11 +123,18 @@ export default function RepoItem({ item }: RepoItemProps) {
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild>
+                        <Link href={`/${item.id}/graphs`}>
+                          <span>Interactive graph</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
                     {graphs.map(graph => (
                       <SidebarMenuSubItem key={graph.id}>
                         <SidebarMenuSubButton asChild>
                           <Link href={`/${item.id}/graphs/${graph.id}`}>
-                            <span>{graph.fileName}</span>
+                            <span>Legacy: {graph.fileName}</span>
                           </Link>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
