@@ -2,6 +2,7 @@ const DEFAULTS = {
   authProvider: 'keycloak',
   corsAllowedOrigins: '*',
   databaseUrl: 'postgres://postgres:postgres@127.0.0.1:5432/codepath',
+  dbAutoMigrate: true,
   ingestIncludeConfigFiles: true,
   ingestIncludeDocumentationFiles: true,
   ingestMaxFileBytes: 5_000_000,
@@ -98,6 +99,7 @@ export const env = {
   authProvider: parseAuthProvider(process.env.AUTH_PROVIDER),
   corsAllowedOrigins: parseList(process.env.CORS_ALLOWED_ORIGINS, DEFAULTS.corsAllowedOrigins),
   databaseUrl: process.env.DATABASE_URL ?? DEFAULTS.databaseUrl,
+  dbAutoMigrate: parseBoolean(process.env.DB_AUTO_MIGRATE, DEFAULTS.dbAutoMigrate),
   ingestIncludeConfigFiles: parseBoolean(
     process.env.INGEST_INCLUDE_CONFIG_FILES,
     DEFAULTS.ingestIncludeConfigFiles
