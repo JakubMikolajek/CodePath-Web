@@ -2,11 +2,27 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
+import { readMigrationFiles } from 'drizzle-orm/migrator'
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { Pool } from 'pg'
 
 import { env } from '../../config/env'
+
+const LEGACY_REQUIRED_TABLES = ['users', 'repos', 'files', 'dependencies'] as const
+
+type LegacyTableName = (typeof LEGACY_REQUIRED_TABLES)[number]
+
+export function shouldBootstrapLegacyMigrationBaseline(
+  hasMigrationHistory: boolean,
+  tablePresenceByName: Record<LegacyTableName, boolean>
+): boolean {
+  if (hasMigrationHistory) {
+    return false
+  }
+
+  return LEGACY_REQUIRED_TABLES.every(tableName => tablePresenceByName[tableName] === true)
+}
 
 @Injectable()
 export class DbService implements OnModuleDestroy, OnModuleInit {
@@ -29,9 +45,99 @@ export class DbService implements OnModuleDestroy, OnModuleInit {
     }
 
     const migrationsFolder = this.resolveMigrationsFolder()
+    const baselinedLegacySchema = await this.bootstrapLegacyMigrationBaselineIfNeeded(migrationsFolder)
+    if (baselinedLegacySchema) {
+      await this.applyRepoAuthSchemaCompatPatch()
+    }
+
     this.logger.log(`Running Drizzle migrations from ${migrationsFolder}`)
     await migrate(this.db, { migrationsFolder })
     this.logger.log('Drizzle migrations completed')
+  }
+
+  private async applyRepoAuthSchemaCompatPatch(): Promise<void> {
+    await this.pool.query(`
+      DO $$
+      BEGIN
+        CREATE TYPE "repo_git_auth_type" AS ENUM ('none', 'https_token', 'ssh_key');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `)
+
+    await this.pool.query(`
+      ALTER TABLE "repos" ADD COLUMN IF NOT EXISTS "default_branch" text;
+      ALTER TABLE "repos" ADD COLUMN IF NOT EXISTS "git_auth_type" "repo_git_auth_type" DEFAULT 'none' NOT NULL;
+      ALTER TABLE "repos" ADD COLUMN IF NOT EXISTS "git_auth_username" text;
+      ALTER TABLE "repos" ADD COLUMN IF NOT EXISTS "git_auth_secret" text;
+    `)
+
+    await this.pool.query(`
+      UPDATE "repos"
+      SET
+        "git_auth_type" = 'ssh_key',
+        "git_auth_secret" = "access_key"
+      WHERE
+        COALESCE(trim("git_auth_secret"), '') = ''
+        AND COALESCE(trim("access_key"), '') <> '';
+    `)
+
+    this.logger.log('Applied legacy repo auth schema compatibility patch')
+  }
+
+  private async bootstrapLegacyMigrationBaselineIfNeeded(migrationsFolder: string): Promise<boolean> {
+    await this.pool.query('CREATE SCHEMA IF NOT EXISTS drizzle')
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS drizzle.__drizzle_migrations (
+        id SERIAL PRIMARY KEY,
+        hash text NOT NULL,
+        created_at bigint
+      )
+    `)
+
+    const migrationCountResult = await this.pool.query<{ count: string }>(
+      'select count(*)::int as count from drizzle.__drizzle_migrations'
+    )
+    const hasMigrationHistory = Number(migrationCountResult.rows[0]?.count ?? 0) > 0
+    const tablePresenceByName = await this.getLegacyTablePresence()
+    const shouldBootstrap = shouldBootstrapLegacyMigrationBaseline(hasMigrationHistory, tablePresenceByName)
+
+    if (!shouldBootstrap) {
+      return false
+    }
+
+    const migrations = readMigrationFiles({ migrationsFolder })
+    const latestMigration = migrations.at(-1)
+    if (!latestMigration) {
+      this.logger.warn(`No migrations found in ${migrationsFolder}; skipping legacy baseline`)
+      return false
+    }
+
+    await this.pool.query(
+      'insert into drizzle.__drizzle_migrations ("hash", "created_at") values ($1, $2)',
+      [latestMigration.hash, latestMigration.folderMillis]
+    )
+    this.logger.warn('Legacy DB schema detected without drizzle history; migration baseline inserted')
+    return true
+  }
+
+  private async getLegacyTablePresence(): Promise<Record<LegacyTableName, boolean>> {
+    const presence = {
+      dependencies: false,
+      files: false,
+      repos: false,
+      users: false
+    } as Record<LegacyTableName, boolean>
+
+    for (const tableName of LEGACY_REQUIRED_TABLES) {
+      const result = await this.pool.query<{ regclass: null | string }>(
+        'select to_regclass($1) as regclass',
+        [`public.${tableName}`]
+      )
+      presence[tableName] = Boolean(result.rows[0]?.regclass)
+    }
+
+    return presence
   }
 
   private resolveMigrationsFolder(): string {
