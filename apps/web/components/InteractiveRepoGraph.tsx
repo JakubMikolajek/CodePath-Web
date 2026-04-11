@@ -26,6 +26,11 @@ const NODE_TYPE_COLORS: Record<RepoGraphNodeType, { fill: string, stroke: string
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 const truncate = (value: string, maxLength: number) => value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value
+const MIN_SCALE = 0.22
+const MAX_SCALE = 7
+const ZOOM_IN_FACTOR = 1.16
+const ZOOM_OUT_FACTOR = 0.86
+const DEFAULT_VIEWPORT = { scale: 1, x: 80, y: 56 }
 
 export default function InteractiveRepoGraph({
   collapsedModuleIds,
@@ -33,7 +38,7 @@ export default function InteractiveRepoGraph({
   graph,
   onFocusNode
 }: InteractiveRepoGraphProps) {
-  const [viewport, setViewport] = useState({ scale: 1, x: 80, y: 56 })
+  const [viewport, setViewport] = useState(DEFAULT_VIEWPORT)
   const [dragStart, setDragStart] = useState<null | { pointerX: number, pointerY: number, startX: number, startY: number }>(null)
 
   const hiddenNodeIds = useMemo(() => {
@@ -77,22 +82,37 @@ export default function InteractiveRepoGraph({
     }
 
     const positions = new Map<string, { x: number, y: number }>()
-    let maxRows = 1
+    const targetRowsPerColumn = clamp(Math.round(Math.sqrt(Math.max(visibleNodes.length, 1)) * 1.55), 8, 26)
+    const rowGap = 88
+    const innerColumnGap = 220
+    const typeGap = 120
+    const minTypeWidth = 250
+    const baseX = 120
+    const baseY = 110
 
-    NODE_TYPE_ORDER.forEach((type, typeIndex) => {
+    let maxRowsInColumn = 1
+    let currentX = baseX
+
+    NODE_TYPE_ORDER.forEach(type => {
       const nodes = grouped.get(type) ?? []
-      maxRows = Math.max(maxRows, nodes.length)
+      const columns = Math.max(1, Math.ceil(nodes.length / targetRowsPerColumn))
+      maxRowsInColumn = Math.max(maxRowsInColumn, Math.min(nodes.length, targetRowsPerColumn))
 
-      nodes.forEach((node, rowIndex) => {
+      nodes.forEach((node, index) => {
+        const columnIndex = Math.floor(index / targetRowsPerColumn)
+        const rowIndex = index % targetRowsPerColumn
         positions.set(node.id, {
-          x: 120 + typeIndex * 270,
-          y: 110 + rowIndex * 88
+          x: currentX + columnIndex * innerColumnGap,
+          y: baseY + rowIndex * rowGap
         })
       })
+
+      const typeWidth = Math.max(minTypeWidth, (columns - 1) * innerColumnGap + minTypeWidth)
+      currentX += typeWidth + typeGap
     })
 
-    const width = Math.max(1320, NODE_TYPE_ORDER.length * 280 + 240)
-    const height = Math.max(760, maxRows * 94 + 220)
+    const width = Math.max(1480, currentX + 220)
+    const height = Math.max(860, baseY + maxRowsInColumn * rowGap + 220)
 
     return {
       height,
@@ -118,14 +138,14 @@ export default function InteractiveRepoGraph({
     return neighbors
   }, [focusedNodeId, visibleEdges])
 
-  const showEdgeLabels = visibleEdges.length <= 80
+  const showEdgeLabels = viewport.scale >= 1.5 && visibleEdges.length <= 120
 
   const handleWheel: WheelEventHandler<HTMLDivElement> = event => {
     event.preventDefault()
-    const factor = event.deltaY < 0 ? 1.12 : 0.88
+    const factor = event.deltaY < 0 ? ZOOM_IN_FACTOR : ZOOM_OUT_FACTOR
     setViewport(prev => ({
       ...prev,
-      scale: clamp(prev.scale * factor, 0.35, 2.6)
+      scale: clamp(prev.scale * factor, MIN_SCALE, MAX_SCALE)
     }))
   }
 
@@ -191,21 +211,21 @@ export default function InteractiveRepoGraph({
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <button
           className="rounded-md border border-border px-2 py-1"
-          onClick={() => setViewport(prev => ({ ...prev, scale: clamp(prev.scale * 1.12, 0.35, 2.6) }))}
+          onClick={() => setViewport(prev => ({ ...prev, scale: clamp(prev.scale * ZOOM_IN_FACTOR, MIN_SCALE, MAX_SCALE) }))}
           type="button"
         >
           Zoom in
         </button>
         <button
           className="rounded-md border border-border px-2 py-1"
-          onClick={() => setViewport(prev => ({ ...prev, scale: clamp(prev.scale * 0.88, 0.35, 2.6) }))}
+          onClick={() => setViewport(prev => ({ ...prev, scale: clamp(prev.scale * ZOOM_OUT_FACTOR, MIN_SCALE, MAX_SCALE) }))}
           type="button"
         >
           Zoom out
         </button>
         <button
           className="rounded-md border border-border px-2 py-1"
-          onClick={() => setViewport({ scale: 1, x: 80, y: 56 })}
+          onClick={() => setViewport(DEFAULT_VIEWPORT)}
           type="button"
         >
           Reset view
@@ -298,6 +318,9 @@ export default function InteractiveRepoGraph({
               const fill = emphasis === 'dim' ? `${palette.fill}66` : palette.fill
               const stroke = emphasis === 'focused' ? '#1d4ed8' : palette.stroke
               const strokeWidth = emphasis === 'focused' ? 3 : emphasis === 'neighbor' ? 2.5 : 2
+              const maxLabelLength = viewport.scale >= 3 ? 56 : viewport.scale >= 2 ? 40 : viewport.scale >= 1.3 ? 30 : 24
+              const label = truncate(node.label, maxLabelLength)
+              const nodeWidth = Math.max(94, Math.min(290, label.length * 6.6 + 30))
 
               return (
                 <g
@@ -306,14 +329,23 @@ export default function InteractiveRepoGraph({
                   onClick={() => onFocusNode(node.id === focusedNodeId ? null : node.id)}
                   transform={`translate(${pos.x}, ${pos.y})`}
                 >
-                  <circle fill={fill} r={18} stroke={stroke} strokeWidth={strokeWidth} />
+                  <rect
+                    fill={fill}
+                    height={34}
+                    rx={10}
+                    stroke={stroke}
+                    strokeWidth={strokeWidth}
+                    width={nodeWidth}
+                    x={-nodeWidth / 2}
+                    y={-17}
+                  />
                   <text
-                    className="fill-foreground text-[10px] font-medium"
+                    className="fill-foreground text-[11px] font-medium"
                     textAnchor="middle"
                     x={0}
-                    y={35}
+                    y={4}
                   >
-                    {truncate(node.label, 24)}
+                    {label}
                   </text>
                   <title>{`${node.label} (${node.type})`}</title>
                 </g>
