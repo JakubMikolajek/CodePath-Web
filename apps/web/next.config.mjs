@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const internalApiBaseUrl = (process.env.INTERNAL_API_BASE_URL ?? 'http://localhost:3001').replace(/\/$/, '')
+
 const nextConfig = {
   transpilePackages: ['@workspace/ui'],
 
@@ -6,7 +8,7 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:3001/api/:path*', // inside container
+        destination: `${internalApiBaseUrl}/api/:path*`,
       },
     ]
   },

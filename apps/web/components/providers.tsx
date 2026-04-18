@@ -1,18 +1,23 @@
 'use client'
 
 import { ThemeProvider as NextThemesProvider } from 'next-themes'
-import { ReactNode } from 'react'
+import type { ReactNode } from 'react'
+import { Provider } from 'react-redux'
+
+import { store } from '@/redux/store'
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <NextThemesProvider
-      attribute="class"
-      defaultTheme="system"
-      enableSystem
-      disableTransitionOnChange
-      enableColorScheme
-    >
-      {children}
-    </NextThemesProvider>
+    <Provider store={store}>
+      <NextThemesProvider
+        attribute="class"
+        defaultTheme="system"
+        disableTransitionOnChange
+        enableColorScheme
+        enableSystem
+      >
+        {children}
+      </NextThemesProvider>
+    </Provider>
   )
 }

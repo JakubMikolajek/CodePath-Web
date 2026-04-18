@@ -3,9 +3,11 @@ import { Button } from '@workspace/ui/components/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@workspace/ui/components/card'
 import { Input } from '@workspace/ui/components/input'
 import { Label } from '@workspace/ui/components/label'
-import { FormEvent, useState } from 'react'
+import type { FormEvent } from 'react'
+import { useState } from 'react'
 
-import { useAuthStore } from '@/store'
+import { useAppDispatch, useAppSelector } from '@/redux/hooks'
+import { clearError, register } from '@/redux/slices/authSlice'
 
 interface RegisterFormProps {
   handleShowRegisterForm: (value: boolean) => void
@@ -18,28 +20,41 @@ interface RegisterFormState {
 }
 
 export default function RegisterForm({ handleShowRegisterForm }: RegisterFormProps) {
-  const { register, loading, error, clearError } = useAuthStore()
+  const dispatch = useAppDispatch()
+  const { error, loading } = useAppSelector(state => state.auth)
+  const [fallbackError, setFallbackError] = useState<null | string>(null)
   const [formData, setFormData] = useState<RegisterFormState>({
     email: '',
     login: '',
-    password: '',
+    password: ''
   })
   const [success, setSuccess] = useState(false)
 
   const handleInputChange = (field: keyof RegisterFormState, value: string) => {
-    if (error) clearError()
+    if (error) dispatch(clearError())
+    if (fallbackError) setFallbackError(null)
     setFormData({ ...formData, [field]: value })
   }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setSuccess(false)
+    setFallbackError(null)
 
-    await register(formData.email, formData.login, formData.password)
-    setSuccess(true)
-    setTimeout(() => {
-      handleShowRegisterForm(false)
-    }, 1500)
+    try {
+      await dispatch(register({
+        email: formData.email,
+        login: formData.login,
+        password: formData.password
+      })).unwrap()
+      setSuccess(true)
+      setTimeout(() => {
+        handleShowRegisterForm(false)
+      }, 1500)
+    } catch (submitError: unknown) {
+      console.error('Registration request failed', submitError)
+      if (!error) setFallbackError('Registration failed')
+    }
   }
 
   return (
@@ -55,6 +70,9 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
               {error && (
                 <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">{error}</div>
               )}
+              {fallbackError && (
+                <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">{fallbackError}</div>
+              )}
               {success && (
                 <div className="p-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md">
                   Registration successful! Redirecting to login...
@@ -63,44 +81,44 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
               <div className="grid gap-3">
                 <Label htmlFor="email">Email</Label>
                 <Input
+                  disabled={loading}
                   id="email"
-                  type="email"
+                  onChange={e => handleInputChange('email', e.target.value)}
                   placeholder="your@email.com"
                   required
+                  type="email"
                   value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  disabled={loading}
                 />
               </div>
               <div className="grid gap-3">
                 <Label htmlFor="login">Login</Label>
                 <Input
+                  disabled={loading}
                   id="login"
-                  type="text"
+                  onChange={e => handleInputChange('login', e.target.value)}
                   placeholder="Choose a username"
                   required
+                  type="text"
                   value={formData.login}
-                  onChange={(e) => handleInputChange('login', e.target.value)}
-                  disabled={loading}
                 />
               </div>
               <div className="grid gap-3">
                 <Label htmlFor="password">Password</Label>
                 <Input
+                  disabled={loading}
                   id="password"
-                  type="password"
+                  onChange={e => handleInputChange('password', e.target.value)}
                   placeholder="Enter your password"
                   required
+                  type="password"
                   value={formData.password}
-                  onChange={(e) => handleInputChange('password', e.target.value)}
-                  disabled={loading}
                 />
               </div>
               <div className="flex flex-col gap-3">
                 <Button
-                  type="submit"
                   className="w-full"
                   disabled={loading || !formData.email || !formData.login || !formData.password}
+                  type="submit"
                 >
                   {loading ? 'Registering...' : 'Register'}
                 </Button>
@@ -109,8 +127,8 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
             <div className="mt-4 text-center text-sm">
               Already have an account?{' '}
               <span
-                onClick={() => handleShowRegisterForm(false)}
                 className="underline underline-offset-4 cursor-pointer hover:text-primary"
+                onClick={() => handleShowRegisterForm(false)}
               >
                 Sign in
               </span>

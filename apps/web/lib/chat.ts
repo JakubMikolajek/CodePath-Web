@@ -1,4 +1,4 @@
-import { ChatSession, SessionDetail } from '@workspace/codepath-common/chat'
+import type { ChatSession, SessionDetail } from '@workspace/codepath-common/chat'
 
 import { apiClient } from '@/lib/api/api'
 

@@ -1,74 +1,67 @@
 'use client'
 
-import { Repository } from '@workspace/codepath-common/repository'
-import { Button } from '@workspace/ui/components/button'
+import type { Repository } from '@workspace/codepath-common/repository'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@workspace/ui/components/collapsible'
 import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubButton,
-  SidebarMenuSubItem,
+  SidebarMenuSubItem
 } from '@workspace/ui/components/sidebar'
 import { ChevronRight, TriangleAlert } from 'lucide-react'
 import Link from 'next/link'
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 
-import PopoverWrapper from '@/components/PopoverWrapper'
-import { useChatStore, useEmbeddingStore, useCollapsibleStore, useGraphsStore } from '@/store'
+import { useAppDispatch, useAppSelector } from '@/redux/hooks'
+import { createSession, getChatSessions } from '@/redux/slices/chatSlice'
+import { setOpenRepoId } from '@/redux/slices/collapsibleSlice'
+import { getGraphs } from '@/redux/slices/graphsSlice'
 
 interface RepoItemProps {
   item: Repository
 }
 
 export default function RepoItem({ item }: RepoItemProps) {
-  const [toEmbedding, setToEmbedding] = useState<boolean>(false)
-  const { shouldBeEmbedded, runEmbedding } = useEmbeddingStore()
-  const { getChatSessions, chatSessions, createSession } = useChatStore()
-  const { isRepoOpen, setOpenRepoId, openRepoId } = useCollapsibleStore()
-  const { graphs, getGraphs } = useGraphsStore()
+  const dispatch = useAppDispatch()
+  const chatSessions = useAppSelector(state => state.chat.chatSessions)
+  const graphs = useAppSelector(state => state.graphs.graphs)
+  const openRepoId = useAppSelector(state => state.collapsible.openRepoId)
 
-  const checkEmbedding = async () => setToEmbedding(await shouldBeEmbedded(item.id))
-  const handleEmbedding = async () => await runEmbedding(item.id)
-  const handleGetChatSessions = async () => await getChatSessions(item.id)
+  const isRepoOpen = openRepoId === item.id
+  const hasPipelineFailure = item.cloneStatus === 'failed'
+    || item.embeddingStatus === 'failed'
+    || item.docsStatus === 'failed'
+  const hasPipelineInProgress = item.cloneStatus === 'pending'
+    || item.cloneStatus === 'cloning'
+    || item.embeddingStatus === 'pending'
+    || item.embeddingStatus === 'processing'
+    || item.docsStatus === 'processing'
 
   const handleOpenChange = (open: boolean) => {
-    setOpenRepoId(open ? item.id : null)
-  }
+    void dispatch(setOpenRepoId(open ? item.id : null))
 
-  useEffect(() => {
-    checkEmbedding()
-  }, [])
-
-  useEffect(() => {
-    if (isRepoOpen(item.id)) {
-      handleGetChatSessions()
-      getGraphs(item.id)
+    if (open) {
+      void dispatch(getChatSessions(item.id))
+      void dispatch(getGraphs(item.id))
     }
-  }, [openRepoId])
+  }
 
   return (
     <Collapsible
-      key={item.id}
       asChild
       className="group/collapsible-main"
-      open={isRepoOpen(item.id)}
+      key={item.id}
       onOpenChange={handleOpenChange}
+      open={isRepoOpen}
     >
       <SidebarMenuItem>
         <CollapsibleTrigger asChild>
           <SidebarMenuButton tooltip={item.name}>
             <div className="flex flex-row gap-1 items-center">
               <span>{item.name}</span>
-              {toEmbedding && (
-                <PopoverWrapper asChild trigger={<TriangleAlert color="orange" />}>
-                  <div className="flex flex-col justify-center items-center gap-2">
-                    <p>Embedding required</p>
-                    <Button onClick={handleEmbedding} variant="outline">
-                      Embed
-                    </Button>
-                  </div>
-                </PopoverWrapper>
+              {(hasPipelineFailure || hasPipelineInProgress) && (
+                <TriangleAlert color={hasPipelineFailure ? 'red' : 'orange'} />
               )}
             </div>
             <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible-main:rotate-90" />
@@ -86,11 +79,14 @@ export default function RepoItem({ item }: RepoItemProps) {
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <SidebarMenuSub>
-                    <SidebarMenuButton asChild onClick={() => createSession(item.id)}>
+                    <SidebarMenuButton asChild onClick={() => {
+                      void dispatch(createSession(item.id))
+                    }}
+                    >
                       <span>New chat</span>
                       {/*<LucideMessagesSquare className="ml-auto h-4 w-4" />*/}
                     </SidebarMenuButton>
-                    {chatSessions.map((session) => (
+                    {chatSessions.map(session => (
                       <SidebarMenuSubItem key={session.sessionId}>
                         <SidebarMenuSubButton asChild>
                           <Link href={`/${item.id}/chat/${session.sessionId}`}>
@@ -127,11 +123,18 @@ export default function RepoItem({ item }: RepoItemProps) {
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <SidebarMenuSub>
-                    {graphs.map((graph) => (
-                      <SidebarMenuSubItem key={graph.fileId}>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild>
+                        <Link href={`/${item.id}/graphs`}>
+                          <span>Interactive graph</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    {graphs.map(graph => (
+                      <SidebarMenuSubItem key={graph.id}>
                         <SidebarMenuSubButton asChild>
                           <Link href={`/${item.id}/graphs/${graph.id}`}>
-                            <span>{graph.fileName}</span>
+                            <span>Legacy: {graph.fileName}</span>
                           </Link>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>

@@ -1,0 +1,11 @@
+.git
+.gitignore
+.idea
+.turbo
+.next
+apps/*/.next
+node_modules
+apps/*/node_modules
+packages/*/node_modules
+storage
+**/.DS_Store

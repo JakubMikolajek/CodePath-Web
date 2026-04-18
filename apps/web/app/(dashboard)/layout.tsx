@@ -1,21 +1,27 @@
 'use server'
 
 import { SidebarInset, SidebarProvider } from '@workspace/ui/components/sidebar'
-import  { ReactNode } from 'react'
+import { cookies } from 'next/headers'
+import type { ReactNode } from 'react'
 
 import AppSidebar from '@/components/AppSideBar'
 import { getCurrentUser } from '@/lib/auth/server'
+import { getRepos } from '@/lib/repos/server'
 
 interface DashboardLayoutProps {
   children: ReactNode
 }
 
 export default async function DashboardLayout({ children }: Readonly<DashboardLayoutProps>) {
-  const me = await getCurrentUser()
+  const cookieStore = await cookies()
+  const cookie = cookieStore.toString()
+
+  const me = await getCurrentUser(cookie)
+  const repos = await getRepos(cookie)
 
   return (
     <SidebarProvider defaultOpen>
-      <AppSidebar me={me} />
+      <AppSidebar fetchedRepos={repos} me={me} />
       <SidebarInset>
         <div className="flex flex-1 flex-col gap-4 p-4 bg-background min-h-screen">{children}</div>
       </SidebarInset>

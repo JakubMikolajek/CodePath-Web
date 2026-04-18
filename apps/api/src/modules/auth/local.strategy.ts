@@ -3,7 +3,6 @@ import { PassportStrategy } from '@nestjs/passport'
 import { Strategy } from 'passport-local'
 
 import { SelectUser } from '../db/schema'
-
 import { AuthService } from './auth.service'
 
 @Injectable()

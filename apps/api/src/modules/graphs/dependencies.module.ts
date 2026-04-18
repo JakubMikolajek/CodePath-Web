@@ -1,17 +1,13 @@
 import { Module } from '@nestjs/common'
-import { TypeOrmModule } from '@nestjs/typeorm'
 
+import { AuthModule } from '../auth/auth.module'
+import { QdrantModule } from '../qdrant/qdrant.module'
 import { DependenciesController } from './dependencies.controller'
 import { DependenciesService } from './dependencies.service'
-import { Dependencies } from './entity/dependencies.entity'
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([
-      Dependencies,
-    ]),
-  ],
   controllers: [DependenciesController],
-  providers: [DependenciesService],
+  imports: [AuthModule, QdrantModule],
+  providers: [DependenciesService]
 })
-export class DependenciesModule {}
+export class DependenciesModule { }

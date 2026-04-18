@@ -1,15 +1,16 @@
 import { Injectable } from '@nestjs/common'
 import { PassportStrategy } from '@nestjs/passport'
-import { GenericNullable } from '@workspace/codepath-common/globals'
+import { Nullable } from '@workspace/codepath-common/globals'
 import { eq } from 'drizzle-orm'
 import { ExtractJwt, Strategy } from 'passport-jwt'
 
+import { env } from '../../config/env'
 import { DbService } from '../db/db.service'
 import { SelectUser, users } from '../db/schema'
 
 interface JWTPayload {
-  sub: number
   email: string
+  sub: number
 }
 
 @Injectable()
@@ -18,8 +19,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private readonly dbService: DbService
   ) {
     super({
+      ignoreExpiration: false,
       jwtFromRequest: ExtractJwt.fromExtractors([
-        (req) => {
+        req => {
           let token = null
 
           if (req && req.cookies) {
@@ -27,14 +29,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           }
 
           return token
-        },
+        }
       ]),
-      ignoreExpiration: false,
-      secretOrKey: 'supersecret',
+      secretOrKey: env.jwtSecret
     })
   }
 
-  async validate(payload: JWTPayload): Promise<GenericNullable<SelectUser>> {
+  async validate(payload: JWTPayload): Promise<Nullable<SelectUser>> {
     const [user] = await this.dbService.dbClient.select()
       .from(users)
       .where(eq(users.id, payload.sub))

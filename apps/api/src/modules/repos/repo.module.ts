@@ -1,18 +1,21 @@
 import { Module } from '@nestjs/common'
 
-import { RepoFetcherService } from './repo-fetcher.service'
+import { AuthModule } from '../auth/auth.module'
+import { RepoStorageModule } from '../repo-storage/repo-storage.module'
 import { RepoController } from './repo.controller'
 import { RepoService } from './repo.service'
+import { RepoFetcherService } from './repo-fetcher.service'
 
 @Module({
   controllers: [RepoController],
-  providers: [
-    RepoService,
-    RepoFetcherService,
-  ],
   exports: [
     RepoService,
-    RepoFetcherService,
+    RepoFetcherService
   ],
+  imports: [RepoStorageModule, AuthModule],
+  providers: [
+    RepoService,
+    RepoFetcherService
+  ]
 })
 export class RepoModule { }

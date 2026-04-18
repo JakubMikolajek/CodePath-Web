@@ -1,17 +1,16 @@
 import { HttpModule } from '@nestjs/axios'
 import { Module } from '@nestjs/common'
 
-import { EmbeddingModule } from '../embedding/embedding.module'
-
+import { AuthModule } from '../auth/auth.module'
 import { ChatController } from './chat.controller'
 import { ChatService } from './chat.service'
 
 @Module({
+  controllers: [ChatController],
   imports: [
     HttpModule,
-    EmbeddingModule,
+    AuthModule
   ],
-  controllers: [ChatController],
-  providers: [ChatService],
+  providers: [ChatService]
 })
 export class ChatModule { }

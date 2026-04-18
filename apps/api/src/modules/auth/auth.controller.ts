@@ -3,65 +3,68 @@ import {
   Controller,
   Get,
   Post,
-  Req, Res,
-  UseGuards,
+  Req,
+  Res,
+  UseGuards
 } from '@nestjs/common'
-import { AuthGuard } from '@nestjs/passport'
-import { Response } from 'express'
+import { FastifyReply } from 'fastify'
 
 import { SelectUser } from '../db/schema'
-
 import { AuthService } from './auth.service'
+import { LoginDto } from './dto/login.dto'
 import { RegisterDto } from './dto/register.dto'
-import { LocalAuthGuard } from './local-auth.guard'
+import { SessionAuthGuard } from './session-auth.guard'
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) { }
 
-  @Post('register')
-  register(@Body() body: RegisterDto) {
-    return this.authService.register(body)
+  @Get('me')
+  @UseGuards(SessionAuthGuard)
+  getMe(@Req() req: { user: SelectUser }) {
+    const { email, id, login } = req.user
+
+    return { email, id, login }
   }
 
-  @UseGuards(LocalAuthGuard)
   @Post('login')
-  login(
-    @Req() req: { user: SelectUser },
-    @Res({ passthrough: true }) res: Response
+  async login(
+    @Body() body: LoginDto,
+    @Res({ passthrough: true }) res: FastifyReply
   ) {
-    const { access_token } = this.authService.login(req.user)
+    const { access_token, expires_in } = await this.authService.loginWithCredentials(
+      body.identifier,
+      body.password
+    )
+    const maxAgeInSeconds = expires_in ?? 7 * 24 * 60 * 60
 
     res.cookie('access_token', access_token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: maxAgeInSeconds,
       path: '/',
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production'
     })
 
     return { message: 'logged_in' }
   }
 
-  @UseGuards(AuthGuard('jwt'))
   @Get('logout')
-  logout(@Res({ passthrough: true }) res: Response) {
+  @UseGuards(SessionAuthGuard)
+  logout(@Res({ passthrough: true }) res: FastifyReply) {
     res.cookie('access_token', '', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
       maxAge: 0,
       path: '/',
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production'
     })
 
     return { message: 'logged_out' }
   }
 
-  @UseGuards(AuthGuard('jwt'))
-  @Get('me')
-  getMe(@Req() req: { user: SelectUser }) {
-    const { id, email, login } = req.user
-
-    return { id, email, login }
+  @Post('register')
+  register(@Body() body: RegisterDto) {
+    return this.authService.register(body)
   }
 }
