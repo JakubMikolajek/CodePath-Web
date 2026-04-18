@@ -15,6 +15,13 @@ interface InteractiveRepoGraphProps {
   onFocusNode: (nodeId: null | string) => void
 }
 
+type LayoutMode = 'coreRings' | 'layered'
+type PositionedGraph = {
+  height: number
+  positions: Map<string, { x: number, y: number }>
+  width: number
+}
+
 const NODE_TYPE_ORDER: RepoGraphNodeType[] = ['repo', 'module', 'file', 'symbol', 'external_package']
 const NODE_TYPE_COLORS: Record<RepoGraphNodeType, { fill: string, stroke: string }> = {
   external_package: { fill: '#fef3c7', stroke: '#f59e0b' },
@@ -32,12 +39,259 @@ const ZOOM_IN_FACTOR = 1.16
 const ZOOM_OUT_FACTOR = 0.86
 const DEFAULT_VIEWPORT = { scale: 1, x: 80, y: 56 }
 
+function buildLayeredLayout(visibleNodes: RepoGraphNode[]): PositionedGraph {
+  const grouped = new Map<RepoGraphNodeType, RepoGraphNode[]>()
+  for (const type of NODE_TYPE_ORDER) {
+    grouped.set(type, [])
+  }
+
+  for (const node of visibleNodes) {
+    grouped.get(node.type)?.push(node)
+  }
+
+  for (const [type, nodes] of grouped.entries()) {
+    grouped.set(type, [...nodes].sort((a, b) => a.label.localeCompare(b.label)))
+  }
+
+  const positions = new Map<string, { x: number, y: number }>()
+  const targetRowsPerColumn = clamp(Math.round(Math.sqrt(Math.max(visibleNodes.length, 1)) * 1.55), 8, 26)
+  const rowGap = 88
+  const innerColumnGap = 220
+  const typeGap = 120
+  const minTypeWidth = 250
+  const baseX = 120
+  const baseY = 110
+
+  let maxRowsInColumn = 1
+  let currentX = baseX
+
+  NODE_TYPE_ORDER.forEach(type => {
+    const nodes = grouped.get(type) ?? []
+    const columns = Math.max(1, Math.ceil(nodes.length / targetRowsPerColumn))
+    maxRowsInColumn = Math.max(maxRowsInColumn, Math.min(nodes.length, targetRowsPerColumn))
+
+    nodes.forEach((node, index) => {
+      const columnIndex = Math.floor(index / targetRowsPerColumn)
+      const rowIndex = index % targetRowsPerColumn
+      positions.set(node.id, {
+        x: currentX + columnIndex * innerColumnGap,
+        y: baseY + rowIndex * rowGap
+      })
+    })
+
+    const typeWidth = Math.max(minTypeWidth, (columns - 1) * innerColumnGap + minTypeWidth)
+    currentX += typeWidth + typeGap
+  })
+
+  const width = Math.max(1480, currentX + 220)
+  const height = Math.max(860, baseY + maxRowsInColumn * rowGap + 220)
+
+  return {
+    height,
+    positions,
+    width
+  }
+}
+
+function buildCoreRingsLayout(visibleNodes: RepoGraphNode[], visibleEdges: RepoGraphEdge[]): PositionedGraph {
+  if (visibleNodes.length === 0) {
+    return {
+      height: 860,
+      positions: new Map(),
+      width: 1480
+    }
+  }
+
+  const nodeById = new Map(visibleNodes.map(node => [node.id, node]))
+  const adjacency = new Map<string, Set<string>>()
+  visibleNodes.forEach(node => adjacency.set(node.id, new Set()))
+
+  for (const edge of visibleEdges) {
+    if (!adjacency.has(edge.source) || !adjacency.has(edge.target)) {
+      continue
+    }
+    adjacency.get(edge.source)?.add(edge.target)
+    adjacency.get(edge.target)?.add(edge.source)
+  }
+
+  const typePriority: Record<RepoGraphNodeType, number> = {
+    external_package: 1,
+    file: 3,
+    module: 6,
+    repo: 9,
+    symbol: 2
+  }
+
+  const nodeScore = (node: RepoGraphNode) => {
+    const degree = adjacency.get(node.id)?.size ?? 0
+    return degree * 3 + (typePriority[node.type] ?? 0)
+  }
+
+  const coreCount = Math.min(
+    visibleNodes.length,
+    clamp(Math.round(Math.sqrt(Math.max(visibleNodes.length, 1))), 1, 14)
+  )
+  const sortedByScore = [...visibleNodes].sort((a, b) => {
+    const scoreDelta = nodeScore(b) - nodeScore(a)
+    if (scoreDelta !== 0) {
+      return scoreDelta
+    }
+    return a.label.localeCompare(b.label)
+  })
+
+  const coreIds = new Set(sortedByScore.slice(0, coreCount).map(node => node.id))
+  const repoNode = visibleNodes.find(node => node.type === 'repo')
+  if (repoNode) {
+    coreIds.add(repoNode.id)
+  }
+
+  while (coreIds.size > coreCount) {
+    const removable = [...coreIds]
+      .map(id => nodeById.get(id))
+      .filter((node): node is RepoGraphNode => node !== undefined && node.id !== repoNode?.id)
+      .sort((a, b) => {
+        const scoreDelta = nodeScore(a) - nodeScore(b)
+        if (scoreDelta !== 0) {
+          return scoreDelta
+        }
+        return a.label.localeCompare(b.label)
+      })[0]
+
+    if (!removable) {
+      break
+    }
+    coreIds.delete(removable.id)
+  }
+
+  const depthByNode = new Map<string, number>()
+  const bfsQueue: string[] = [...coreIds]
+  for (const id of coreIds) {
+    depthByNode.set(id, 0)
+  }
+
+  while (bfsQueue.length > 0) {
+    const currentId = bfsQueue.shift()
+    if (!currentId) {
+      break
+    }
+
+    const currentDepth = depthByNode.get(currentId) ?? 0
+    const neighbors = adjacency.get(currentId)
+    if (!neighbors) {
+      continue
+    }
+
+    for (const neighborId of neighbors) {
+      if (depthByNode.has(neighborId)) {
+        continue
+      }
+      depthByNode.set(neighborId, currentDepth + 1)
+      bfsQueue.push(neighborId)
+    }
+  }
+
+  let maxDepth = 0
+  for (const value of depthByNode.values()) {
+    maxDepth = Math.max(maxDepth, value)
+  }
+
+  const fallbackDepth = maxDepth + 1
+  const rings = new Map<number, RepoGraphNode[]>()
+  for (const node of visibleNodes) {
+    const depth = depthByNode.get(node.id) ?? fallbackDepth
+    if (!rings.has(depth)) {
+      rings.set(depth, [])
+    }
+    rings.get(depth)?.push(node)
+  }
+
+  const typeOrder = new Map<RepoGraphNodeType, number>()
+  NODE_TYPE_ORDER.forEach((type, index) => typeOrder.set(type, index))
+
+  for (const [depth, nodes] of rings.entries()) {
+    rings.set(depth, [...nodes].sort((a, b) => {
+      const typeDelta = (typeOrder.get(a.type) ?? 99) - (typeOrder.get(b.type) ?? 99)
+      if (typeDelta !== 0) {
+        return typeDelta
+      }
+      return a.label.localeCompare(b.label)
+    }))
+  }
+
+  const relativePositions = new Map<string, { x: number, y: number }>()
+  const sortedRingDepths = [...rings.keys()].sort((a, b) => a - b)
+  const coreNodes = rings.get(0) ?? []
+
+  if (coreNodes.length === 1) {
+    relativePositions.set(coreNodes[0].id, { x: 0, y: 0 })
+  } else if (coreNodes.length > 1) {
+    const coreRadius = 92
+    coreNodes.forEach((node, index) => {
+      const angle = (2 * Math.PI * index) / coreNodes.length - Math.PI / 2
+      relativePositions.set(node.id, {
+        x: Math.cos(angle) * coreRadius,
+        y: Math.sin(angle) * coreRadius
+      })
+    })
+  }
+
+  const firstRingRadius = coreNodes.length > 0 ? 230 : 140
+  const ringGap = 165
+
+  sortedRingDepths
+    .filter(depth => depth > 0)
+    .forEach(depth => {
+      const nodes = rings.get(depth) ?? []
+      if (nodes.length === 0) {
+        return
+      }
+
+      const radius = firstRingRadius + (depth - 1) * ringGap
+      nodes.forEach((node, index) => {
+        const angleOffset = depth % 2 === 0 ? Math.PI / nodes.length : 0
+        const angle = (2 * Math.PI * index) / nodes.length + angleOffset - Math.PI / 2
+        relativePositions.set(node.id, {
+          x: Math.cos(angle) * radius,
+          y: Math.sin(angle) * radius
+        })
+      })
+    })
+
+  let maxAbsX = 0
+  let maxAbsY = 0
+  for (const pos of relativePositions.values()) {
+    maxAbsX = Math.max(maxAbsX, Math.abs(pos.x))
+    maxAbsY = Math.max(maxAbsY, Math.abs(pos.y))
+  }
+
+  const width = Math.max(1480, Math.round((maxAbsX + 260) * 2))
+  const height = Math.max(860, Math.round((maxAbsY + 260) * 2))
+  const centerX = width / 2
+  const centerY = height / 2
+
+  const positions = new Map<string, { x: number, y: number }>()
+  for (const node of visibleNodes) {
+    const relative = relativePositions.get(node.id) ?? { x: 0, y: 0 }
+    positions.set(node.id, {
+      x: centerX + relative.x,
+      y: centerY + relative.y
+    })
+  }
+
+  return {
+    height,
+    positions,
+    width
+  }
+}
+
 export default function InteractiveRepoGraph({
   collapsedModuleIds,
   focusedNodeId,
   graph,
   onFocusNode
 }: InteractiveRepoGraphProps) {
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>('coreRings')
   const [viewport, setViewport] = useState(DEFAULT_VIEWPORT)
   const [dragStart, setDragStart] = useState<null | { pointerX: number, pointerY: number, startX: number, startY: number }>(null)
 
@@ -68,58 +322,11 @@ export default function InteractiveRepoGraph({
   }, [graph.edges, visibleNodeIdSet])
 
   const positioned = useMemo(() => {
-    const grouped = new Map<RepoGraphNodeType, RepoGraphNode[]>()
-    for (const type of NODE_TYPE_ORDER) {
-      grouped.set(type, [])
+    if (layoutMode === 'coreRings') {
+      return buildCoreRingsLayout(visibleNodes, visibleEdges)
     }
-
-    for (const node of visibleNodes) {
-      grouped.get(node.type)?.push(node)
-    }
-
-    for (const [type, nodes] of grouped.entries()) {
-      grouped.set(type, [...nodes].sort((a, b) => a.label.localeCompare(b.label)))
-    }
-
-    const positions = new Map<string, { x: number, y: number }>()
-    const targetRowsPerColumn = clamp(Math.round(Math.sqrt(Math.max(visibleNodes.length, 1)) * 1.55), 8, 26)
-    const rowGap = 88
-    const innerColumnGap = 220
-    const typeGap = 120
-    const minTypeWidth = 250
-    const baseX = 120
-    const baseY = 110
-
-    let maxRowsInColumn = 1
-    let currentX = baseX
-
-    NODE_TYPE_ORDER.forEach(type => {
-      const nodes = grouped.get(type) ?? []
-      const columns = Math.max(1, Math.ceil(nodes.length / targetRowsPerColumn))
-      maxRowsInColumn = Math.max(maxRowsInColumn, Math.min(nodes.length, targetRowsPerColumn))
-
-      nodes.forEach((node, index) => {
-        const columnIndex = Math.floor(index / targetRowsPerColumn)
-        const rowIndex = index % targetRowsPerColumn
-        positions.set(node.id, {
-          x: currentX + columnIndex * innerColumnGap,
-          y: baseY + rowIndex * rowGap
-        })
-      })
-
-      const typeWidth = Math.max(minTypeWidth, (columns - 1) * innerColumnGap + minTypeWidth)
-      currentX += typeWidth + typeGap
-    })
-
-    const width = Math.max(1480, currentX + 220)
-    const height = Math.max(860, baseY + maxRowsInColumn * rowGap + 220)
-
-    return {
-      height,
-      positions,
-      width
-    }
-  }, [visibleNodes])
+    return buildLayeredLayout(visibleNodes)
+  }, [layoutMode, visibleEdges, visibleNodes])
 
   const focusedNeighborIds = useMemo(() => {
     if (!focusedNodeId) {
@@ -236,6 +443,31 @@ export default function InteractiveRepoGraph({
           type="button"
         >
           Clear focus
+        </button>
+        <span className="text-muted-foreground">Layout:</span>
+        <button
+          aria-pressed={layoutMode === 'coreRings'}
+          className={`rounded-md border px-2 py-1 ${
+            layoutMode === 'coreRings'
+              ? 'border-primary/60 bg-primary/10 text-primary'
+              : 'border-border'
+          }`}
+          onClick={() => setLayoutMode('coreRings')}
+          type="button"
+        >
+          Core Rings
+        </button>
+        <button
+          aria-pressed={layoutMode === 'layered'}
+          className={`rounded-md border px-2 py-1 ${
+            layoutMode === 'layered'
+              ? 'border-primary/60 bg-primary/10 text-primary'
+              : 'border-border'
+          }`}
+          onClick={() => setLayoutMode('layered')}
+          type="button"
+        >
+          Layered
         </button>
         <span className="text-muted-foreground">Nodes: {visibleNodes.length}</span>
         <span className="text-muted-foreground">Edges: {visibleEdges.length}</span>
