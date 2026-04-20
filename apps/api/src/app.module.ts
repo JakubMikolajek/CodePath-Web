@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { ScheduleModule } from '@nestjs/schedule'
 
+import { ApiExplorerModule } from './modules/api-explorer/api-explorer.module'
 import { AuthModule } from './modules/auth/auth.module'
 import { ChatModule } from './modules/chat/chat.module'
 import { DbModule } from './modules/db/db.module'
@@ -13,6 +14,7 @@ import { RepoModule } from './modules/repos/repo.module'
   imports: [
     ScheduleModule.forRoot(),
     DbModule,
+    ApiExplorerModule,
     ChatModule,
     RepoModule,
     AuthModule,
