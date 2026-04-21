@@ -1,6 +1,9 @@
 import { NotFoundException } from '@nestjs/common'
+import axios from 'axios'
 
 import { ApiExplorerService } from './api-explorer.service'
+
+jest.mock('axios')
 
 function createDbMocks(repo: null | { id: number, name: string }) {
   const limitMock = jest.fn().mockResolvedValue(repo ? [repo] : [])
@@ -27,6 +30,10 @@ function createDbMocks(repo: null | { id: number, name: string }) {
 }
 
 describe('ApiExplorerService', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
   it('extracts NestJS endpoints from qdrant segments', async () => {
     const { dbService } = createDbMocks({ id: 10, name: 'repo-alpha' })
     const qdrantService = {
@@ -135,6 +142,53 @@ describe('ApiExplorerService', () => {
     expect(spec.paths['/users/{id}']?.get).toBeDefined()
     expect(spec.paths['/users']?.post?.requestBody).toBeDefined()
     expect(spec.paths['/users/{id}']?.get?.parameters?.some(param => param.in === 'path' && param.name === 'id')).toBe(true)
+  })
+
+  it('rejects runner calls to public internet URLs', async () => {
+    const { dbService } = createDbMocks({ id: 40, name: 'repo-runner' })
+    const qdrantService = {
+      scroll: jest.fn()
+    }
+    const service = new ApiExplorerService(dbService as never, qdrantService as never)
+
+    await expect(service.runApiRequest(1, 40, {
+      method: 'GET',
+      url: 'https://example.com/api/health'
+    })).rejects.toThrow('localhost or private LAN')
+
+    expect(axios.request).not.toHaveBeenCalled()
+  })
+
+  it('executes runner call for localhost URL', async () => {
+    const { dbService } = createDbMocks({ id: 41, name: 'repo-runner-local' })
+    const qdrantService = {
+      scroll: jest.fn()
+    }
+    const service = new ApiExplorerService(dbService as never, qdrantService as never)
+
+    jest.mocked(axios.request).mockResolvedValue({
+      data: Buffer.from(JSON.stringify({ ok: true }), 'utf8'),
+      headers: {
+        'content-type': 'application/json'
+      },
+      status: 200,
+      statusText: 'OK'
+    } as never)
+
+    const response = await service.runApiRequest(1, 41, {
+      method: 'POST',
+      url: 'http://127.0.0.1:4000/api/test',
+      body: { hello: 'world' },
+      headers: {
+        'X-Test': '1'
+      },
+      timeoutMs: 2500
+    })
+
+    expect(response.ok).toBe(true)
+    expect(response.status).toBe(200)
+    expect(response.data).toEqual({ ok: true })
+    expect(axios.request).toHaveBeenCalledTimes(1)
   })
 
   it('throws not found when repo does not belong to user', async () => {

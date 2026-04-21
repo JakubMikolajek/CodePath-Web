@@ -2,7 +2,7 @@ import type { InferInsertModel, InferSelectModel } from 'drizzle-orm'
 import { relations } from 'drizzle-orm'
 import { foreignKey, integer, pgEnum, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core'
 
-import { chatSessions, dependencies, files, users } from './index'
+import { apiRunnerCollections, chatSessions, dependencies, files, users } from './index'
 
 export const repoCloneStatusEnum = pgEnum('repo_clone_status', ['pending', 'cloning', 'cloned', 'failed'])
 export const repoEmbeddingStatusEnum = pgEnum('repo_embedding_status', ['pending', 'processing', 'embedded', 'failed'])
@@ -39,6 +39,7 @@ export const repos = pgTable('repos', {
 ])
 
 export const reposRelations = relations(repos, ({ many, one }) => ({
+  apiRunnerCollections: many(apiRunnerCollections),
   chatSessions: many(chatSessions),
   dependencies: many(dependencies),
   files: many(files),

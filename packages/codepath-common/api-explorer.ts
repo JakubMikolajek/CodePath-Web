@@ -95,3 +95,60 @@ export interface RepoOpenApiDocument {
   openapi: '3.1.0'
   paths: Record<string, Partial<Record<RepoOpenApiOperationMethod, RepoOpenApiOperation>>>
 }
+
+export interface RepoApiRunnerRequest {
+  body?: unknown
+  headers?: Record<string, string>
+  method: RepoApiHttpMethod
+  timeoutMs?: number
+  url: string
+}
+
+export interface RepoApiRunnerResponse {
+  data: unknown
+  durationMs: number
+  headers: Record<string, string>
+  ok: boolean
+  status: number
+  statusText: string
+  url: string
+}
+
+export type RepoApiRunnerAuthMode = 'apiKey' | 'basic' | 'bearer' | 'none'
+export type RepoApiRunnerApiKeyPlacement = 'header' | 'query'
+
+export interface RepoApiRunnerAuthConfig {
+  apiKeyName: string
+  apiKeyPlacement: RepoApiRunnerApiKeyPlacement
+  apiKeyValue: string
+  basicPassword: string
+  basicUsername: string
+  bearerToken: string
+  mode: RepoApiRunnerAuthMode
+}
+
+export interface RepoApiRunnerCollectionConfig {
+  auth: RepoApiRunnerAuthConfig
+  baseUrl: string
+  bodyJson: string
+  endpointId: null | string
+  endpointMethod: null | RepoApiHttpMethod
+  endpointPath: null | string
+  headersJson: string
+  pathValues: Record<string, string>
+  queryJson: string
+  timeoutMs: number
+}
+
+export interface RepoApiRunnerCollection {
+  config: RepoApiRunnerCollectionConfig
+  createdAt: string
+  id: number
+  name: string
+  updatedAt: string
+}
+
+export interface RepoApiRunnerSaveCollectionRequest {
+  config: RepoApiRunnerCollectionConfig
+  name: string
+}

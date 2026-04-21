@@ -1,6 +1,11 @@
 import type {
   RepoApiFramework,
   RepoApiHttpMethod,
+  RepoApiRunnerCollection,
+  RepoApiRunnerCollectionConfig,
+  RepoApiRunnerRequest,
+  RepoApiRunnerResponse,
+  RepoApiRunnerSaveCollectionRequest,
   RepoInteractiveApi,
   RepoOpenApiDocument
 } from '@workspace/codepath-common/api-explorer'
@@ -41,4 +46,35 @@ export async function getRepoOpenApiSpec(repoId: number, filters?: InteractiveAp
       search: filters?.search?.trim() || undefined
     }
   })
+}
+
+export async function runRepoApiRequest(repoId: number, payload: RepoApiRunnerRequest) {
+  return await apiClient.post<RepoApiRunnerResponse, RepoApiRunnerRequest>(`/api-explorer/${repoId}/run`, payload)
+}
+
+export async function listRepoRunnerCollections(repoId: number) {
+  return await apiClient.get<RepoApiRunnerCollection[]>(`/api-explorer/${repoId}/collections`)
+}
+
+export async function saveRepoRunnerCollection(repoId: number, payload: RepoApiRunnerSaveCollectionRequest) {
+  return await apiClient.post<RepoApiRunnerCollection, RepoApiRunnerSaveCollectionRequest>(
+    `/api-explorer/${repoId}/collections`,
+    payload
+  )
+}
+
+export async function deleteRepoRunnerCollection(repoId: number, collectionId: number) {
+  return await apiClient.delete<{ id: number, ok: true }>(`/api-explorer/${repoId}/collections/${collectionId}`)
+}
+
+export function createDefaultRunnerAuthConfig(): RepoApiRunnerCollectionConfig['auth'] {
+  return {
+    apiKeyName: 'x-api-key',
+    apiKeyPlacement: 'header',
+    apiKeyValue: '',
+    basicPassword: '',
+    basicUsername: '',
+    bearerToken: '',
+    mode: 'none'
+  }
 }

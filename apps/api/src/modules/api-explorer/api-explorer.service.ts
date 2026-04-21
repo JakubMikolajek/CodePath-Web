@@ -1,22 +1,30 @@
 import { posix as pathPosix } from 'node:path'
 
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import type {
   RepoApiEndpoint,
   RepoApiEndpointParameter,
   RepoApiFramework,
   RepoApiHttpMethod,
+  RepoApiRunnerAuthMode,
   RepoInteractiveApi,
+  RepoApiRunnerCollection,
+  RepoApiRunnerCollectionConfig,
+  RepoApiRunnerRequest,
+  RepoApiRunnerResponse,
+  RepoApiRunnerSaveCollectionRequest,
   RepoOpenApiDocument,
   RepoOpenApiOperation,
+  RepoOpenApiParameter,
   RepoOpenApiOperationMethod,
   RepoOpenApiSourceMetadata
 } from '@workspace/codepath-common/api-explorer'
-import { and, eq } from 'drizzle-orm'
+import axios from 'axios'
+import { and, desc, eq } from 'drizzle-orm'
 
 import { env } from '../../config/env'
 import { DbService } from '../db/db.service'
-import { repos } from '../db/schema'
+import { apiRunnerCollections, repos } from '../db/schema'
 import { QdrantService } from '../qdrant/qdrant.service'
 
 interface ApiExplorerQuery {
@@ -77,6 +85,12 @@ const METHOD_TO_OPENAPI: Record<RepoApiHttpMethod, RepoOpenApiOperationMethod> =
   POST: 'post',
   PUT: 'put'
 }
+
+const RUNNER_DEFAULT_TIMEOUT_MS = 10_000
+const RUNNER_MAX_TIMEOUT_MS = 30_000
+const RUNNER_MAX_RESPONSE_BYTES = 1_000_000
+const RUNNER_COLLECTION_NAME_MAX_LENGTH = 120
+const RUNNER_AUTH_MODES: RepoApiRunnerAuthMode[] = ['none', 'bearer', 'basic', 'apiKey']
 
 @Injectable()
 export class ApiExplorerService {
@@ -212,6 +226,161 @@ export class ApiExplorerService {
       },
       openapi: '3.1.0',
       paths
+    }
+  }
+
+  async runApiRequest(
+    userId: number,
+    repoId: number,
+    input: RepoApiRunnerRequest
+  ): Promise<RepoApiRunnerResponse> {
+    await this.assertRepoOwnership(userId, repoId)
+
+    const method = this.assertMethod(input.method)
+    if (!method) {
+      throw new BadRequestException('Unsupported HTTP method')
+    }
+
+    const targetUrl = this.normalizeRunnerUrl(input.url)
+    if (!this.isAllowedRunnerTarget(targetUrl)) {
+      throw new BadRequestException(
+        'Target URL must be localhost or private LAN address (10.x, 172.16-31.x, 192.168.x)'
+      )
+    }
+
+    const timeoutMs = this.normalizeRunnerTimeout(input.timeoutMs)
+    const headers = this.normalizeRunnerHeaders(input.headers)
+    if (['POST', 'PUT', 'PATCH'].includes(method) && !headers['content-type']) {
+      headers['content-type'] = 'application/json'
+    }
+    if (!headers.accept) {
+      headers.accept = 'application/json'
+    }
+
+    const startedAt = Date.now()
+
+    try {
+      const response = await axios.request<ArrayBuffer>({
+        data: ['GET', 'HEAD'].includes(method) ? undefined : input.body,
+        headers,
+        maxBodyLength: RUNNER_MAX_RESPONSE_BYTES,
+        maxContentLength: RUNNER_MAX_RESPONSE_BYTES,
+        method,
+        responseType: 'arraybuffer',
+        timeout: timeoutMs,
+        url: targetUrl,
+        validateStatus: () => true
+      })
+
+      const durationMs = Date.now() - startedAt
+      const responseHeaders = this.toPlainHeaders(response.headers)
+      const contentType = responseHeaders['content-type'] ?? ''
+      const data = this.decodeRunnerResponseBody(response.data, contentType)
+
+      return {
+        data,
+        durationMs,
+        headers: responseHeaders,
+        ok: response.status >= 200 && response.status < 300,
+        status: response.status,
+        statusText: response.statusText ?? '',
+        url: targetUrl
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      throw new BadRequestException(`Runner request failed: ${message}`)
+    }
+  }
+
+  async deleteRunnerCollection(userId: number, repoId: number, collectionId: number) {
+    await this.assertRepoOwnership(userId, repoId)
+
+    const [deleted] = await this.dbService.dbClient.delete(apiRunnerCollections)
+      .where(and(
+        eq(apiRunnerCollections.id, collectionId),
+        eq(apiRunnerCollections.repoId, repoId),
+        eq(apiRunnerCollections.userId, userId)
+      ))
+      .returning({ id: apiRunnerCollections.id })
+
+    if (!deleted) {
+      throw new NotFoundException('Runner collection not found')
+    }
+
+    return {
+      id: deleted.id,
+      ok: true as const
+    }
+  }
+
+  async listRunnerCollections(userId: number, repoId: number): Promise<RepoApiRunnerCollection[]> {
+    await this.assertRepoOwnership(userId, repoId)
+
+    const rows = await this.dbService.dbClient.select({
+      config: apiRunnerCollections.config,
+      createdAt: apiRunnerCollections.createdAt,
+      id: apiRunnerCollections.id,
+      name: apiRunnerCollections.name,
+      updatedAt: apiRunnerCollections.updatedAt
+    })
+      .from(apiRunnerCollections)
+      .where(and(
+        eq(apiRunnerCollections.repoId, repoId),
+        eq(apiRunnerCollections.userId, userId)
+      ))
+      .orderBy(desc(apiRunnerCollections.updatedAt))
+
+    return rows.map(row => ({
+      config: row.config,
+      createdAt: row.createdAt,
+      id: row.id,
+      name: row.name,
+      updatedAt: row.updatedAt
+    }))
+  }
+
+  async saveRunnerCollection(
+    userId: number,
+    repoId: number,
+    input: RepoApiRunnerSaveCollectionRequest
+  ): Promise<RepoApiRunnerCollection> {
+    await this.assertRepoOwnership(userId, repoId)
+
+    const name = this.normalizeCollectionName(input.name)
+    const config = this.normalizeCollectionConfig(input.config)
+
+    const [saved] = await this.dbService.dbClient.insert(apiRunnerCollections)
+      .values({
+        config,
+        name,
+        repoId,
+        userId
+      })
+      .onConflictDoUpdate({
+        target: [
+          apiRunnerCollections.repoId,
+          apiRunnerCollections.userId,
+          apiRunnerCollections.name
+        ],
+        set: {
+          config,
+          updatedAt: new Date().toISOString()
+        }
+      })
+      .returning({
+        config: apiRunnerCollections.config,
+        createdAt: apiRunnerCollections.createdAt,
+        id: apiRunnerCollections.id,
+        name: apiRunnerCollections.name,
+        updatedAt: apiRunnerCollections.updatedAt
+      })
+
+    return {
+      config: saved.config,
+      createdAt: saved.createdAt,
+      id: saved.id,
+      name: saved.name,
+      updatedAt: saved.updatedAt
     }
   }
 
@@ -724,6 +893,224 @@ export class ApiExplorerService {
     return normalized
   }
 
+  private decodeRunnerResponseBody(data: ArrayBuffer, contentType: string) {
+    const buffer = Buffer.from(data)
+    const normalizedContentType = contentType.toLowerCase()
+
+    if (normalizedContentType.includes('application/json')) {
+      try {
+        return JSON.parse(buffer.toString('utf8'))
+      } catch {
+        return buffer.toString('utf8')
+      }
+    }
+
+    if (
+      normalizedContentType.startsWith('text/')
+      || normalizedContentType.includes('xml')
+      || normalizedContentType.includes('html')
+      || normalizedContentType.includes('javascript')
+    ) {
+      return buffer.toString('utf8')
+    }
+
+    return {
+      base64: buffer.toString('base64'),
+      bytes: buffer.byteLength,
+      contentType: contentType || 'application/octet-stream'
+    }
+  }
+
+  private isAllowedRunnerTarget(urlString: string) {
+    let parsed: URL
+    try {
+      parsed = new URL(urlString)
+    } catch {
+      return false
+    }
+
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return false
+    }
+
+    const hostname = parsed.hostname.toLowerCase()
+    if (['localhost', '127.0.0.1', '::1'].includes(hostname)) {
+      return true
+    }
+
+    if (hostname.endsWith('.local') || hostname.endsWith('.lan')) {
+      return true
+    }
+
+    if (!hostname.includes('.')) {
+      // Single-label hostnames on local network (for example: raspberrypi).
+      return true
+    }
+
+    return this.isPrivateIpv4Host(hostname)
+  }
+
+  private isPrivateIpv4Host(hostname: string) {
+    const octets = hostname.split('.').map(value => Number.parseInt(value, 10))
+    if (octets.length !== 4 || octets.some(value => !Number.isInteger(value) || value < 0 || value > 255)) {
+      return false
+    }
+
+    const [first, second] = octets
+    if (first === 10) {
+      return true
+    }
+
+    if (first === 192 && second === 168) {
+      return true
+    }
+
+    if (first === 172 && second >= 16 && second <= 31) {
+      return true
+    }
+
+    return false
+  }
+
+  private normalizeRunnerHeaders(headers?: Record<string, string>) {
+    const normalized: Record<string, string> = {}
+    if (!headers || typeof headers !== 'object') {
+      return normalized
+    }
+
+    for (const [rawKey, rawValue] of Object.entries(headers)) {
+      const key = rawKey.trim().toLowerCase()
+      if (!key || ['connection', 'content-length', 'host'].includes(key)) {
+        continue
+      }
+
+      const value = typeof rawValue === 'string' ? rawValue.trim() : String(rawValue)
+      if (!value) {
+        continue
+      }
+
+      normalized[key] = value
+    }
+
+    return normalized
+  }
+
+  private normalizeRunnerTimeout(timeoutMs?: number) {
+    if (!Number.isFinite(timeoutMs)) {
+      return RUNNER_DEFAULT_TIMEOUT_MS
+    }
+
+    return Math.min(RUNNER_MAX_TIMEOUT_MS, Math.max(1_000, Math.trunc(timeoutMs as number)))
+  }
+
+  private normalizeRunnerUrl(url: string) {
+    if (typeof url !== 'string' || !url.trim()) {
+      throw new BadRequestException('Runner URL is required')
+    }
+
+    try {
+      return new URL(url.trim()).toString()
+    } catch {
+      throw new BadRequestException('Runner URL is invalid')
+    }
+  }
+
+  private toPlainHeaders(headers: unknown) {
+    const normalized: Record<string, string> = {}
+    if (!headers || typeof headers !== 'object') {
+      return normalized
+    }
+
+    for (const [rawKey, rawValue] of Object.entries(headers)) {
+      const key = rawKey.toLowerCase()
+      if (!key) {
+        continue
+      }
+
+      if (Array.isArray(rawValue)) {
+        normalized[key] = rawValue.map(value => String(value)).join(', ')
+        continue
+      }
+
+      if (typeof rawValue === 'string') {
+        normalized[key] = rawValue
+        continue
+      }
+
+      if (rawValue === undefined || rawValue === null) {
+        continue
+      }
+
+      normalized[key] = String(rawValue)
+    }
+
+    return normalized
+  }
+
+  private normalizeCollectionConfig(config: RepoApiRunnerCollectionConfig): RepoApiRunnerCollectionConfig {
+    if (!config || typeof config !== 'object') {
+      throw new BadRequestException('Collection config is required')
+    }
+
+    const safeAuth = config.auth && typeof config.auth === 'object'
+      ? config.auth
+      : {
+          apiKeyName: 'x-api-key',
+          apiKeyPlacement: 'header',
+          apiKeyValue: '',
+          basicPassword: '',
+          basicUsername: '',
+          bearerToken: '',
+          mode: 'none'
+        }
+
+    const timeoutMs = Number.isFinite(config.timeoutMs)
+      ? Math.min(RUNNER_MAX_TIMEOUT_MS, Math.max(1_000, Math.trunc(config.timeoutMs)))
+      : RUNNER_DEFAULT_TIMEOUT_MS
+
+    const rawMode = String(safeAuth.mode ?? '')
+    const mode: RepoApiRunnerAuthMode = RUNNER_AUTH_MODES.includes(rawMode as RepoApiRunnerAuthMode)
+      ? (rawMode as RepoApiRunnerAuthMode)
+      : 'none'
+
+    return {
+      auth: {
+        apiKeyName: String(safeAuth.apiKeyName ?? 'x-api-key'),
+        apiKeyPlacement: safeAuth.apiKeyPlacement === 'query' ? 'query' : 'header',
+        apiKeyValue: String(safeAuth.apiKeyValue ?? ''),
+        basicPassword: String(safeAuth.basicPassword ?? ''),
+        basicUsername: String(safeAuth.basicUsername ?? ''),
+        bearerToken: String(safeAuth.bearerToken ?? ''),
+        mode
+      },
+      baseUrl: String(config.baseUrl ?? ''),
+      bodyJson: String(config.bodyJson ?? '{}'),
+      endpointId: config.endpointId ? String(config.endpointId) : null,
+      endpointMethod: this.assertMethod(String(config.endpointMethod ?? '')) ?? null,
+      endpointPath: config.endpointPath ? String(config.endpointPath) : null,
+      headersJson: String(config.headersJson ?? '{}'),
+      pathValues: typeof config.pathValues === 'object' && config.pathValues !== null
+        ? Object.fromEntries(
+            Object.entries(config.pathValues).map(([key, value]) => [String(key), String(value)])
+          )
+        : {},
+      queryJson: String(config.queryJson ?? '{}'),
+      timeoutMs
+    }
+  }
+
+  private normalizeCollectionName(name: string) {
+    const normalizedName = typeof name === 'string' ? name.trim() : ''
+    if (!normalizedName) {
+      throw new BadRequestException('Collection name is required')
+    }
+    if (normalizedName.length > RUNNER_COLLECTION_NAME_MAX_LENGTH) {
+      throw new BadRequestException(`Collection name max length is ${RUNNER_COLLECTION_NAME_MAX_LENGTH}`)
+    }
+
+    return normalizedName
+  }
+
   private mergeOperationSources(existing: RepoOpenApiOperation, nextOperation: RepoOpenApiOperation) {
     const allSources: RepoOpenApiSourceMetadata[] = []
 
@@ -755,8 +1142,12 @@ export class ApiExplorerService {
   }
 
   private toOpenApiOperation(endpoint: RepoApiEndpoint, openApiPath: string): RepoOpenApiOperation {
-    const parameters = endpoint.params
-      .filter(param => param.location !== 'body')
+    const parameters: RepoOpenApiParameter[] = endpoint.params
+      .filter(
+        (
+          param
+        ): param is RepoApiEndpointParameter & { location: 'header' | 'path' | 'query' } => param.location !== 'body'
+      )
       .map(param => ({
         in: param.location,
         name: param.name,
