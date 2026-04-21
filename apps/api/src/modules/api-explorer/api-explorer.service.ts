@@ -6,12 +6,15 @@ import type {
   RepoApiEndpointParameter,
   RepoApiFramework,
   RepoApiHttpMethod,
+  RepoApiRunnerAuthConfig,
   RepoApiRunnerAuthMode,
+  RepoApiRunnerAuthPreset,
   RepoInteractiveApi,
   RepoApiRunnerCollection,
   RepoApiRunnerCollectionConfig,
   RepoApiRunnerRequest,
   RepoApiRunnerResponse,
+  RepoApiRunnerSaveAuthPresetRequest,
   RepoApiRunnerSaveCollectionRequest,
   RepoOpenApiDocument,
   RepoOpenApiOperation,
@@ -24,7 +27,7 @@ import { and, desc, eq } from 'drizzle-orm'
 
 import { env } from '../../config/env'
 import { DbService } from '../db/db.service'
-import { apiRunnerCollections, repos } from '../db/schema'
+import { apiRunnerAuthPresets, apiRunnerCollections, repos } from '../db/schema'
 import { QdrantService } from '../qdrant/qdrant.service'
 
 interface ApiExplorerQuery {
@@ -52,6 +55,11 @@ interface IngestSegmentPayload {
 interface RepoOwnership {
   id: number
   name: string
+}
+
+interface SourceContext {
+  lineStart: number
+  snippet: string
 }
 
 const MAX_CONTENT_PER_FILE = 220_000
@@ -90,6 +98,7 @@ const RUNNER_DEFAULT_TIMEOUT_MS = 10_000
 const RUNNER_MAX_TIMEOUT_MS = 30_000
 const RUNNER_MAX_RESPONSE_BYTES = 1_000_000
 const RUNNER_COLLECTION_NAME_MAX_LENGTH = 120
+const RUNNER_AUTH_PRESET_NAME_MAX_LENGTH = 120
 const RUNNER_AUTH_MODES: RepoApiRunnerAuthMode[] = ['none', 'bearer', 'basic', 'apiKey']
 
 @Injectable()
@@ -384,6 +393,98 @@ export class ApiExplorerService {
     }
   }
 
+  async deleteRunnerAuthPreset(userId: number, repoId: number, presetId: number) {
+    await this.assertRepoOwnership(userId, repoId)
+
+    const [deleted] = await this.dbService.dbClient.delete(apiRunnerAuthPresets)
+      .where(and(
+        eq(apiRunnerAuthPresets.id, presetId),
+        eq(apiRunnerAuthPresets.repoId, repoId),
+        eq(apiRunnerAuthPresets.userId, userId)
+      ))
+      .returning({ id: apiRunnerAuthPresets.id })
+
+    if (!deleted) {
+      throw new NotFoundException('Runner auth preset not found')
+    }
+
+    return {
+      id: deleted.id,
+      ok: true as const
+    }
+  }
+
+  async listRunnerAuthPresets(userId: number, repoId: number): Promise<RepoApiRunnerAuthPreset[]> {
+    await this.assertRepoOwnership(userId, repoId)
+
+    const rows = await this.dbService.dbClient.select({
+      config: apiRunnerAuthPresets.config,
+      createdAt: apiRunnerAuthPresets.createdAt,
+      id: apiRunnerAuthPresets.id,
+      name: apiRunnerAuthPresets.name,
+      updatedAt: apiRunnerAuthPresets.updatedAt
+    })
+      .from(apiRunnerAuthPresets)
+      .where(and(
+        eq(apiRunnerAuthPresets.repoId, repoId),
+        eq(apiRunnerAuthPresets.userId, userId)
+      ))
+      .orderBy(desc(apiRunnerAuthPresets.updatedAt))
+
+    return rows.map(row => ({
+      config: row.config,
+      createdAt: row.createdAt,
+      id: row.id,
+      name: row.name,
+      updatedAt: row.updatedAt
+    }))
+  }
+
+  async saveRunnerAuthPreset(
+    userId: number,
+    repoId: number,
+    input: RepoApiRunnerSaveAuthPresetRequest
+  ): Promise<RepoApiRunnerAuthPreset> {
+    await this.assertRepoOwnership(userId, repoId)
+
+    const name = this.normalizeName(input.name, RUNNER_AUTH_PRESET_NAME_MAX_LENGTH, 'Auth preset name')
+    const config = this.normalizeRunnerAuthConfig(input.config)
+
+    const [saved] = await this.dbService.dbClient.insert(apiRunnerAuthPresets)
+      .values({
+        config,
+        name,
+        repoId,
+        userId
+      })
+      .onConflictDoUpdate({
+        target: [
+          apiRunnerAuthPresets.repoId,
+          apiRunnerAuthPresets.userId,
+          apiRunnerAuthPresets.name
+        ],
+        set: {
+          config,
+          updatedAt: new Date().toISOString()
+        }
+      })
+      .returning({
+        config: apiRunnerAuthPresets.config,
+        createdAt: apiRunnerAuthPresets.createdAt,
+        id: apiRunnerAuthPresets.id,
+        name: apiRunnerAuthPresets.name,
+        updatedAt: apiRunnerAuthPresets.updatedAt
+      })
+
+    return {
+      config: saved.config,
+      createdAt: saved.createdAt,
+      id: saved.id,
+      name: saved.name,
+      updatedAt: saved.updatedAt
+    }
+  }
+
   private addPathParameters(params: RepoApiEndpointParameter[], path: string) {
     for (const match of path.matchAll(/:([A-Za-z0-9_]+)/g)) {
       this.pushParam(params, {
@@ -464,7 +565,8 @@ export class ApiExplorerService {
     method: RepoApiHttpMethod,
     path: string,
     params: RepoApiEndpointParameter[],
-    symbolName?: string
+    symbolName?: string,
+    sourceContext?: SourceContext
   ): RepoApiEndpoint {
     return {
       filePath: file.filePath,
@@ -473,6 +575,8 @@ export class ApiExplorerService {
       method,
       params: this.uniqueParams(params),
       path,
+      sourceLineStart: sourceContext?.lineStart,
+      sourceSnippet: sourceContext?.snippet,
       symbolName
     }
   }
@@ -486,8 +590,9 @@ export class ApiExplorerService {
     for (const match of file.content.matchAll(/\b(?:re_)?path\s*\(\s*['"`]([^'"`]+)['"`]/g)) {
       const path = this.normalizeHttpPath(match[1] ?? '/')
       const params: RepoApiEndpointParameter[] = []
+      const sourceContext = this.readSourceContext(file.content, match.index ?? 0, 360)
       this.addPathParameters(params, path)
-      endpoints.push(this.createEndpoint(file, 'django', 'GET', path, params))
+      endpoints.push(this.createEndpoint(file, 'django', 'GET', path, params, undefined, sourceContext))
     }
 
     return endpoints
@@ -526,8 +631,8 @@ export class ApiExplorerService {
       const params: RepoApiEndpointParameter[] = []
       this.addPathParameters(params, path)
 
-      const snippet = this.readSnippet(file.content, match.index ?? 0, 450)
-      for (const reqParamMatch of snippet.matchAll(/\breq\.params\.([A-Za-z0-9_]+)/g)) {
+      const sourceContext = this.readSourceContext(file.content, match.index ?? 0, 450)
+      for (const reqParamMatch of sourceContext.snippet.matchAll(/\breq\.params\.([A-Za-z0-9_]+)/g)) {
         this.pushParam(params, {
           location: 'path',
           name: reqParamMatch[1] ?? 'param',
@@ -535,7 +640,7 @@ export class ApiExplorerService {
         })
       }
 
-      for (const reqParamMatch of snippet.matchAll(/\breq\.query\.([A-Za-z0-9_]+)/g)) {
+      for (const reqParamMatch of sourceContext.snippet.matchAll(/\breq\.query\.([A-Za-z0-9_]+)/g)) {
         this.pushParam(params, {
           location: 'query',
           name: reqParamMatch[1] ?? 'query',
@@ -543,7 +648,7 @@ export class ApiExplorerService {
         })
       }
 
-      for (const reqParamMatch of snippet.matchAll(/\breq\.body\.([A-Za-z0-9_]+)/g)) {
+      for (const reqParamMatch of sourceContext.snippet.matchAll(/\breq\.body\.([A-Za-z0-9_]+)/g)) {
         this.pushParam(params, {
           location: 'body',
           name: reqParamMatch[1] ?? 'body',
@@ -551,7 +656,7 @@ export class ApiExplorerService {
         })
       }
 
-      endpoints.push(this.createEndpoint(file, 'express', method, path, params))
+      endpoints.push(this.createEndpoint(file, 'express', method, path, params, undefined, sourceContext))
     }
 
     return endpoints
@@ -588,8 +693,8 @@ export class ApiExplorerService {
       const params: RepoApiEndpointParameter[] = []
       this.addPathParameters(params, path)
 
-      const snippet = this.readSnippet(file.content, match.index ?? 0, 500)
-      for (const paramMatch of snippet.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*[^=,\n)]+\s*=\s*(Query|Path|Body|Header)\(/g)) {
+      const sourceContext = this.readSourceContext(file.content, match.index ?? 0, 500)
+      for (const paramMatch of sourceContext.snippet.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*[^=,\n)]+\s*=\s*(Query|Path|Body|Header)\(/g)) {
         const locationToken = (paramMatch[2] ?? '').toLowerCase()
         const location = locationToken === 'query'
           ? 'query'
@@ -606,7 +711,7 @@ export class ApiExplorerService {
         })
       }
 
-      endpoints.push(this.createEndpoint(file, 'fastapi', method, path, params))
+      endpoints.push(this.createEndpoint(file, 'fastapi', method, path, params, undefined, sourceContext))
     }
 
     return endpoints
@@ -639,8 +744,9 @@ export class ApiExplorerService {
       const prefix = owner === 'app' ? '/' : (blueprintPrefixes.get(owner) ?? '/')
       const path = this.joinHttpPath(prefix, match[3] ?? '/')
       const params: RepoApiEndpointParameter[] = []
+      const sourceContext = this.readSourceContext(file.content, match.index ?? 0, 420)
       this.addPathParameters(params, path)
-      endpoints.push(this.createEndpoint(file, 'flask', method, path, params))
+      endpoints.push(this.createEndpoint(file, 'flask', method, path, params, undefined, sourceContext))
     }
 
     const routePattern = /@([A-Za-z_][A-Za-z0-9_]*)\.route\(\s*['"`]([^'"`]+)['"`]\s*(?:,\s*methods\s*=\s*\[([^\]]+)])?/gi
@@ -649,6 +755,7 @@ export class ApiExplorerService {
       const prefix = owner === 'app' ? '/' : (blueprintPrefixes.get(owner) ?? '/')
       const path = this.joinHttpPath(prefix, match[2] ?? '/')
       const params: RepoApiEndpointParameter[] = []
+      const sourceContext = this.readSourceContext(file.content, match.index ?? 0, 420)
       this.addPathParameters(params, path)
 
       const methodsLiteral = match[3] ?? ''
@@ -658,7 +765,7 @@ export class ApiExplorerService {
 
       const methods: RepoApiHttpMethod[] = methodsFromLiteral.length > 0 ? methodsFromLiteral : ['GET']
       for (const method of methods) {
-        endpoints.push(this.createEndpoint(file, 'flask', method, path, params))
+        endpoints.push(this.createEndpoint(file, 'flask', method, path, params, undefined, sourceContext))
       }
     }
 
@@ -686,13 +793,13 @@ export class ApiExplorerService {
       }
 
       const routePath = this.normalizeHttpPath(match[2] ?? '/')
-      const snippet = this.readSnippet(file.content, match.index ?? 0, 500)
-      const symbolName = this.extractSymbolNameFromSnippet(snippet)
+      const sourceContext = this.readSourceContext(file.content, match.index ?? 0, 500)
+      const symbolName = this.extractSymbolNameFromSnippet(sourceContext.snippet)
 
       const params: RepoApiEndpointParameter[] = []
       this.addPathParameters(params, routePath)
 
-      for (const paramMatch of snippet.matchAll(/@Param\s*\(\s*['"`]([A-Za-z0-9_:-]+)['"`]/g)) {
+      for (const paramMatch of sourceContext.snippet.matchAll(/@Param\s*\(\s*['"`]([A-Za-z0-9_:-]+)['"`]/g)) {
         this.pushParam(params, {
           location: 'path',
           name: paramMatch[1] ?? 'param',
@@ -700,7 +807,7 @@ export class ApiExplorerService {
         })
       }
 
-      for (const paramMatch of snippet.matchAll(/@Query\s*\(\s*['"`]([A-Za-z0-9_.-]+)['"`]/g)) {
+      for (const paramMatch of sourceContext.snippet.matchAll(/@Query\s*\(\s*['"`]([A-Za-z0-9_.-]+)['"`]/g)) {
         this.pushParam(params, {
           location: 'query',
           name: paramMatch[1] ?? 'query',
@@ -708,7 +815,7 @@ export class ApiExplorerService {
         })
       }
 
-      for (const paramMatch of snippet.matchAll(/@Headers\s*\(\s*['"`]([A-Za-z0-9_.-]+)['"`]/g)) {
+      for (const paramMatch of sourceContext.snippet.matchAll(/@Headers\s*\(\s*['"`]([A-Za-z0-9_.-]+)['"`]/g)) {
         this.pushParam(params, {
           location: 'header',
           name: paramMatch[1] ?? 'header',
@@ -716,8 +823,8 @@ export class ApiExplorerService {
         })
       }
 
-      if (/@Body\s*\(/.test(snippet)) {
-        const namedBodyMatch = snippet.match(/@Body\s*\(\s*['"`]([A-Za-z0-9_.-]+)['"`]/)
+      if (/@Body\s*\(/.test(sourceContext.snippet)) {
+        const namedBodyMatch = sourceContext.snippet.match(/@Body\s*\(\s*['"`]([A-Za-z0-9_.-]+)['"`]/)
         this.pushParam(params, {
           location: 'body',
           name: namedBodyMatch?.[1] ?? 'body',
@@ -727,7 +834,7 @@ export class ApiExplorerService {
 
       for (const controllerPrefix of uniqueControllerPrefixes) {
         const path = this.joinHttpPath(controllerPrefix, routePath)
-        endpoints.push(this.createEndpoint(file, 'nestjs', method, path, params, symbolName))
+        endpoints.push(this.createEndpoint(file, 'nestjs', method, path, params, symbolName, sourceContext))
       }
     }
 
@@ -1052,37 +1159,12 @@ export class ApiExplorerService {
       throw new BadRequestException('Collection config is required')
     }
 
-    const safeAuth = config.auth && typeof config.auth === 'object'
-      ? config.auth
-      : {
-          apiKeyName: 'x-api-key',
-          apiKeyPlacement: 'header',
-          apiKeyValue: '',
-          basicPassword: '',
-          basicUsername: '',
-          bearerToken: '',
-          mode: 'none'
-        }
-
     const timeoutMs = Number.isFinite(config.timeoutMs)
       ? Math.min(RUNNER_MAX_TIMEOUT_MS, Math.max(1_000, Math.trunc(config.timeoutMs)))
       : RUNNER_DEFAULT_TIMEOUT_MS
 
-    const rawMode = String(safeAuth.mode ?? '')
-    const mode: RepoApiRunnerAuthMode = RUNNER_AUTH_MODES.includes(rawMode as RepoApiRunnerAuthMode)
-      ? (rawMode as RepoApiRunnerAuthMode)
-      : 'none'
-
     return {
-      auth: {
-        apiKeyName: String(safeAuth.apiKeyName ?? 'x-api-key'),
-        apiKeyPlacement: safeAuth.apiKeyPlacement === 'query' ? 'query' : 'header',
-        apiKeyValue: String(safeAuth.apiKeyValue ?? ''),
-        basicPassword: String(safeAuth.basicPassword ?? ''),
-        basicUsername: String(safeAuth.basicUsername ?? ''),
-        bearerToken: String(safeAuth.bearerToken ?? ''),
-        mode
-      },
+      auth: this.normalizeRunnerAuthConfig(config.auth),
       baseUrl: String(config.baseUrl ?? ''),
       bodyJson: String(config.bodyJson ?? '{}'),
       endpointId: config.endpointId ? String(config.endpointId) : null,
@@ -1099,16 +1181,41 @@ export class ApiExplorerService {
     }
   }
 
-  private normalizeCollectionName(name: string) {
+  private normalizeName(name: string, maxLength: number, label: string) {
     const normalizedName = typeof name === 'string' ? name.trim() : ''
     if (!normalizedName) {
-      throw new BadRequestException('Collection name is required')
+      throw new BadRequestException(`${label} is required`)
     }
-    if (normalizedName.length > RUNNER_COLLECTION_NAME_MAX_LENGTH) {
-      throw new BadRequestException(`Collection name max length is ${RUNNER_COLLECTION_NAME_MAX_LENGTH}`)
+    if (normalizedName.length > maxLength) {
+      throw new BadRequestException(`${label} max length is ${maxLength}`)
     }
 
     return normalizedName
+  }
+
+  private normalizeCollectionName(name: string) {
+    return this.normalizeName(name, RUNNER_COLLECTION_NAME_MAX_LENGTH, 'Collection name')
+  }
+
+  private normalizeRunnerAuthConfig(input: unknown): RepoApiRunnerAuthConfig {
+    const safeAuth = input && typeof input === 'object'
+      ? (input as Record<string, unknown>)
+      : {}
+
+    const rawMode = String(safeAuth.mode ?? '')
+    const mode: RepoApiRunnerAuthMode = RUNNER_AUTH_MODES.includes(rawMode as RepoApiRunnerAuthMode)
+      ? (rawMode as RepoApiRunnerAuthMode)
+      : 'none'
+
+    return {
+      apiKeyName: String(safeAuth.apiKeyName ?? 'x-api-key'),
+      apiKeyPlacement: safeAuth.apiKeyPlacement === 'query' ? 'query' : 'header',
+      apiKeyValue: String(safeAuth.apiKeyValue ?? ''),
+      basicPassword: String(safeAuth.basicPassword ?? ''),
+      basicUsername: String(safeAuth.basicUsername ?? ''),
+      bearerToken: String(safeAuth.bearerToken ?? ''),
+      mode
+    }
   }
 
   private mergeOperationSources(existing: RepoOpenApiOperation, nextOperation: RepoOpenApiOperation) {
@@ -1280,6 +1387,17 @@ export class ApiExplorerService {
     return content.slice(start, Math.min(content.length, start + size))
   }
 
+  private readSourceContext(content: string, start: number, size: number): SourceContext {
+    const safeStart = Math.max(0, start)
+    const lineStart = content.slice(0, safeStart).split('\n').length
+    const snippet = this.readSnippet(content, safeStart, size).trim()
+
+    return {
+      lineStart,
+      snippet
+    }
+  }
+
   private safeString(value: unknown) {
     if (typeof value !== 'string') {
       return null
@@ -1318,6 +1436,8 @@ export class ApiExplorerService {
     endpointsByKey.set(key, {
       ...existing,
       params: mergedParams,
+      sourceLineStart: existing.sourceLineStart ?? endpoint.sourceLineStart,
+      sourceSnippet: existing.sourceSnippet ?? endpoint.sourceSnippet,
       symbolName: existing.symbolName ?? endpoint.symbolName
     })
   }

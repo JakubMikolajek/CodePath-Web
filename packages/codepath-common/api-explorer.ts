@@ -24,6 +24,8 @@ export interface RepoApiEndpoint {
   method: RepoApiHttpMethod
   params: RepoApiEndpointParameter[]
   path: string
+  sourceLineStart?: number
+  sourceSnippet?: string
   symbolName?: string
 }
 
@@ -150,5 +152,18 @@ export interface RepoApiRunnerCollection {
 
 export interface RepoApiRunnerSaveCollectionRequest {
   config: RepoApiRunnerCollectionConfig
+  name: string
+}
+
+export interface RepoApiRunnerAuthPreset {
+  config: RepoApiRunnerAuthConfig
+  createdAt: string
+  id: number
+  name: string
+  updatedAt: string
+}
+
+export interface RepoApiRunnerSaveAuthPresetRequest {
+  config: RepoApiRunnerAuthConfig
   name: string
 }

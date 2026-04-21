@@ -6,6 +6,7 @@ import type {
   RepoApiHttpMethod,
   RepoApiRunnerApiKeyPlacement,
   RepoApiRunnerAuthMode,
+  RepoApiRunnerAuthPreset,
   RepoApiRunnerCollection,
   RepoApiRunnerCollectionConfig,
   RepoApiRunnerResponse,
@@ -16,12 +17,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import {
   createDefaultRunnerAuthConfig,
+  deleteRepoRunnerAuthPreset,
   deleteRepoRunnerCollection,
   getRepoInteractiveApi,
   getRepoInteractiveApiJson,
   getRepoOpenApiSpec,
+  listRepoRunnerAuthPresets,
   listRepoRunnerCollections,
   runRepoApiRequest,
+  saveRepoRunnerAuthPreset,
   saveRepoRunnerCollection
 } from '@/lib/api-explorer'
 import { getFirstRouteParam } from '@/lib/route-params'
@@ -316,6 +320,20 @@ function EndpointRow({
           </div>
         )}
       </td>
+      <td className="px-3 py-2 align-top text-xs">
+        {endpoint.sourceSnippet ? (
+          <details>
+            <summary className="cursor-pointer text-primary">
+              Show code{endpoint.sourceLineStart ? ` (L${endpoint.sourceLineStart})` : ''}
+            </summary>
+            <pre className="mt-2 max-h-44 overflow-auto rounded bg-muted p-2 font-mono text-[11px] leading-relaxed">
+              {endpoint.sourceSnippet}
+            </pre>
+          </details>
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        )}
+      </td>
       <td className="px-3 py-2 align-top">
         <button
           className={`rounded-md border px-2 py-1 text-xs ${isActive ? 'border-primary text-primary' : 'border-border'}`}
@@ -353,6 +371,8 @@ export default function Page() {
   const [runnerError, setRunnerError] = useState<null | string>(null)
   const [runnerResult, setRunnerResult] = useState<null | RepoApiRunnerResponse>(null)
   const [auth, setAuth] = useState<RepoApiRunnerCollectionConfig['auth']>(createDefaultRunnerAuthConfig())
+  const [runnerAuthPresets, setRunnerAuthPresets] = useState<RepoApiRunnerAuthPreset[]>([])
+  const [authPresetNameInput, setAuthPresetNameInput] = useState('')
   const [runnerCollections, setRunnerCollections] = useState<RepoApiRunnerCollection[]>([])
   const [collectionNameInput, setCollectionNameInput] = useState('')
 
@@ -398,6 +418,23 @@ export default function Page() {
   useEffect(() => {
     void loadRunnerCollectionsFromServer()
   }, [loadRunnerCollectionsFromServer])
+
+  const loadRunnerAuthPresetsFromServer = useCallback(async () => {
+    if (!Number.isFinite(repoId)) {
+      return
+    }
+
+    try {
+      const presets = await listRepoRunnerAuthPresets(repoId)
+      setRunnerAuthPresets(presets)
+    } catch (nextError) {
+      setRunnerError(resolveErrorMessage(nextError))
+    }
+  }, [repoId])
+
+  useEffect(() => {
+    void loadRunnerAuthPresetsFromServer()
+  }, [loadRunnerAuthPresetsFromServer])
 
   const initializeRunnerForEndpoint = useCallback((endpoint: RepoApiEndpoint) => {
     const seed = endpoint.id
@@ -543,6 +580,53 @@ export default function Page() {
     try {
       await deleteRepoRunnerCollection(repoId, collectionId)
       setRunnerCollections(prev => prev.filter(collection => collection.id !== collectionId))
+    } catch (nextError) {
+      setRunnerError(resolveErrorMessage(nextError))
+    }
+  }
+
+  const handleSaveAuthPreset = async () => {
+    if (!Number.isFinite(repoId)) {
+      setRunnerError('Invalid repository identifier')
+      return
+    }
+
+    const name = authPresetNameInput.trim()
+    if (!name) {
+      setRunnerError('Auth preset name is required')
+      return
+    }
+
+    try {
+      const saved = await saveRepoRunnerAuthPreset(repoId, {
+        config: { ...auth },
+        name
+      })
+
+      setRunnerAuthPresets(prev => [
+        saved,
+        ...prev.filter(preset => preset.id !== saved.id)
+      ])
+      setRunnerError(null)
+    } catch (nextError) {
+      setRunnerError(resolveErrorMessage(nextError))
+    }
+  }
+
+  const handleLoadAuthPreset = (preset: RepoApiRunnerAuthPreset) => {
+    setAuth({ ...preset.config })
+    setAuthPresetNameInput(preset.name)
+    setRunnerError(null)
+  }
+
+  const handleDeleteAuthPreset = async (presetId: number) => {
+    if (!Number.isFinite(repoId)) {
+      return
+    }
+
+    try {
+      await deleteRepoRunnerAuthPreset(repoId, presetId)
+      setRunnerAuthPresets(prev => prev.filter(preset => preset.id !== presetId))
     } catch (nextError) {
       setRunnerError(resolveErrorMessage(nextError))
     }
@@ -791,6 +875,17 @@ export default function Page() {
           )}
         </div>
 
+        {selectedEndpoint?.sourceSnippet && (
+          <details className="rounded-md border border-border p-2 text-xs">
+            <summary className="cursor-pointer text-primary">
+              Source fragment{selectedEndpoint.sourceLineStart ? ` (L${selectedEndpoint.sourceLineStart})` : ''}
+            </summary>
+            <pre className="mt-2 max-h-40 overflow-auto rounded bg-muted p-2 font-mono text-[11px] leading-relaxed">
+              {selectedEndpoint.sourceSnippet}
+            </pre>
+          </details>
+        )}
+
         <div className="grid gap-3 md:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm">
             <span>Base URL</span>
@@ -895,6 +990,57 @@ export default function Page() {
                   <option value="query">Query</option>
                 </select>
               </label>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2 rounded-md border border-border p-3">
+          <p className="text-xs font-medium uppercase text-muted-foreground">Auth presets (workspace-shared)</p>
+          <div className="flex flex-wrap gap-2">
+            <input
+              className="min-w-[220px] flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm"
+              onChange={event => setAuthPresetNameInput(event.target.value)}
+              placeholder="Auth preset name"
+              value={authPresetNameInput}
+            />
+            <button
+              className="rounded-md border border-border px-3 py-2 text-sm"
+              onClick={handleSaveAuthPreset}
+              type="button"
+            >
+              Save current auth
+            </button>
+          </div>
+          {runnerAuthPresets.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No saved auth presets for this repo yet.</p>
+          ) : (
+            <div className="max-h-44 overflow-auto space-y-1">
+              {runnerAuthPresets.map(preset => (
+                <div className="flex items-center justify-between gap-2 rounded-md border border-border px-2 py-1" key={preset.id}>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm">{preset.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      mode: {preset.config.mode}
+                    </p>
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      className="rounded-md border border-border px-2 py-1 text-xs"
+                      onClick={() => handleLoadAuthPreset(preset)}
+                      type="button"
+                    >
+                      Load
+                    </button>
+                    <button
+                      className="rounded-md border border-border px-2 py-1 text-xs"
+                      onClick={() => handleDeleteAuthPreset(preset.id)}
+                      type="button"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -1064,6 +1210,7 @@ export default function Page() {
                 <th className="px-3 py-2">Framework</th>
                 <th className="px-3 py-2">File</th>
                 <th className="px-3 py-2">Params</th>
+                <th className="px-3 py-2">Code</th>
                 <th className="px-3 py-2">Runner</th>
               </tr>
             </thead>

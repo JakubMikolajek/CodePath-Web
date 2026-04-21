@@ -1,10 +1,12 @@
 import type {
   RepoApiFramework,
   RepoApiHttpMethod,
+  RepoApiRunnerAuthPreset,
   RepoApiRunnerCollection,
   RepoApiRunnerCollectionConfig,
   RepoApiRunnerRequest,
   RepoApiRunnerResponse,
+  RepoApiRunnerSaveAuthPresetRequest,
   RepoApiRunnerSaveCollectionRequest,
   RepoInteractiveApi,
   RepoOpenApiDocument
@@ -65,6 +67,21 @@ export async function saveRepoRunnerCollection(repoId: number, payload: RepoApiR
 
 export async function deleteRepoRunnerCollection(repoId: number, collectionId: number) {
   return await apiClient.delete<{ id: number, ok: true }>(`/api-explorer/${repoId}/collections/${collectionId}`)
+}
+
+export async function listRepoRunnerAuthPresets(repoId: number) {
+  return await apiClient.get<RepoApiRunnerAuthPreset[]>(`/api-explorer/${repoId}/auth-presets`)
+}
+
+export async function saveRepoRunnerAuthPreset(repoId: number, payload: RepoApiRunnerSaveAuthPresetRequest) {
+  return await apiClient.post<RepoApiRunnerAuthPreset, RepoApiRunnerSaveAuthPresetRequest>(
+    `/api-explorer/${repoId}/auth-presets`,
+    payload
+  )
+}
+
+export async function deleteRepoRunnerAuthPreset(repoId: number, presetId: number) {
+  return await apiClient.delete<{ id: number, ok: true }>(`/api-explorer/${repoId}/auth-presets/${presetId}`)
 }
 
 export function createDefaultRunnerAuthConfig(): RepoApiRunnerCollectionConfig['auth'] {

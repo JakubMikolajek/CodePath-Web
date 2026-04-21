@@ -1,5 +1,9 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Query, Req, UseGuards } from '@nestjs/common'
-import type { RepoApiRunnerRequest, RepoApiRunnerSaveCollectionRequest } from '@workspace/codepath-common/api-explorer'
+import type {
+  RepoApiRunnerRequest,
+  RepoApiRunnerSaveAuthPresetRequest,
+  RepoApiRunnerSaveCollectionRequest
+} from '@workspace/codepath-common/api-explorer'
 
 import { SessionAuthGuard } from '../auth/session-auth.guard'
 import { SelectUser } from '../db/schema'
@@ -26,6 +30,35 @@ export class ApiExplorerController {
     @Body() body: RepoApiRunnerSaveCollectionRequest
   ) {
     return await this.apiExplorerService.saveRunnerCollection(req.user.id, repoId, body)
+  }
+
+  @Get(':repoId/auth-presets')
+  @UseGuards(SessionAuthGuard)
+  async listRunnerAuthPresets(
+    @Req() req: { user: SelectUser },
+    @Param('repoId', ParseIntPipe) repoId: number
+  ) {
+    return await this.apiExplorerService.listRunnerAuthPresets(req.user.id, repoId)
+  }
+
+  @Post(':repoId/auth-presets')
+  @UseGuards(SessionAuthGuard)
+  async saveRunnerAuthPreset(
+    @Req() req: { user: SelectUser },
+    @Param('repoId', ParseIntPipe) repoId: number,
+    @Body() body: RepoApiRunnerSaveAuthPresetRequest
+  ) {
+    return await this.apiExplorerService.saveRunnerAuthPreset(req.user.id, repoId, body)
+  }
+
+  @Delete(':repoId/auth-presets/:presetId')
+  @UseGuards(SessionAuthGuard)
+  async deleteRunnerAuthPreset(
+    @Req() req: { user: SelectUser },
+    @Param('repoId', ParseIntPipe) repoId: number,
+    @Param('presetId', ParseIntPipe) presetId: number
+  ) {
+    return await this.apiExplorerService.deleteRunnerAuthPreset(req.user.id, repoId, presetId)
   }
 
   @Delete(':repoId/collections/:collectionId')
