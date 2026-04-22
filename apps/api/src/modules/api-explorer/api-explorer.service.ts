@@ -95,6 +95,15 @@ const METHOD_TO_OPENAPI: Record<RepoApiHttpMethod, RepoOpenApiOperationMethod> =
   POST: 'post',
   PUT: 'put'
 }
+const SUPPORTED_OPENAPI_METHODS: RepoOpenApiOperationMethod[] = [
+  'delete',
+  'get',
+  'head',
+  'options',
+  'patch',
+  'post',
+  'put'
+]
 
 function parsePathParamNames(path: string) {
   const names = new Set<string>()
@@ -256,6 +265,23 @@ export class ApiExplorerService {
     })
 
     const frameworks = Array.from(new Set(endpoints.map(endpoint => endpoint.framework))).sort()
+    const modules = Array.from(
+      new Set(
+        endpoints
+          .map(endpoint => endpoint.moduleName?.trim())
+          .filter((value): value is string => Boolean(value))
+      )
+    )
+      .sort((a, b) => a.localeCompare(b))
+    const endpointDistributionByFramework = this.countEndpointsByFramework(endpoints)
+    const endpointDistributionByMethod = this.countEndpointsByMethod(endpoints)
+    const endpointsWithRequestBodyModel = endpoints.filter(endpoint => (
+      this.normalizeTypeName(endpoint.requestBodyTypeName) !== undefined
+    )).length
+    const endpointsWithSourceSnippet = endpoints.filter(endpoint => (
+      typeof endpoint.sourceSnippet === 'string' && endpoint.sourceSnippet.trim().length > 0
+    )).length
+    const totalParamCount = endpoints.reduce((sum, endpoint) => sum + endpoint.params.length, 0)
     this.logger.log(
       `Interactive API explorer built for repo=${repo.id}, endpoints=${endpoints.length}, segments=${segments.length}`
     )
@@ -269,11 +295,20 @@ export class ApiExplorerService {
       },
       generatedAt: new Date().toISOString(),
       metadata: {
+        avgParamsPerEndpoint: this.toRatio(totalParamCount, endpoints.length),
+        endpointDistributionByFramework,
+        endpointDistributionByMethod,
         endpointCount: endpoints.length,
+        endpointsWithRequestBodyModel,
+        endpointsWithSourceSnippet,
         frameworks,
+        moduleCount: modules.length,
+        modules,
+        requestBodyModelCoverage: this.toRatio(endpointsWithRequestBodyModel, endpoints.length),
         repoId: repo.id,
         repoName: repo.name,
-        segmentCount: segments.length
+        segmentCount: segments.length,
+        sourceSnippetCoverage: this.toRatio(endpointsWithSourceSnippet, endpoints.length)
       }
     }
   }
@@ -317,6 +352,11 @@ export class ApiExplorerService {
       .sort((a, b) => a.localeCompare(b))
       .map(name => ({ name }))
 
+    const staticOperationCount = this.countOpenApiOperations(paths)
+    const staticOperationsWithCodeSource = this.countOperationsWithCodeSource(paths)
+    const staticSchemaComponentCount = Object.keys(schemaRegistry).length
+    const staticModuleTagCount = tags.length
+
     const staticSpec: RepoOpenApiDocument = {
       components: Object.keys(schemaRegistry).length > 0
         ? {
@@ -330,7 +370,18 @@ export class ApiExplorerService {
       },
       openapi: '3.1.0',
       paths,
-      tags
+      tags,
+      'x-codepath-metrics': {
+        codeSourceCoverage: this.toRatio(staticOperationsWithCodeSource, staticOperationCount),
+        mergedOperationCount: staticOperationCount,
+        moduleTagCount: staticModuleTagCount,
+        operationCount: staticOperationCount,
+        operationsWithCodeSource: staticOperationsWithCodeSource,
+        runtimeOperationCount: 0,
+        schemaComponentCount: staticSchemaComponentCount,
+        sourceMode: 'static',
+        staticOperationCount
+      }
     }
 
     const runtimeBaseUrl = this.parseRuntimeBaseUrl(query.runtimeBaseUrl)
@@ -338,12 +389,12 @@ export class ApiExplorerService {
       return staticSpec
     }
 
-    const runtimeSpec = await this.tryFetchRuntimeOpenApiDocument(runtimeBaseUrl)
-    if (!runtimeSpec) {
+    const runtimeResult = await this.tryFetchRuntimeOpenApiDocument(runtimeBaseUrl)
+    if (!runtimeResult) {
       return staticSpec
     }
 
-    return this.mergeRuntimeOpenApiWithStatic(runtimeSpec, staticSpec)
+    return this.mergeRuntimeOpenApiWithStatic(runtimeResult.spec, staticSpec, runtimeResult.resolvedUrl)
   }
 
   async listRunnerAuthPresets(userId: number, repoId: number): Promise<RepoApiRunnerAuthPreset[]> {
@@ -944,7 +995,7 @@ export class ApiExplorerService {
       }
 
       const routePath = this.normalizeHttpPath(match[2] ?? '/')
-      const sourceContext = this.readSourceContext(file.content, match.index ?? 0, 500)
+      const sourceContext = this.readNestRouteSourceContext(file.content, match.index ?? 0)
       const symbolName = this.extractSymbolNameFromSnippet(sourceContext.snippet)
 
       const params: RepoApiEndpointParameter[] = []
@@ -1020,7 +1071,7 @@ export class ApiExplorerService {
 
   private extractFastApiBodyTypeFromSnippet(snippet: string, path: string): string | undefined {
     const pathParamNames = new Set(parsePathParamNames(path))
-    const typedParamPattern = /([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([A-Za-z_][A-Za-z0-9_.[\],<>]*)\s*(?:=\s*([^,\n)]+))?/g
+    const typedParamPattern = /([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([A-Za-z_][A-Za-z0-9_.[\],<>| ]*)\s*(?:=\s*([^,\n)]+))?/g
 
     for (const match of snippet.matchAll(typedParamPattern)) {
       const name = match[1] ?? ''
@@ -1035,7 +1086,7 @@ export class ApiExplorerService {
         continue
       }
 
-      const typeName = this.normalizeTypeName(rawType)
+      const typeName = this.extractModelTypeName(rawType)
       if (!typeName || this.isPrimitiveTypeName(typeName)) {
         continue
       }
@@ -1048,10 +1099,10 @@ export class ApiExplorerService {
 
   private extractNestBodyTypeFromSnippet(snippet: string): string | undefined {
     const match = snippet.match(
-      /@Body\s*\([^)]*\)\s*(?:public\s+|private\s+|protected\s+|readonly\s+)?[A-Za-z_][A-Za-z0-9_]*\s*:\s*([A-Za-z_][A-Za-z0-9_.<>]*)/
+      /@Body\s*\([^)]*\)\s*(?:public\s+|private\s+|protected\s+|readonly\s+)?[A-Za-z_][A-Za-z0-9_]*\s*:\s*([^=,\n)]+)/
     )
 
-    return this.normalizeTypeName(match?.[1])
+    return this.extractModelTypeName(match?.[1])
   }
 
   private extractPythonObjectSchemas(content: string): Record<string, RepoOpenApiSchema> {
@@ -1406,16 +1457,27 @@ export class ApiExplorerService {
       'Any',
       'Dict',
       'List',
+      'Null',
       'None',
+      'Record',
       'Optional',
       'Union',
+      'array',
       'bool',
+      'boolean',
       'dict',
+      'double',
       'float',
       'int',
+      'integer',
+      'null',
+      'number',
       'object',
       'str',
-      'string'
+      'string',
+      'undefined',
+      'unknown',
+      'void'
     ]).has(typeName)
   }
 
@@ -1480,7 +1542,8 @@ export class ApiExplorerService {
 
   private mergeRuntimeOpenApiWithStatic(
     runtimeSpec: RepoOpenApiDocument,
-    staticSpec: RepoOpenApiDocument
+    staticSpec: RepoOpenApiDocument,
+    runtimeResolvedUrl?: string
   ): RepoOpenApiDocument {
     const mergedPaths: RepoOpenApiDocument['paths'] = {}
     const runtimePaths = runtimeSpec.paths ?? {}
@@ -1547,6 +1610,16 @@ export class ApiExplorerService {
       staticSpec.tags?.map(tag => tag.name)
     ).map(name => ({ name }))
 
+    const staticOperationCount = this.countOpenApiOperations(staticPaths)
+    const runtimeOperationCount = this.countOpenApiOperations(runtimePaths)
+    const mergedOperationCount = this.countOpenApiOperations(mergedPaths)
+    const operationsWithCodeSource = this.countOperationsWithCodeSource(mergedPaths)
+    const moduleTagCount = mergedTags.length > 0 ? mergedTags.length : runtimeSpec.tags?.length ?? 0
+    const schemaComponentCount = Object.keys(mergedSchemas).length
+    const sourceMode = runtimeOperationCount > 0
+      ? (staticOperationCount > 0 ? 'hybrid' : 'runtime')
+      : 'static'
+
     return {
       components: Object.keys(mergedSchemas).length > 0
         ? {
@@ -1556,7 +1629,19 @@ export class ApiExplorerService {
       info: runtimeSpec.info?.title ? runtimeSpec.info : staticSpec.info,
       openapi: '3.1.0',
       paths: mergedPaths,
-      tags: mergedTags.length > 0 ? mergedTags : runtimeSpec.tags
+      tags: mergedTags.length > 0 ? mergedTags : runtimeSpec.tags,
+      'x-codepath-metrics': {
+        codeSourceCoverage: this.toRatio(operationsWithCodeSource, mergedOperationCount),
+        mergedOperationCount,
+        moduleTagCount,
+        operationCount: mergedOperationCount,
+        operationsWithCodeSource,
+        runtimeOperationCount,
+        runtimeResolvedUrl,
+        schemaComponentCount,
+        sourceMode,
+        staticOperationCount
+      }
     }
   }
 
@@ -1569,6 +1654,55 @@ export class ApiExplorerService {
           .filter(Boolean)
       )
     )
+  }
+
+  private countEndpointsByFramework(endpoints: RepoApiEndpoint[]) {
+    const counts: Partial<Record<RepoApiFramework, number>> = {}
+    for (const endpoint of endpoints) {
+      counts[endpoint.framework] = (counts[endpoint.framework] ?? 0) + 1
+    }
+
+    return counts
+  }
+
+  private countEndpointsByMethod(endpoints: RepoApiEndpoint[]) {
+    const counts: Partial<Record<RepoApiHttpMethod, number>> = {}
+    for (const endpoint of endpoints) {
+      counts[endpoint.method] = (counts[endpoint.method] ?? 0) + 1
+    }
+
+    return counts
+  }
+
+  private countOpenApiOperations(paths: RepoOpenApiDocument['paths']) {
+    let total = 0
+    for (const operations of Object.values(paths)) {
+      for (const method of SUPPORTED_OPENAPI_METHODS) {
+        if (operations?.[method]) {
+          total += 1
+        }
+      }
+    }
+
+    return total
+  }
+
+  private countOperationsWithCodeSource(paths: RepoOpenApiDocument['paths']) {
+    let total = 0
+    for (const operations of Object.values(paths)) {
+      for (const method of SUPPORTED_OPENAPI_METHODS) {
+        const operation = operations?.[method]
+        if (!operation) {
+          continue
+        }
+
+        if (operation['x-codepath'] || (operation['x-codepath-sources']?.length ?? 0) > 0) {
+          total += 1
+        }
+      }
+    }
+
+    return total
   }
 
   private normalizeCollectionConfig(config: RepoApiRunnerCollectionConfig): RepoApiRunnerCollectionConfig {
@@ -1797,6 +1931,50 @@ export class ApiExplorerService {
     return normalized
   }
 
+  private extractModelTypeName(value: unknown): string | undefined {
+    if (typeof value !== 'string') {
+      return undefined
+    }
+
+    const raw = value.trim()
+    if (!raw) {
+      return undefined
+    }
+
+    const candidates = new Set<string>()
+    candidates.add(raw)
+
+    for (const unionPart of raw.split('|')) {
+      const trimmed = unionPart.trim()
+      if (trimmed) {
+        candidates.add(trimmed)
+      }
+    }
+
+    const genericMatch = raw.match(
+      /^(?:typing\.)?(?:Optional|Union|List|Sequence|Array|Nullable)\s*[\[<]([\s\S]+)[\]>]\s*$/
+    )
+    if (genericMatch?.[1]) {
+      for (const part of genericMatch[1].split(',')) {
+        const trimmed = part.trim()
+        if (trimmed) {
+          candidates.add(trimmed)
+        }
+      }
+    }
+
+    for (const candidate of candidates) {
+      const normalized = this.normalizeTypeName(candidate)
+      if (!normalized || this.isPrimitiveTypeName(normalized)) {
+        continue
+      }
+
+      return normalized
+    }
+
+    return undefined
+  }
+
   private parseFrameworks(frameworks?: string) {
     if (!frameworks) {
       return [] as RepoApiFramework[]
@@ -1808,6 +1986,14 @@ export class ApiExplorerService {
       .filter(value => SUPPORTED_FRAMEWORKS.includes(value))
 
     return Array.from(new Set(values))
+  }
+
+  private toRatio(value: number, total: number) {
+    if (total <= 0) {
+      return 0
+    }
+
+    return Number((value / total).toFixed(4))
   }
 
   private parseMethods(methods?: string) {
@@ -1876,6 +2062,28 @@ export class ApiExplorerService {
 
     return {
       lineStart,
+      snippet
+    }
+  }
+
+  private readNestRouteSourceContext(content: string, start: number): SourceContext {
+    const safeStart = Math.max(0, start)
+    const fallback = this.readSourceContext(content, safeStart, 500)
+    const tail = content.slice(safeStart)
+    const nextDecoratorPattern = /\n\s*@(Get|Post|Put|Patch|Delete|Options|Head|All)\s*\(/g
+    nextDecoratorPattern.lastIndex = 1
+    const nextDecoratorMatch = nextDecoratorPattern.exec(tail)
+    const snippetEnd = nextDecoratorMatch
+      ? safeStart + nextDecoratorMatch.index
+      : Math.min(content.length, safeStart + 900)
+    const snippet = content.slice(safeStart, snippetEnd).trim()
+
+    if (!snippet) {
+      return fallback
+    }
+
+    return {
+      lineStart: content.slice(0, safeStart).split('\n').length,
       snippet
     }
   }
@@ -2029,7 +2237,10 @@ export class ApiExplorerService {
     return normalized
   }
 
-  private async tryFetchRuntimeOpenApiDocument(runtimeBaseUrl: string): Promise<null | RepoOpenApiDocument> {
+  private async tryFetchRuntimeOpenApiDocument(runtimeBaseUrl: string): Promise<null | {
+    resolvedUrl: string
+    spec: RepoOpenApiDocument
+  }> {
     for (const candidatePath of RUNTIME_OPENAPI_CANDIDATE_PATHS) {
       const candidateUrl = new URL(candidatePath, runtimeBaseUrl).toString()
       try {
@@ -2044,7 +2255,10 @@ export class ApiExplorerService {
         const normalized = this.normalizeRuntimeOpenApiDocument(response.data)
         if (normalized) {
           this.logger.log(`Using runtime OpenAPI from ${candidateUrl}`)
-          return normalized
+          return {
+            resolvedUrl: candidateUrl,
+            spec: normalized
+          }
         }
       } catch {
         continue

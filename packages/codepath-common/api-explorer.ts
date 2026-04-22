@@ -42,11 +42,20 @@ export interface RepoInteractiveApi {
   filters: RepoInteractiveApiFilters
   generatedAt: string
   metadata: {
+    avgParamsPerEndpoint: number
+    endpointDistributionByFramework: Partial<Record<RepoApiFramework, number>>
+    endpointDistributionByMethod: Partial<Record<RepoApiHttpMethod, number>>
     endpointCount: number
+    endpointsWithRequestBodyModel: number
+    endpointsWithSourceSnippet: number
     frameworks: RepoApiFramework[]
+    moduleCount: number
+    modules: string[]
+    requestBodyModelCoverage: number
     repoId: number
     repoName: string
     segmentCount: number
+    sourceSnippetCoverage: number
   }
 }
 
@@ -105,6 +114,18 @@ export interface RepoOpenApiDocument {
   openapi: '3.1.0'
   paths: Record<string, Partial<Record<RepoOpenApiOperationMethod, RepoOpenApiOperation>>>
   tags?: Array<{ name: string }>
+  'x-codepath-metrics'?: {
+    codeSourceCoverage: number
+    mergedOperationCount: number
+    moduleTagCount: number
+    operationCount: number
+    operationsWithCodeSource: number
+    runtimeOperationCount: number
+    runtimeResolvedUrl?: string
+    schemaComponentCount: number
+    sourceMode: 'hybrid' | 'runtime' | 'static'
+    staticOperationCount: number
+  }
 }
 
 export interface RepoApiRunnerRequest {

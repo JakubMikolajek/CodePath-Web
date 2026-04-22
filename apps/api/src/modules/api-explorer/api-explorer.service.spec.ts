@@ -73,9 +73,66 @@ describe('ApiExplorerService', () => {
     expect(methodsAndPaths).toContain('POST /users')
     const detailEndpoint = response.endpoints.find(endpoint => endpoint.method === 'GET' && endpoint.path === '/users/:id')
     expect(detailEndpoint?.sourceSnippet).toContain("@Get(':id')")
+    expect(detailEndpoint?.sourceSnippet).not.toContain('@Post()')
     expect(detailEndpoint?.sourceLineStart).toBeGreaterThan(0)
     expect(response.metadata.endpointCount).toBe(3)
     expect(response.metadata.frameworks).toContain('nestjs')
+    expect(response.metadata.endpointDistributionByFramework.nestjs).toBe(3)
+    expect(response.metadata.endpointDistributionByMethod.GET).toBe(2)
+    expect(response.metadata.endpointDistributionByMethod.POST).toBe(1)
+    expect(response.metadata.endpointsWithSourceSnippet).toBe(3)
+    expect(response.metadata.sourceSnippetCoverage).toBe(1)
+    expect(response.metadata.endpointsWithRequestBodyModel).toBe(0)
+    expect(response.metadata.requestBodyModelCoverage).toBe(0)
+    const expectedAverage = Number((
+      response.endpoints.reduce((sum, endpoint) => sum + endpoint.params.length, 0) / response.endpoints.length
+    ).toFixed(4))
+    expect(response.metadata.avgParamsPerEndpoint).toBe(expectedAverage)
+    expect(response.metadata.moduleCount).toBeGreaterThan(0)
+    expect(response.metadata.modules).toHaveLength(response.metadata.moduleCount)
+  })
+
+  it('does not leak next NestJS route decorator into endpoint snippet', async () => {
+    const { dbService } = createDbMocks({ id: 11, name: 'repo-nest-snippet-boundary' })
+    const qdrantService = {
+      scroll: jest.fn().mockResolvedValue({
+        points: [
+          {
+            payload: {
+              content: `
+                @Controller('admin')
+                export class ApiConfigController {
+                  @Post('change-password')
+                  changePassword(@Body() body: ChangePasswordDto) {
+                    return this.apiConfig.changePassword(body)
+                  }
+
+                  @Post('update-api-key')
+                  updateApiKey(@Body() body: UpdateApiKeyDto) {
+                    return this.apiConfig.updateApi(body)
+                  }
+                }
+              `,
+              file_ext: '.ts',
+              file_path: 'backend/src/modules/apiConfig/api-config.controller.ts',
+              language: 'typescript',
+              message_type: 'ingest.batch.ready'
+            }
+          }
+        ]
+      })
+    }
+    const service = new ApiExplorerService(dbService as never, qdrantService as never)
+
+    const response = await service.getRepoInteractiveApi(1, 11, {})
+    const changePasswordEndpoint = response.endpoints.find(
+      endpoint => endpoint.method === 'POST' && endpoint.path === '/admin/change-password'
+    )
+
+    expect(changePasswordEndpoint).toBeDefined()
+    expect(changePasswordEndpoint?.sourceSnippet).toContain("@Post('change-password')")
+    expect(changePasswordEndpoint?.sourceSnippet).not.toContain("@Post('update-api-key')")
+    expect(changePasswordEndpoint?.sourceSnippet).not.toContain('updateApiKey(')
   })
 
   it('applies method filters to detected endpoints', async () => {
@@ -145,6 +202,17 @@ describe('ApiExplorerService', () => {
     expect(spec.paths['/users/{id}']?.get).toBeDefined()
     expect(spec.paths['/users']?.post?.requestBody).toBeDefined()
     expect(spec.paths['/users/{id}']?.get?.parameters?.some(param => param.in === 'path' && param.name === 'id')).toBe(true)
+    expect(spec['x-codepath-metrics']).toMatchObject({
+      codeSourceCoverage: 1,
+      mergedOperationCount: 2,
+      moduleTagCount: 1,
+      operationCount: 2,
+      operationsWithCodeSource: 2,
+      runtimeOperationCount: 0,
+      schemaComponentCount: 0,
+      sourceMode: 'static',
+      staticOperationCount: 2
+    })
   })
 
   it('groups OpenAPI tags by module and references DTO schema when inferred', async () => {
@@ -183,6 +251,66 @@ describe('ApiExplorerService', () => {
     expect(spec.tags?.some(tag => tag.name === 'users')).toBe(true)
     expect(spec.components?.schemas?.CreateUserDto).toBeDefined()
     expect(requestBodySchema).toEqual({ $ref: '#/components/schemas/CreateUserDto' })
+    expect(spec['x-codepath-metrics']?.schemaComponentCount).toBeGreaterThanOrEqual(1)
+    expect(spec['x-codepath-metrics']?.sourceMode).toBe('static')
+  })
+
+  it('infers request DTO for Optional/union Nest body type', async () => {
+    const { dbService } = createDbMocks({ id: 35, name: 'repo-nest-optional' })
+    const qdrantService = {
+      scroll: jest.fn().mockResolvedValue({
+        points: [
+          {
+            payload: {
+              content: `
+                export class CreateOrderDto {
+                  amount: number
+                }
+
+                @Controller('orders')
+                export class OrdersController {
+                  @Post()
+                  create(@Body() payload: CreateOrderDto | null) {}
+                }
+              `,
+              file_ext: '.ts',
+              file_path: 'apps/api/src/modules/orders/orders.controller.ts',
+              language: 'typescript',
+              message_type: 'ingest.batch.ready'
+            }
+          }
+        ]
+      })
+    }
+    const service = new ApiExplorerService(dbService as never, qdrantService as never)
+
+    const spec = await service.getRepoOpenApiSpec(1, 35, {})
+    const requestBodySchema = spec.paths['/orders']?.post?.requestBody?.content['application/json']?.schema
+
+    expect(spec.components?.schemas?.CreateOrderDto).toBeDefined()
+    expect(requestBodySchema).toEqual({ $ref: '#/components/schemas/CreateOrderDto' })
+    expect(spec['x-codepath-metrics']).toMatchObject({
+      codeSourceCoverage: 1,
+      mergedOperationCount: 1,
+      operationCount: 1,
+      operationsWithCodeSource: 1,
+      sourceMode: 'static',
+      staticOperationCount: 1
+    })
+  })
+
+  it('rejects runtime OpenAPI base URL outside localhost/private LAN', async () => {
+    const { dbService } = createDbMocks({ id: 36, name: 'repo-runtime-url-guard' })
+    const qdrantService = {
+      scroll: jest.fn().mockResolvedValue({
+        points: []
+      })
+    }
+    const service = new ApiExplorerService(dbService as never, qdrantService as never)
+
+    await expect(service.getRepoOpenApiSpec(1, 36, {
+      runtimeBaseUrl: 'https://example.com'
+    })).rejects.toThrow('runtimeBaseUrl must be localhost or private LAN')
   })
 
   it('prefers runtime OpenAPI and enriches operations with static code metadata', async () => {
@@ -244,6 +372,16 @@ describe('ApiExplorerService', () => {
     expect(operation).toBeDefined()
     expect(operation?.['x-codepath']).toBeDefined()
     expect(operation?.['x-codepath-sources']?.length).toBeGreaterThan(0)
+    expect(spec['x-codepath-metrics']).toMatchObject({
+      codeSourceCoverage: 1,
+      mergedOperationCount: 1,
+      operationCount: 1,
+      operationsWithCodeSource: 1,
+      runtimeOperationCount: 1,
+      sourceMode: 'hybrid',
+      staticOperationCount: 1
+    })
+    expect(spec['x-codepath-metrics']?.runtimeResolvedUrl).toContain('/openapi.json')
   })
 
   it('falls back to static OpenAPI when runtime OpenAPI is unavailable', async () => {
@@ -279,6 +417,11 @@ describe('ApiExplorerService', () => {
 
     expect(spec.info.title).toContain('repo-runtime-fallback')
     expect(spec.paths['/users/{id}']?.get).toBeDefined()
+    expect(spec['x-codepath-metrics']).toMatchObject({
+      sourceMode: 'static',
+      staticOperationCount: 1,
+      runtimeOperationCount: 0
+    })
   })
 
   it('rejects runner calls to public internet URLs', async () => {
