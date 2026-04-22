@@ -104,11 +104,13 @@ export class ApiExplorerController {
     @Param('repoId', ParseIntPipe) repoId: number,
     @Query('frameworks') frameworks?: string,
     @Query('methods') methods?: string,
+    @Query('runtimeBaseUrl') runtimeBaseUrl?: string,
     @Query('search') search?: string
   ) {
     return await this.apiExplorerService.getRepoOpenApiSpec(req.user.id, repoId, {
       frameworks,
       methods,
+      runtimeBaseUrl,
       search
     })
   }

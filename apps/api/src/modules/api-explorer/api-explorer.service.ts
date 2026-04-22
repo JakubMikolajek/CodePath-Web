@@ -19,6 +19,7 @@ import type {
   RepoOpenApiDocument,
   RepoOpenApiOperation,
   RepoOpenApiParameter,
+  RepoOpenApiSchema,
   RepoOpenApiOperationMethod,
   RepoOpenApiSourceMetadata
 } from '@workspace/codepath-common/api-explorer'
@@ -33,6 +34,7 @@ import { QdrantService } from '../qdrant/qdrant.service'
 interface ApiExplorerQuery {
   frameworks?: string
   methods?: string
+  runtimeBaseUrl?: string
   search?: string
 }
 
@@ -94,12 +96,42 @@ const METHOD_TO_OPENAPI: Record<RepoApiHttpMethod, RepoOpenApiOperationMethod> =
   PUT: 'put'
 }
 
+function parsePathParamNames(path: string) {
+  const names = new Set<string>()
+  for (const match of path.matchAll(/:([A-Za-z0-9_]+)/g)) {
+    if (match[1]) {
+      names.add(match[1])
+    }
+  }
+  for (const match of path.matchAll(/\{([A-Za-z0-9_]+)(?::[^}]+)?}/g)) {
+    if (match[1]) {
+      names.add(match[1])
+    }
+  }
+  for (const match of path.matchAll(/<(?:(?:[A-Za-z0-9_]+):)?([A-Za-z0-9_]+)>/g)) {
+    if (match[1]) {
+      names.add(match[1])
+    }
+  }
+
+  return [...names]
+}
+
 const RUNNER_DEFAULT_TIMEOUT_MS = 10_000
 const RUNNER_MAX_TIMEOUT_MS = 30_000
 const RUNNER_MAX_RESPONSE_BYTES = 1_000_000
+const RUNTIME_OPENAPI_TIMEOUT_MS = 6_000
 const RUNNER_COLLECTION_NAME_MAX_LENGTH = 120
 const RUNNER_AUTH_PRESET_NAME_MAX_LENGTH = 120
 const RUNNER_AUTH_MODES: RepoApiRunnerAuthMode[] = ['none', 'bearer', 'basic', 'apiKey']
+const RUNTIME_OPENAPI_CANDIDATE_PATHS = [
+  '/openapi.json',
+  '/v3/api-docs',
+  '/swagger.json',
+  '/api/docs-json',
+  '/api/openapi.json',
+  '/api/swagger.json'
+]
 
 @Injectable()
 export class ApiExplorerService {
@@ -147,7 +179,9 @@ export class ApiExplorerService {
           endpoint.filePath,
           endpoint.framework,
           endpoint.method,
+          endpoint.moduleName ?? '',
           endpoint.path,
+          endpoint.requestBodyTypeName ?? '',
           endpoint.symbolName ?? ''
         ].join(' ').toLowerCase()
 
@@ -156,6 +190,11 @@ export class ApiExplorerService {
     }
 
     endpoints.sort((a, b) => {
+      const byModule = (a.moduleName ?? '').localeCompare(b.moduleName ?? '')
+      if (byModule !== 0) {
+        return byModule
+      }
+
       const byMethod = a.method.localeCompare(b.method)
       if (byMethod !== 0) {
         return byMethod
@@ -203,12 +242,13 @@ export class ApiExplorerService {
     query: ApiExplorerQuery
   ): Promise<RepoOpenApiDocument> {
     const interactiveApi = await this.getRepoInteractiveApi(userId, repoId, query)
+    const schemaRegistry = await this.buildOpenApiSchemaRegistry(repoId)
     const paths: RepoOpenApiDocument['paths'] = {}
 
     for (const endpoint of interactiveApi.endpoints) {
       const openApiPath = this.toOpenApiPath(endpoint.path)
       const openApiMethod = METHOD_TO_OPENAPI[endpoint.method]
-      const nextOperation = this.toOpenApiOperation(endpoint, openApiPath)
+      const nextOperation = this.toOpenApiOperation(endpoint, openApiPath, schemaRegistry)
 
       if (!paths[openApiPath]) {
         paths[openApiPath] = {}
@@ -227,15 +267,41 @@ export class ApiExplorerService {
       }
     }
 
-    return {
+    const tags = Array.from(
+      new Set(
+        interactiveApi.endpoints.map(endpoint => endpoint.moduleName || endpoint.framework)
+      )
+    )
+      .sort((a, b) => a.localeCompare(b))
+      .map(name => ({ name }))
+
+    const staticSpec: RepoOpenApiDocument = {
+      components: Object.keys(schemaRegistry).length > 0
+        ? {
+            schemas: schemaRegistry
+          }
+        : undefined,
       info: {
         description: `Generated from repository segments for repo ${interactiveApi.metadata.repoId}`,
         title: `${interactiveApi.metadata.repoName} Interactive API`,
         version: '0.1.0'
       },
       openapi: '3.1.0',
-      paths
+      paths,
+      tags
     }
+
+    const runtimeBaseUrl = this.parseRuntimeBaseUrl(query.runtimeBaseUrl)
+    if (!runtimeBaseUrl) {
+      return staticSpec
+    }
+
+    const runtimeSpec = await this.tryFetchRuntimeOpenApiDocument(runtimeBaseUrl)
+    if (!runtimeSpec) {
+      return staticSpec
+    }
+
+    return this.mergeRuntimeOpenApiWithStatic(runtimeSpec, staticSpec)
   }
 
   async runApiRequest(
@@ -565,19 +631,24 @@ export class ApiExplorerService {
     method: RepoApiHttpMethod,
     path: string,
     params: RepoApiEndpointParameter[],
-    symbolName?: string,
-    sourceContext?: SourceContext
+    options?: {
+      requestBodyTypeName?: string
+      sourceContext?: SourceContext
+      symbolName?: string
+    }
   ): RepoApiEndpoint {
     return {
       filePath: file.filePath,
       framework,
       id: `${framework}:${method}:${file.filePath}:${path}`,
       method,
+      moduleName: this.inferModuleName(file.filePath, framework),
       params: this.uniqueParams(params),
       path,
-      sourceLineStart: sourceContext?.lineStart,
-      sourceSnippet: sourceContext?.snippet,
-      symbolName
+      requestBodyTypeName: options?.requestBodyTypeName,
+      sourceLineStart: options?.sourceContext?.lineStart,
+      sourceSnippet: options?.sourceContext?.snippet,
+      symbolName: options?.symbolName
     }
   }
 
@@ -592,7 +663,7 @@ export class ApiExplorerService {
       const params: RepoApiEndpointParameter[] = []
       const sourceContext = this.readSourceContext(file.content, match.index ?? 0, 360)
       this.addPathParameters(params, path)
-      endpoints.push(this.createEndpoint(file, 'django', 'GET', path, params, undefined, sourceContext))
+      endpoints.push(this.createEndpoint(file, 'django', 'GET', path, params, { sourceContext }))
     }
 
     return endpoints
@@ -656,7 +727,7 @@ export class ApiExplorerService {
         })
       }
 
-      endpoints.push(this.createEndpoint(file, 'express', method, path, params, undefined, sourceContext))
+      endpoints.push(this.createEndpoint(file, 'express', method, path, params, { sourceContext }))
     }
 
     return endpoints
@@ -711,7 +782,11 @@ export class ApiExplorerService {
         })
       }
 
-      endpoints.push(this.createEndpoint(file, 'fastapi', method, path, params, undefined, sourceContext))
+      const requestBodyTypeName = this.extractFastApiBodyTypeFromSnippet(sourceContext.snippet, path)
+      endpoints.push(this.createEndpoint(file, 'fastapi', method, path, params, {
+        requestBodyTypeName,
+        sourceContext
+      }))
     }
 
     return endpoints
@@ -746,7 +821,7 @@ export class ApiExplorerService {
       const params: RepoApiEndpointParameter[] = []
       const sourceContext = this.readSourceContext(file.content, match.index ?? 0, 420)
       this.addPathParameters(params, path)
-      endpoints.push(this.createEndpoint(file, 'flask', method, path, params, undefined, sourceContext))
+      endpoints.push(this.createEndpoint(file, 'flask', method, path, params, { sourceContext }))
     }
 
     const routePattern = /@([A-Za-z_][A-Za-z0-9_]*)\.route\(\s*['"`]([^'"`]+)['"`]\s*(?:,\s*methods\s*=\s*\[([^\]]+)])?/gi
@@ -765,7 +840,7 @@ export class ApiExplorerService {
 
       const methods: RepoApiHttpMethod[] = methodsFromLiteral.length > 0 ? methodsFromLiteral : ['GET']
       for (const method of methods) {
-        endpoints.push(this.createEndpoint(file, 'flask', method, path, params, undefined, sourceContext))
+        endpoints.push(this.createEndpoint(file, 'flask', method, path, params, { sourceContext }))
       }
     }
 
@@ -832,9 +907,14 @@ export class ApiExplorerService {
         })
       }
 
+      const requestBodyTypeName = this.extractNestBodyTypeFromSnippet(sourceContext.snippet)
       for (const controllerPrefix of uniqueControllerPrefixes) {
         const path = this.joinHttpPath(controllerPrefix, routePath)
-        endpoints.push(this.createEndpoint(file, 'nestjs', method, path, params, symbolName, sourceContext))
+        endpoints.push(this.createEndpoint(file, 'nestjs', method, path, params, {
+          requestBodyTypeName,
+          sourceContext,
+          symbolName
+        }))
       }
     }
 
@@ -856,6 +936,82 @@ export class ApiExplorerService {
     }
 
     return undefined
+  }
+
+  private extractNestBodyTypeFromSnippet(snippet: string): string | undefined {
+    const match = snippet.match(
+      /@Body\s*\([^)]*\)\s*(?:public\s+|private\s+|protected\s+|readonly\s+)?[A-Za-z_][A-Za-z0-9_]*\s*:\s*([A-Za-z_][A-Za-z0-9_.<>]*)/
+    )
+
+    return this.normalizeTypeName(match?.[1])
+  }
+
+  private extractFastApiBodyTypeFromSnippet(snippet: string, path: string): string | undefined {
+    const pathParamNames = new Set(parsePathParamNames(path))
+    const typedParamPattern = /([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([A-Za-z_][A-Za-z0-9_.[\],<>]*)\s*(?:=\s*([^,\n)]+))?/g
+
+    for (const match of snippet.matchAll(typedParamPattern)) {
+      const name = match[1] ?? ''
+      const rawType = match[2] ?? ''
+      const defaultExpr = (match[3] ?? '').trim()
+
+      if (!name || pathParamNames.has(name)) {
+        continue
+      }
+
+      if (/\b(Query|Path|Header)\s*\(/.test(defaultExpr)) {
+        continue
+      }
+
+      const typeName = this.normalizeTypeName(rawType)
+      if (!typeName || this.isPrimitiveTypeName(typeName)) {
+        continue
+      }
+
+      return typeName
+    }
+
+    return undefined
+  }
+
+  private inferModuleName(filePath: string, framework: RepoApiFramework) {
+    const segments = filePath.split('/').filter(Boolean)
+    if (segments.length === 0) {
+      return framework
+    }
+
+    const lowercase = segments.map(segment => segment.toLowerCase())
+    const markerCandidates = [
+      'modules',
+      'module',
+      'routers',
+      'router',
+      'controllers',
+      'controller',
+      'routes',
+      'route',
+      'views',
+      'view',
+      'blueprints',
+      'blueprint',
+      'apps',
+      'api'
+    ]
+
+    for (const marker of markerCandidates) {
+      const markerIndex = lowercase.lastIndexOf(marker)
+      if (markerIndex < 0) {
+        continue
+      }
+
+      const nextSegment = segments[markerIndex + 1]
+      if (nextSegment && !nextSegment.includes('.')) {
+        return this.normalizeModuleSegment(nextSegment)
+      }
+    }
+
+    const fileName = segments[segments.length - 1] ?? framework
+    return this.normalizeModuleSegment(fileName)
   }
 
   private async fetchRepoSegmentsFromQdrant(repoId: number): Promise<IngestSegmentPayload[]> {
@@ -1240,6 +1396,245 @@ export class ApiExplorerService {
     return [...unique.values()]
   }
 
+  private mergeRuntimeOpenApiWithStatic(
+    runtimeSpec: RepoOpenApiDocument,
+    staticSpec: RepoOpenApiDocument
+  ): RepoOpenApiDocument {
+    const mergedPaths: RepoOpenApiDocument['paths'] = {}
+    const runtimePaths = runtimeSpec.paths ?? {}
+    const staticPaths = staticSpec.paths ?? {}
+
+    for (const [runtimePath, runtimeOperations] of Object.entries(runtimePaths)) {
+      const mergedOperations: Partial<Record<RepoOpenApiOperationMethod, RepoOpenApiOperation>> = {}
+
+      for (const [rawMethod, runtimeOperation] of Object.entries(runtimeOperations ?? {})) {
+        const method = rawMethod as RepoOpenApiOperationMethod
+        if (!runtimeOperation) {
+          continue
+        }
+
+        const staticOperation = this.findStaticOperationForRuntimePath(staticPaths, runtimePath, method)
+        if (!staticOperation) {
+          mergedOperations[method] = runtimeOperation
+          continue
+        }
+
+        const mergedSources = this.mergeOperationSources(runtimeOperation, staticOperation)
+        const mergedTags = this.mergeTagValues(runtimeOperation.tags, staticOperation.tags)
+
+        mergedOperations[method] = {
+          ...runtimeOperation,
+          operationId: runtimeOperation.operationId || staticOperation.operationId,
+          tags: mergedTags.length > 0 ? mergedTags : runtimeOperation.tags,
+          'x-codepath': runtimeOperation['x-codepath'] ?? staticOperation['x-codepath'],
+          'x-codepath-sources': mergedSources
+        }
+      }
+
+      mergedPaths[runtimePath] = mergedOperations
+    }
+
+    for (const [staticPath, staticOperations] of Object.entries(staticPaths)) {
+      for (const [rawMethod, staticOperation] of Object.entries(staticOperations ?? {})) {
+        const method = rawMethod as RepoOpenApiOperationMethod
+        if (!staticOperation) {
+          continue
+        }
+
+        const runtimeMatch = this.findRuntimePathForStatic(staticPath, method, runtimePaths)
+        if (runtimeMatch) {
+          continue
+        }
+
+        if (!mergedPaths[staticPath]) {
+          mergedPaths[staticPath] = {}
+        }
+        mergedPaths[staticPath][method] = staticOperation
+      }
+    }
+
+    const runtimeSchemas = runtimeSpec.components?.schemas ?? {}
+    const staticSchemas = staticSpec.components?.schemas ?? {}
+    const mergedSchemas = {
+      ...staticSchemas,
+      ...runtimeSchemas
+    }
+
+    const mergedTags = this.mergeTagValues(
+      runtimeSpec.tags?.map(tag => tag.name),
+      staticSpec.tags?.map(tag => tag.name)
+    ).map(name => ({ name }))
+
+    return {
+      components: Object.keys(mergedSchemas).length > 0
+        ? {
+            schemas: mergedSchemas
+          }
+        : undefined,
+      info: runtimeSpec.info?.title ? runtimeSpec.info : staticSpec.info,
+      openapi: '3.1.0',
+      paths: mergedPaths,
+      tags: mergedTags.length > 0 ? mergedTags : runtimeSpec.tags
+    }
+  }
+
+  private mergeTagValues(...tagsLists: Array<Array<string> | undefined>) {
+    return Array.from(
+      new Set(
+        tagsLists
+          .flatMap(list => list ?? [])
+          .map(value => value.trim())
+          .filter(Boolean)
+      )
+    )
+  }
+
+  private findRuntimePathForStatic(
+    staticPath: string,
+    method: RepoOpenApiOperationMethod,
+    runtimePaths: RepoOpenApiDocument['paths']
+  ) {
+    const candidates = this.buildPathMatchCandidates(staticPath)
+    for (const candidate of candidates) {
+      const operation = runtimePaths[candidate]?.[method]
+      if (operation) {
+        return candidate
+      }
+    }
+
+    return null
+  }
+
+  private findStaticOperationForRuntimePath(
+    staticPaths: RepoOpenApiDocument['paths'],
+    runtimePath: string,
+    method: RepoOpenApiOperationMethod
+  ) {
+    const candidates = this.buildPathMatchCandidates(runtimePath)
+    for (const candidate of candidates) {
+      const operation = staticPaths[candidate]?.[method]
+      if (operation) {
+        return operation
+      }
+    }
+
+    return null
+  }
+
+  private buildPathMatchCandidates(path: string) {
+    const normalized = this.normalizeHttpPath(path)
+    const candidates = new Set<string>([normalized])
+
+    if (normalized.startsWith('/api/')) {
+      candidates.add(this.normalizeHttpPath(normalized.slice(4)))
+    } else if (normalized === '/api') {
+      candidates.add('/')
+    } else {
+      candidates.add(this.normalizeHttpPath(`/api${normalized}`))
+    }
+
+    return [...candidates]
+  }
+
+  private normalizeRuntimeOpenApiDocument(input: unknown): RepoOpenApiDocument | null {
+    if (!input || typeof input !== 'object') {
+      return null
+    }
+
+    const raw = input as Record<string, unknown>
+    if (typeof raw.openapi !== 'string') {
+      return null
+    }
+
+    if (!raw.paths || typeof raw.paths !== 'object' || Array.isArray(raw.paths)) {
+      return null
+    }
+
+    const infoRaw = raw.info && typeof raw.info === 'object' ? raw.info as Record<string, unknown> : {}
+    const runtimeTags = Array.isArray(raw.tags)
+      ? raw.tags
+          .map(item => {
+            if (!item || typeof item !== 'object') {
+              return null
+            }
+            const name = (item as Record<string, unknown>).name
+            return typeof name === 'string' && name.trim() ? { name: name.trim() } : null
+          })
+          .filter((value): value is { name: string } => value !== null)
+      : undefined
+
+    const componentsRaw = raw.components && typeof raw.components === 'object'
+      ? raw.components as Record<string, unknown>
+      : undefined
+    const schemasRaw = componentsRaw?.schemas && typeof componentsRaw.schemas === 'object' && !Array.isArray(componentsRaw.schemas)
+      ? componentsRaw.schemas as Record<string, RepoOpenApiSchema>
+      : undefined
+
+    return {
+      components: schemasRaw
+        ? {
+            schemas: schemasRaw
+          }
+        : undefined,
+      info: {
+        description: typeof infoRaw.description === 'string' ? infoRaw.description : '',
+        title: typeof infoRaw.title === 'string' ? infoRaw.title : 'Runtime OpenAPI',
+        version: typeof infoRaw.version === 'string' ? infoRaw.version : '0.1.0'
+      },
+      openapi: '3.1.0',
+      paths: raw.paths as RepoOpenApiDocument['paths'],
+      tags: runtimeTags
+    }
+  }
+
+  private async tryFetchRuntimeOpenApiDocument(runtimeBaseUrl: string): Promise<null | RepoOpenApiDocument> {
+    for (const candidatePath of RUNTIME_OPENAPI_CANDIDATE_PATHS) {
+      const candidateUrl = new URL(candidatePath, runtimeBaseUrl).toString()
+      try {
+        const response = await axios.request<unknown>({
+          maxContentLength: RUNNER_MAX_RESPONSE_BYTES,
+          method: 'GET',
+          timeout: RUNTIME_OPENAPI_TIMEOUT_MS,
+          url: candidateUrl,
+          validateStatus: status => status >= 200 && status < 300
+        })
+
+        const normalized = this.normalizeRuntimeOpenApiDocument(response.data)
+        if (normalized) {
+          this.logger.log(`Using runtime OpenAPI from ${candidateUrl}`)
+          return normalized
+        }
+      } catch {
+        continue
+      }
+    }
+
+    this.logger.warn(`Runtime OpenAPI unavailable for base URL ${runtimeBaseUrl}, using static fallback`)
+    return null
+  }
+
+  private parseRuntimeBaseUrl(value: unknown) {
+    if (typeof value !== 'string' || !value.trim()) {
+      return null
+    }
+
+    let parsed: URL
+    try {
+      parsed = new URL(value.trim())
+    } catch {
+      throw new BadRequestException('runtimeBaseUrl is invalid')
+    }
+
+    const normalized = parsed.toString()
+    if (!this.isAllowedRunnerTarget(normalized)) {
+      throw new BadRequestException(
+        'runtimeBaseUrl must be localhost or private LAN address (10.x, 172.16-31.x, 192.168.x)'
+      )
+    }
+
+    return normalized
+  }
+
   private sourceFromEndpoint(endpoint: RepoApiEndpoint): RepoOpenApiSourceMetadata {
     return {
       filePath: endpoint.filePath,
@@ -1248,7 +1643,11 @@ export class ApiExplorerService {
     }
   }
 
-  private toOpenApiOperation(endpoint: RepoApiEndpoint, openApiPath: string): RepoOpenApiOperation {
+  private toOpenApiOperation(
+    endpoint: RepoApiEndpoint,
+    openApiPath: string,
+    schemaRegistry: Record<string, RepoOpenApiSchema>
+  ): RepoOpenApiOperation {
     const parameters: RepoOpenApiParameter[] = endpoint.params
       .filter(
         (
@@ -1265,15 +1664,18 @@ export class ApiExplorerService {
       }))
 
     const bodyParams = endpoint.params.filter(param => param.location === 'body')
-    const bodyProperties = Object.fromEntries(bodyParams.map(param => [
-      param.name === 'body' ? 'payload' : param.name,
-      {
-        type: 'string' as const
-      }
-    ]))
+    const bodyProperties = Object.fromEntries(
+      bodyParams.map(param => [
+        param.name === 'body' ? 'payload' : param.name,
+        {
+          type: 'string' as const
+        }
+      ])
+    )
     const requiredBodyProperties = bodyParams
       .filter(param => param.required)
       .map(param => param.name === 'body' ? 'payload' : param.name)
+    const requestBodyTypeName = this.normalizeTypeName(endpoint.requestBodyTypeName)
 
     const operation: RepoOpenApiOperation = {
       operationId: this.toOperationId(endpoint),
@@ -1283,7 +1685,7 @@ export class ApiExplorerService {
         }
       },
       summary: `${endpoint.method} ${openApiPath}`,
-      tags: [endpoint.framework],
+      tags: [endpoint.moduleName || endpoint.framework],
       'x-codepath': this.sourceFromEndpoint(endpoint)
     }
 
@@ -1291,19 +1693,23 @@ export class ApiExplorerService {
       operation.parameters = parameters
     }
 
-    if (bodyParams.length > 0) {
+    if (bodyParams.length > 0 || (requestBodyTypeName && schemaRegistry[requestBodyTypeName])) {
+      const schema = requestBodyTypeName && schemaRegistry[requestBodyTypeName]
+        ? { $ref: `#/components/schemas/${requestBodyTypeName}` }
+        : {
+            additionalProperties: true,
+            properties: bodyProperties,
+            required: requiredBodyProperties.length > 0 ? requiredBodyProperties : undefined,
+            type: 'object' as const
+          }
+
       operation.requestBody = {
         content: {
           'application/json': {
-            schema: {
-              additionalProperties: true,
-              properties: bodyProperties,
-              required: requiredBodyProperties.length > 0 ? requiredBodyProperties : undefined,
-              type: 'object'
-            }
+            schema
           }
         },
-        required: requiredBodyProperties.length > 0
+        required: requestBodyTypeName ? true : requiredBodyProperties.length > 0
       }
     }
 
@@ -1335,6 +1741,248 @@ export class ApiExplorerService {
       : 'handler'
 
     return `${methodPart}_${pathPart}_${filePart}_${symbolPart}`
+  }
+
+  private async buildOpenApiSchemaRegistry(repoId: number): Promise<Record<string, RepoOpenApiSchema>> {
+    const segments = await this.fetchRepoSegmentsFromQdrant(repoId)
+    const files = this.buildCanonicalFiles(segments)
+    const schemaRegistry: Record<string, RepoOpenApiSchema> = {}
+
+    for (const file of files.values()) {
+      const nextSchemas = this.extractSchemasFromFile(file)
+      for (const [name, schema] of Object.entries(nextSchemas)) {
+        if (!schemaRegistry[name]) {
+          schemaRegistry[name] = schema
+        }
+      }
+    }
+
+    return schemaRegistry
+  }
+
+  private extractSchemasFromFile(file: CanonicalFile): Record<string, RepoOpenApiSchema> {
+    if (!file.content.trim()) {
+      return {}
+    }
+
+    const fromTs = this.extractTypeScriptObjectSchemas(file.content)
+    const fromPy = this.extractPythonObjectSchemas(file.content)
+    return {
+      ...fromTs,
+      ...fromPy
+    }
+  }
+
+  private extractTypeScriptObjectSchemas(content: string): Record<string, RepoOpenApiSchema> {
+    const schemas: Record<string, RepoOpenApiSchema> = {}
+    const patterns = [
+      /(?:export\s+)?interface\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{/g,
+      /(?:export\s+)?type\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*\{/g,
+      /(?:export\s+)?class\s+([A-Za-z_][A-Za-z0-9_]*)[^{]*\{/g
+    ]
+
+    for (const pattern of patterns) {
+      for (const match of content.matchAll(pattern)) {
+        const typeName = this.normalizeTypeName(match[1])
+        if (!typeName) {
+          continue
+        }
+
+        const braceIndex = (match.index ?? 0) + match[0].lastIndexOf('{')
+        const block = this.extractBracedBlock(content, braceIndex)
+        if (!block) {
+          continue
+        }
+
+        const properties: Record<string, RepoOpenApiSchema> = {}
+        const required: string[] = []
+
+        for (const propertyMatch of block.matchAll(/^\s*([A-Za-z_][A-Za-z0-9_]*)\??\s*:\s*([^;\n]+)[;,]?/gm)) {
+          const name = propertyMatch[1] ?? ''
+          const rawType = propertyMatch[2] ?? ''
+          if (!name || /\breadonly\b/.test(name)) {
+            continue
+          }
+
+          const schema = this.inferSchemaFromTypeHint(rawType)
+          properties[name] = schema
+
+          const isOptional = propertyMatch[0].includes('?:') || /\|\s*undefined\b/.test(rawType)
+          if (!isOptional) {
+            required.push(name)
+          }
+        }
+
+        if (Object.keys(properties).length === 0) {
+          continue
+        }
+
+        schemas[typeName] = {
+          properties,
+          required: required.length > 0 ? required : undefined,
+          type: 'object'
+        }
+      }
+    }
+
+    return schemas
+  }
+
+  private extractPythonObjectSchemas(content: string): Record<string, RepoOpenApiSchema> {
+    const schemas: Record<string, RepoOpenApiSchema> = {}
+    const classPattern = /^class\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*:\s*$/gm
+
+    for (const classMatch of content.matchAll(classPattern)) {
+      const typeName = this.normalizeTypeName(classMatch[1])
+      const bases = classMatch[2] ?? ''
+      if (!typeName || !/\b(BaseModel|Serializer|Schema)\b/.test(bases)) {
+        continue
+      }
+
+      const start = classMatch.index ?? 0
+      const afterClass = content.slice(start)
+      const bodyMatch = afterClass.match(/^class[^\n]*\n((?:[ \t]+[^\n]*\n?)*)/m)
+      const body = bodyMatch?.[1] ?? ''
+      const properties: Record<string, RepoOpenApiSchema> = {}
+      const required: string[] = []
+
+      for (const fieldMatch of body.matchAll(/^[ \t]+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([^\n=]+)(?:\s*=\s*(.+))?$/gm)) {
+        const name = fieldMatch[1] ?? ''
+        const rawType = fieldMatch[2] ?? ''
+        if (!name) {
+          continue
+        }
+
+        properties[name] = this.inferSchemaFromTypeHint(rawType)
+
+        const hasDefault = typeof fieldMatch[3] === 'string' && fieldMatch[3].trim().length > 0
+        if (!hasDefault && !/\bOptional\[/i.test(rawType)) {
+          required.push(name)
+        }
+      }
+
+      if (Object.keys(properties).length === 0) {
+        continue
+      }
+
+      schemas[typeName] = {
+        properties,
+        required: required.length > 0 ? required : undefined,
+        type: 'object'
+      }
+    }
+
+    return schemas
+  }
+
+  private inferSchemaFromTypeHint(rawType: string): RepoOpenApiSchema {
+    const normalized = rawType
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/^\(/, '')
+      .replace(/\)$/, '')
+    const lower = normalized.toLowerCase()
+
+    if (!normalized) {
+      return { type: 'string' }
+    }
+
+    if (lower.startsWith('array<') || /\[\]$/.test(normalized) || lower.startsWith('list[') || lower.startsWith('sequence[')) {
+      return {
+        items: {
+          type: 'string'
+        },
+        type: 'array'
+      }
+    }
+
+    if (/\b(bool|boolean)\b/i.test(normalized)) {
+      return { type: 'boolean' }
+    }
+
+    if (/\b(int|integer|int32|int64)\b/i.test(normalized)) {
+      return { type: 'integer' }
+    }
+
+    if (/\b(number|float|double|decimal)\b/i.test(normalized)) {
+      return { type: 'number' }
+    }
+
+    if (/\b(object|dict|map|record)\b/i.test(normalized)) {
+      return {
+        additionalProperties: true,
+        type: 'object'
+      }
+    }
+
+    return { type: 'string' }
+  }
+
+  private extractBracedBlock(content: string, startBraceIndex: number): string | null {
+    if (startBraceIndex < 0 || startBraceIndex >= content.length || content[startBraceIndex] !== '{') {
+      return null
+    }
+
+    let depth = 0
+    for (let index = startBraceIndex; index < content.length; index += 1) {
+      const char = content[index]
+      if (char === '{') {
+        depth += 1
+      } else if (char === '}') {
+        depth -= 1
+        if (depth === 0) {
+          return content.slice(startBraceIndex + 1, index)
+        }
+      }
+    }
+
+    return null
+  }
+
+  private normalizeTypeName(value: unknown): string | undefined {
+    if (typeof value !== 'string') {
+      return undefined
+    }
+
+    const normalized = value
+      .trim()
+      .split(/[\s<>\[\],|]/)[0]
+      ?.replace(/^.*\./, '')
+      ?.replace(/[^A-Za-z0-9_]/g, '')
+
+    if (!normalized || normalized.length === 0) {
+      return undefined
+    }
+
+    return normalized
+  }
+
+  private isPrimitiveTypeName(typeName: string) {
+    return new Set([
+      'Any',
+      'Dict',
+      'List',
+      'None',
+      'Optional',
+      'Union',
+      'bool',
+      'dict',
+      'float',
+      'int',
+      'object',
+      'str',
+      'string'
+    ]).has(typeName)
+  }
+
+  private normalizeModuleSegment(segment: string) {
+    const cleaned = segment
+      .replace(/\.[^.]+$/, '')
+      .replace(/(?:\.|_)?(controller|controllers|route|routes|router|routers|view|views|handler|handlers)$/i, '')
+      .replace(/[-_]+/g, ' ')
+      .trim()
+
+    return cleaned.length > 0 ? cleaned : segment
   }
 
   private parseFrameworks(frameworks?: string) {
@@ -1435,7 +2083,9 @@ export class ApiExplorerService {
     const mergedParams = this.uniqueParams([...existing.params, ...endpoint.params])
     endpointsByKey.set(key, {
       ...existing,
+      moduleName: existing.moduleName ?? endpoint.moduleName,
       params: mergedParams,
+      requestBodyTypeName: existing.requestBodyTypeName ?? endpoint.requestBodyTypeName,
       sourceLineStart: existing.sourceLineStart ?? endpoint.sourceLineStart,
       sourceSnippet: existing.sourceSnippet ?? endpoint.sourceSnippet,
       symbolName: existing.symbolName ?? endpoint.symbolName

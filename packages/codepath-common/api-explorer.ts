@@ -22,8 +22,10 @@ export interface RepoApiEndpoint {
   framework: RepoApiFramework
   id: string
   method: RepoApiHttpMethod
+  moduleName?: string
   params: RepoApiEndpointParameter[]
   path: string
+  requestBodyTypeName?: string
   sourceLineStart?: number
   sourceSnippet?: string
   symbolName?: string
@@ -50,13 +52,21 @@ export interface RepoInteractiveApi {
 
 export type RepoOpenApiOperationMethod = 'delete' | 'get' | 'head' | 'options' | 'patch' | 'post' | 'put'
 
+export type RepoOpenApiSchema =
+  | { $ref: string }
+  | {
+      additionalProperties?: boolean
+      items?: RepoOpenApiSchema
+      properties?: Record<string, RepoOpenApiSchema>
+      required?: string[]
+      type: 'array' | 'boolean' | 'integer' | 'number' | 'object' | 'string'
+    }
+
 export interface RepoOpenApiParameter {
   in: 'header' | 'path' | 'query'
   name: string
   required: boolean
-  schema: {
-    type: 'string'
-  }
+  schema: RepoOpenApiSchema
 }
 
 export interface RepoOpenApiSourceMetadata {
@@ -71,12 +81,7 @@ export interface RepoOpenApiOperation {
   requestBody?: {
     content: {
       'application/json': {
-        schema: {
-          additionalProperties?: boolean
-          properties?: Record<string, { type: 'string' }>
-          required?: string[]
-          type: 'object'
-        }
+        schema: RepoOpenApiSchema
       }
     }
     required: boolean
@@ -89,6 +94,9 @@ export interface RepoOpenApiOperation {
 }
 
 export interface RepoOpenApiDocument {
+  components?: {
+    schemas?: Record<string, RepoOpenApiSchema>
+  }
   info: {
     description: string
     title: string
@@ -96,6 +104,7 @@ export interface RepoOpenApiDocument {
   }
   openapi: '3.1.0'
   paths: Record<string, Partial<Record<RepoOpenApiOperationMethod, RepoOpenApiOperation>>>
+  tags?: Array<{ name: string }>
 }
 
 export interface RepoApiRunnerRequest {

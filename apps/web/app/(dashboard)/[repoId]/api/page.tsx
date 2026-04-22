@@ -303,6 +303,7 @@ function EndpointRow({
       </td>
       <td className="px-3 py-2 align-top font-mono text-xs">{endpoint.path}</td>
       <td className="px-3 py-2 align-top text-sm">{endpoint.framework}</td>
+      <td className="px-3 py-2 align-top text-sm">{endpoint.moduleName ?? '-'}</td>
       <td className="px-3 py-2 align-top font-mono text-xs">{endpoint.filePath}</td>
       <td className="px-3 py-2 align-top text-xs">
         {endpoint.params.length === 0 ? (
@@ -357,6 +358,7 @@ export default function Page() {
   const [exportingOpenApi, setExportingOpenApi] = useState(false)
   const [error, setError] = useState<null | string>(null)
   const [search, setSearch] = useState('')
+  const [runtimeOpenApiBaseUrl, setRuntimeOpenApiBaseUrl] = useState('')
   const [selectedMethods, setSelectedMethods] = useState<RepoApiHttpMethod[]>([])
   const [selectedFrameworks, setSelectedFrameworks] = useState<RepoApiFramework[]>([])
 
@@ -644,6 +646,7 @@ export default function Page() {
       const spec = await getRepoOpenApiSpec(repoId, {
         frameworks: selectedFrameworks.length > 0 ? selectedFrameworks : undefined,
         methods: selectedMethods.length > 0 ? selectedMethods : undefined,
+        runtimeBaseUrl: runtimeOpenApiBaseUrl,
         search
       })
       const json = JSON.stringify(spec, null, 2)
@@ -787,6 +790,22 @@ export default function Page() {
             placeholder="path, file, method, framework..."
             value={search}
           />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-medium" htmlFor="runtime-openapi-base-url">
+            Runtime OpenAPI Base URL (optional)
+          </label>
+          <input
+            className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+            id="runtime-openapi-base-url"
+            onChange={event => setRuntimeOpenApiBaseUrl(event.target.value)}
+            placeholder="http://127.0.0.1:3001"
+            value={runtimeOpenApiBaseUrl}
+          />
+          <p className="text-xs text-muted-foreground">
+            OpenAPI export: runtime-first from this URL, with static fallback from code.
+          </p>
         </div>
 
         <div className="space-y-2">
@@ -1208,6 +1227,7 @@ export default function Page() {
                 <th className="px-3 py-2">Method</th>
                 <th className="px-3 py-2">Path</th>
                 <th className="px-3 py-2">Framework</th>
+                <th className="px-3 py-2">Module</th>
                 <th className="px-3 py-2">File</th>
                 <th className="px-3 py-2">Params</th>
                 <th className="px-3 py-2">Code</th>

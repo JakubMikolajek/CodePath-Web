@@ -31,7 +31,7 @@ function createDbMocks(repo: null | { id: number, name: string }) {
 
 describe('ApiExplorerService', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    jest.resetAllMocks()
   })
 
   it('extracts NestJS endpoints from qdrant segments', async () => {
@@ -145,6 +145,140 @@ describe('ApiExplorerService', () => {
     expect(spec.paths['/users/{id}']?.get).toBeDefined()
     expect(spec.paths['/users']?.post?.requestBody).toBeDefined()
     expect(spec.paths['/users/{id}']?.get?.parameters?.some(param => param.in === 'path' && param.name === 'id')).toBe(true)
+  })
+
+  it('groups OpenAPI tags by module and references DTO schema when inferred', async () => {
+    const { dbService } = createDbMocks({ id: 32, name: 'repo-dto' })
+    const qdrantService = {
+      scroll: jest.fn().mockResolvedValue({
+        points: [
+          {
+            payload: {
+              content: `
+                export class CreateUserDto {
+                  email: string
+                  age?: number
+                }
+
+                @Controller('users')
+                export class UsersController {
+                  @Post()
+                  create(@Body() payload: CreateUserDto) {}
+                }
+              `,
+              file_ext: '.ts',
+              file_path: 'apps/api/src/modules/users/users.controller.ts',
+              language: 'typescript',
+              message_type: 'ingest.batch.ready'
+            }
+          }
+        ]
+      })
+    }
+    const service = new ApiExplorerService(dbService as never, qdrantService as never)
+
+    const spec = await service.getRepoOpenApiSpec(1, 32, {})
+    const requestBodySchema = spec.paths['/users']?.post?.requestBody?.content['application/json']?.schema
+
+    expect(spec.tags?.some(tag => tag.name === 'users')).toBe(true)
+    expect(spec.components?.schemas?.CreateUserDto).toBeDefined()
+    expect(requestBodySchema).toEqual({ $ref: '#/components/schemas/CreateUserDto' })
+  })
+
+  it('prefers runtime OpenAPI and enriches operations with static code metadata', async () => {
+    const { dbService } = createDbMocks({ id: 33, name: 'repo-runtime-first' })
+    const qdrantService = {
+      scroll: jest.fn().mockResolvedValue({
+        points: [
+          {
+            payload: {
+              content: `
+                @Controller('users')
+                export class UsersController {
+                  @Get(':id')
+                  detail(@Param('id') id: string) {}
+                }
+              `,
+              file_ext: '.ts',
+              file_path: 'apps/api/src/modules/users/users.controller.ts',
+              language: 'typescript',
+              message_type: 'ingest.batch.ready'
+            }
+          }
+        ]
+      })
+    }
+    const service = new ApiExplorerService(dbService as never, qdrantService as never)
+
+    jest.mocked(axios.request).mockResolvedValue({
+      data: {
+        info: {
+          title: 'Runtime API',
+          version: '1.0.0'
+        },
+        openapi: '3.0.0',
+        paths: {
+          '/api/users/{id}': {
+            get: {
+              operationId: 'UsersController_detail',
+              responses: {
+                '200': {
+                  description: 'ok'
+                }
+              },
+              summary: 'GET /api/users/{id}',
+              tags: ['Users']
+            }
+          }
+        }
+      },
+      status: 200
+    } as never)
+
+    const spec = await service.getRepoOpenApiSpec(1, 33, {
+      runtimeBaseUrl: 'http://127.0.0.1:3001'
+    })
+
+    const operation = spec.paths['/api/users/{id}']?.get
+    expect(spec.info.title).toBe('Runtime API')
+    expect(operation).toBeDefined()
+    expect(operation?.['x-codepath']).toBeDefined()
+    expect(operation?.['x-codepath-sources']?.length).toBeGreaterThan(0)
+  })
+
+  it('falls back to static OpenAPI when runtime OpenAPI is unavailable', async () => {
+    const { dbService } = createDbMocks({ id: 34, name: 'repo-runtime-fallback' })
+    const qdrantService = {
+      scroll: jest.fn().mockResolvedValue({
+        points: [
+          {
+            payload: {
+              content: `
+                @Controller('users')
+                export class UsersController {
+                  @Get(':id')
+                  detail(@Param('id') id: string) {}
+                }
+              `,
+              file_ext: '.ts',
+              file_path: 'apps/api/src/modules/users/users.controller.ts',
+              language: 'typescript',
+              message_type: 'ingest.batch.ready'
+            }
+          }
+        ]
+      })
+    }
+    const service = new ApiExplorerService(dbService as never, qdrantService as never)
+
+    jest.mocked(axios.request).mockRejectedValue(new Error('timeout'))
+
+    const spec = await service.getRepoOpenApiSpec(1, 34, {
+      runtimeBaseUrl: 'http://127.0.0.1:3001'
+    })
+
+    expect(spec.info.title).toContain('repo-runtime-fallback')
+    expect(spec.paths['/users/{id}']?.get).toBeDefined()
   })
 
   it('rejects runner calls to public internet URLs', async () => {

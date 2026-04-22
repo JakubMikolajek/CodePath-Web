@@ -17,6 +17,7 @@ import { apiClient } from '@/lib/api/api'
 interface InteractiveApiFilters {
   frameworks?: RepoApiFramework[]
   methods?: RepoApiHttpMethod[]
+  runtimeBaseUrl?: string
   search?: string
 }
 
@@ -45,6 +46,7 @@ export async function getRepoOpenApiSpec(repoId: number, filters?: InteractiveAp
     params: {
       frameworks: filters?.frameworks?.length ? filters.frameworks.join(',') : undefined,
       methods: filters?.methods?.length ? filters.methods.join(',') : undefined,
+      runtimeBaseUrl: filters?.runtimeBaseUrl?.trim() || undefined,
       search: filters?.search?.trim() || undefined
     }
   })
