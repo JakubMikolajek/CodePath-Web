@@ -9,18 +9,18 @@ import type {
   RepoApiRunnerAuthConfig,
   RepoApiRunnerAuthMode,
   RepoApiRunnerAuthPreset,
-  RepoInteractiveApi,
   RepoApiRunnerCollection,
   RepoApiRunnerCollectionConfig,
   RepoApiRunnerRequest,
   RepoApiRunnerResponse,
   RepoApiRunnerSaveAuthPresetRequest,
   RepoApiRunnerSaveCollectionRequest,
+  RepoInteractiveApi,
   RepoOpenApiDocument,
   RepoOpenApiOperation,
+  RepoOpenApiOperationMethod,
   RepoOpenApiParameter,
   RepoOpenApiSchema,
-  RepoOpenApiOperationMethod,
   RepoOpenApiSourceMetadata
 } from '@workspace/codepath-common/api-explorer'
 import axios from 'axios'
@@ -142,6 +142,48 @@ export class ApiExplorerService {
     private readonly qdrantService: QdrantService
   ) {}
 
+  async deleteRunnerAuthPreset(userId: number, repoId: number, presetId: number) {
+    await this.assertRepoOwnership(userId, repoId)
+
+    const [deleted] = await this.dbService.dbClient.delete(apiRunnerAuthPresets)
+      .where(and(
+        eq(apiRunnerAuthPresets.id, presetId),
+        eq(apiRunnerAuthPresets.repoId, repoId),
+        eq(apiRunnerAuthPresets.userId, userId)
+      ))
+      .returning({ id: apiRunnerAuthPresets.id })
+
+    if (!deleted) {
+      throw new NotFoundException('Runner auth preset not found')
+    }
+
+    return {
+      id: deleted.id,
+      ok: true as const
+    }
+  }
+
+  async deleteRunnerCollection(userId: number, repoId: number, collectionId: number) {
+    await this.assertRepoOwnership(userId, repoId)
+
+    const [deleted] = await this.dbService.dbClient.delete(apiRunnerCollections)
+      .where(and(
+        eq(apiRunnerCollections.id, collectionId),
+        eq(apiRunnerCollections.repoId, repoId),
+        eq(apiRunnerCollections.userId, userId)
+      ))
+      .returning({ id: apiRunnerCollections.id })
+
+    if (!deleted) {
+      throw new NotFoundException('Runner collection not found')
+    }
+
+    return {
+      id: deleted.id,
+      ok: true as const
+    }
+  }
+
   async getRepoInteractiveApi(
     userId: number,
     repoId: number,
@@ -213,7 +255,7 @@ export class ApiExplorerService {
       return a.filePath.localeCompare(b.filePath)
     })
 
-    const frameworks = Array.from(new Set(endpoints.map(endpoint => endpoint.framework))).sort() as RepoApiFramework[]
+    const frameworks = Array.from(new Set(endpoints.map(endpoint => endpoint.framework))).sort()
     this.logger.log(
       `Interactive API explorer built for repo=${repo.id}, endpoints=${endpoints.length}, segments=${segments.length}`
     )
@@ -278,8 +320,8 @@ export class ApiExplorerService {
     const staticSpec: RepoOpenApiDocument = {
       components: Object.keys(schemaRegistry).length > 0
         ? {
-            schemas: schemaRegistry
-          }
+          schemas: schemaRegistry
+        }
         : undefined,
       info: {
         description: `Generated from repository segments for repo ${interactiveApi.metadata.repoId}`,
@@ -302,6 +344,58 @@ export class ApiExplorerService {
     }
 
     return this.mergeRuntimeOpenApiWithStatic(runtimeSpec, staticSpec)
+  }
+
+  async listRunnerAuthPresets(userId: number, repoId: number): Promise<RepoApiRunnerAuthPreset[]> {
+    await this.assertRepoOwnership(userId, repoId)
+
+    const rows = await this.dbService.dbClient.select({
+      config: apiRunnerAuthPresets.config,
+      createdAt: apiRunnerAuthPresets.createdAt,
+      id: apiRunnerAuthPresets.id,
+      name: apiRunnerAuthPresets.name,
+      updatedAt: apiRunnerAuthPresets.updatedAt
+    })
+      .from(apiRunnerAuthPresets)
+      .where(and(
+        eq(apiRunnerAuthPresets.repoId, repoId),
+        eq(apiRunnerAuthPresets.userId, userId)
+      ))
+      .orderBy(desc(apiRunnerAuthPresets.updatedAt))
+
+    return rows.map(row => ({
+      config: row.config,
+      createdAt: row.createdAt,
+      id: row.id,
+      name: row.name,
+      updatedAt: row.updatedAt
+    }))
+  }
+
+  async listRunnerCollections(userId: number, repoId: number): Promise<RepoApiRunnerCollection[]> {
+    await this.assertRepoOwnership(userId, repoId)
+
+    const rows = await this.dbService.dbClient.select({
+      config: apiRunnerCollections.config,
+      createdAt: apiRunnerCollections.createdAt,
+      id: apiRunnerCollections.id,
+      name: apiRunnerCollections.name,
+      updatedAt: apiRunnerCollections.updatedAt
+    })
+      .from(apiRunnerCollections)
+      .where(and(
+        eq(apiRunnerCollections.repoId, repoId),
+        eq(apiRunnerCollections.userId, userId)
+      ))
+      .orderBy(desc(apiRunnerCollections.updatedAt))
+
+    return rows.map(row => ({
+      config: row.config,
+      createdAt: row.createdAt,
+      id: row.id,
+      name: row.name,
+      updatedAt: row.updatedAt
+    }))
   }
 
   async runApiRequest(
@@ -367,51 +461,49 @@ export class ApiExplorerService {
     }
   }
 
-  async deleteRunnerCollection(userId: number, repoId: number, collectionId: number) {
+  async saveRunnerAuthPreset(
+    userId: number,
+    repoId: number,
+    input: RepoApiRunnerSaveAuthPresetRequest
+  ): Promise<RepoApiRunnerAuthPreset> {
     await this.assertRepoOwnership(userId, repoId)
 
-    const [deleted] = await this.dbService.dbClient.delete(apiRunnerCollections)
-      .where(and(
-        eq(apiRunnerCollections.id, collectionId),
-        eq(apiRunnerCollections.repoId, repoId),
-        eq(apiRunnerCollections.userId, userId)
-      ))
-      .returning({ id: apiRunnerCollections.id })
+    const name = this.normalizeName(input.name, RUNNER_AUTH_PRESET_NAME_MAX_LENGTH, 'Auth preset name')
+    const config = this.normalizeRunnerAuthConfig(input.config)
 
-    if (!deleted) {
-      throw new NotFoundException('Runner collection not found')
-    }
+    const [saved] = await this.dbService.dbClient.insert(apiRunnerAuthPresets)
+      .values({
+        config,
+        name,
+        repoId,
+        userId
+      })
+      .onConflictDoUpdate({
+        set: {
+          config,
+          updatedAt: new Date().toISOString()
+        },
+        target: [
+          apiRunnerAuthPresets.repoId,
+          apiRunnerAuthPresets.userId,
+          apiRunnerAuthPresets.name
+        ]
+      })
+      .returning({
+        config: apiRunnerAuthPresets.config,
+        createdAt: apiRunnerAuthPresets.createdAt,
+        id: apiRunnerAuthPresets.id,
+        name: apiRunnerAuthPresets.name,
+        updatedAt: apiRunnerAuthPresets.updatedAt
+      })
 
     return {
-      id: deleted.id,
-      ok: true as const
+      config: saved.config,
+      createdAt: saved.createdAt,
+      id: saved.id,
+      name: saved.name,
+      updatedAt: saved.updatedAt
     }
-  }
-
-  async listRunnerCollections(userId: number, repoId: number): Promise<RepoApiRunnerCollection[]> {
-    await this.assertRepoOwnership(userId, repoId)
-
-    const rows = await this.dbService.dbClient.select({
-      config: apiRunnerCollections.config,
-      createdAt: apiRunnerCollections.createdAt,
-      id: apiRunnerCollections.id,
-      name: apiRunnerCollections.name,
-      updatedAt: apiRunnerCollections.updatedAt
-    })
-      .from(apiRunnerCollections)
-      .where(and(
-        eq(apiRunnerCollections.repoId, repoId),
-        eq(apiRunnerCollections.userId, userId)
-      ))
-      .orderBy(desc(apiRunnerCollections.updatedAt))
-
-    return rows.map(row => ({
-      config: row.config,
-      createdAt: row.createdAt,
-      id: row.id,
-      name: row.name,
-      updatedAt: row.updatedAt
-    }))
   }
 
   async saveRunnerCollection(
@@ -432,15 +524,15 @@ export class ApiExplorerService {
         userId
       })
       .onConflictDoUpdate({
+        set: {
+          config,
+          updatedAt: new Date().toISOString()
+        },
         target: [
           apiRunnerCollections.repoId,
           apiRunnerCollections.userId,
           apiRunnerCollections.name
-        ],
-        set: {
-          config,
-          updatedAt: new Date().toISOString()
-        }
+        ]
       })
       .returning({
         config: apiRunnerCollections.config,
@@ -448,98 +540,6 @@ export class ApiExplorerService {
         id: apiRunnerCollections.id,
         name: apiRunnerCollections.name,
         updatedAt: apiRunnerCollections.updatedAt
-      })
-
-    return {
-      config: saved.config,
-      createdAt: saved.createdAt,
-      id: saved.id,
-      name: saved.name,
-      updatedAt: saved.updatedAt
-    }
-  }
-
-  async deleteRunnerAuthPreset(userId: number, repoId: number, presetId: number) {
-    await this.assertRepoOwnership(userId, repoId)
-
-    const [deleted] = await this.dbService.dbClient.delete(apiRunnerAuthPresets)
-      .where(and(
-        eq(apiRunnerAuthPresets.id, presetId),
-        eq(apiRunnerAuthPresets.repoId, repoId),
-        eq(apiRunnerAuthPresets.userId, userId)
-      ))
-      .returning({ id: apiRunnerAuthPresets.id })
-
-    if (!deleted) {
-      throw new NotFoundException('Runner auth preset not found')
-    }
-
-    return {
-      id: deleted.id,
-      ok: true as const
-    }
-  }
-
-  async listRunnerAuthPresets(userId: number, repoId: number): Promise<RepoApiRunnerAuthPreset[]> {
-    await this.assertRepoOwnership(userId, repoId)
-
-    const rows = await this.dbService.dbClient.select({
-      config: apiRunnerAuthPresets.config,
-      createdAt: apiRunnerAuthPresets.createdAt,
-      id: apiRunnerAuthPresets.id,
-      name: apiRunnerAuthPresets.name,
-      updatedAt: apiRunnerAuthPresets.updatedAt
-    })
-      .from(apiRunnerAuthPresets)
-      .where(and(
-        eq(apiRunnerAuthPresets.repoId, repoId),
-        eq(apiRunnerAuthPresets.userId, userId)
-      ))
-      .orderBy(desc(apiRunnerAuthPresets.updatedAt))
-
-    return rows.map(row => ({
-      config: row.config,
-      createdAt: row.createdAt,
-      id: row.id,
-      name: row.name,
-      updatedAt: row.updatedAt
-    }))
-  }
-
-  async saveRunnerAuthPreset(
-    userId: number,
-    repoId: number,
-    input: RepoApiRunnerSaveAuthPresetRequest
-  ): Promise<RepoApiRunnerAuthPreset> {
-    await this.assertRepoOwnership(userId, repoId)
-
-    const name = this.normalizeName(input.name, RUNNER_AUTH_PRESET_NAME_MAX_LENGTH, 'Auth preset name')
-    const config = this.normalizeRunnerAuthConfig(input.config)
-
-    const [saved] = await this.dbService.dbClient.insert(apiRunnerAuthPresets)
-      .values({
-        config,
-        name,
-        repoId,
-        userId
-      })
-      .onConflictDoUpdate({
-        target: [
-          apiRunnerAuthPresets.repoId,
-          apiRunnerAuthPresets.userId,
-          apiRunnerAuthPresets.name
-        ],
-        set: {
-          config,
-          updatedAt: new Date().toISOString()
-        }
-      })
-      .returning({
-        config: apiRunnerAuthPresets.config,
-        createdAt: apiRunnerAuthPresets.createdAt,
-        id: apiRunnerAuthPresets.id,
-        name: apiRunnerAuthPresets.name,
-        updatedAt: apiRunnerAuthPresets.updatedAt
       })
 
     return {
@@ -586,6 +586,22 @@ export class ApiExplorerService {
     return method
   }
 
+  private async assertRepoOwnership(userId: number, repoId: number): Promise<RepoOwnership> {
+    const [repo] = await this.dbService.dbClient.select({
+      id: repos.id,
+      name: repos.name
+    })
+      .from(repos)
+      .where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
+      .limit(1)
+
+    if (!repo) {
+      throw new NotFoundException('Repository not found')
+    }
+
+    return repo
+  }
+
   private buildCanonicalFiles(segments: IngestSegmentPayload[]) {
     const files = new Map<string, CanonicalFile>()
 
@@ -625,6 +641,38 @@ export class ApiExplorerService {
     return files
   }
 
+  private async buildOpenApiSchemaRegistry(repoId: number): Promise<Record<string, RepoOpenApiSchema>> {
+    const segments = await this.fetchRepoSegmentsFromQdrant(repoId)
+    const files = this.buildCanonicalFiles(segments)
+    const schemaRegistry: Record<string, RepoOpenApiSchema> = {}
+
+    for (const file of files.values()) {
+      const nextSchemas = this.extractSchemasFromFile(file)
+      for (const [name, schema] of Object.entries(nextSchemas)) {
+        if (!schemaRegistry[name]) {
+          schemaRegistry[name] = schema
+        }
+      }
+    }
+
+    return schemaRegistry
+  }
+
+  private buildPathMatchCandidates(path: string) {
+    const normalized = this.normalizeHttpPath(path)
+    const candidates = new Set<string>([normalized])
+
+    if (normalized.startsWith('/api/')) {
+      candidates.add(this.normalizeHttpPath(normalized.slice(4)))
+    } else if (normalized === '/api') {
+      candidates.add('/')
+    } else {
+      candidates.add(this.normalizeHttpPath(`/api${normalized}`))
+    }
+
+    return [...candidates]
+  }
+
   private createEndpoint(
     file: CanonicalFile,
     framework: RepoApiFramework,
@@ -649,6 +697,34 @@ export class ApiExplorerService {
       sourceLineStart: options?.sourceContext?.lineStart,
       sourceSnippet: options?.sourceContext?.snippet,
       symbolName: options?.symbolName
+    }
+  }
+
+  private decodeRunnerResponseBody(data: ArrayBuffer, contentType: string) {
+    const buffer = Buffer.from(data)
+    const normalizedContentType = contentType.toLowerCase()
+
+    if (normalizedContentType.includes('application/json')) {
+      try {
+        return JSON.parse(buffer.toString('utf8'))
+      } catch {
+        return buffer.toString('utf8')
+      }
+    }
+
+    if (
+      normalizedContentType.startsWith('text/')
+      || normalizedContentType.includes('xml')
+      || normalizedContentType.includes('html')
+      || normalizedContentType.includes('javascript')
+    ) {
+      return buffer.toString('utf8')
+    }
+
+    return {
+      base64: buffer.toString('base64'),
+      bytes: buffer.byteLength,
+      contentType: contentType || 'application/octet-stream'
     }
   }
 
@@ -921,29 +997,25 @@ export class ApiExplorerService {
     return endpoints
   }
 
-  private extractSymbolNameFromSnippet(snippet: string) {
-    const candidatePatterns = [
-      /\basync\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/,
-      /\b([A-Za-z_][A-Za-z0-9_]*)\s*\([^)]*\)\s*\{/,
-      /\bdef\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/
-    ]
+  private extractBracedBlock(content: string, startBraceIndex: number): null | string {
+    if (startBraceIndex < 0 || startBraceIndex >= content.length || content[startBraceIndex] !== '{') {
+      return null
+    }
 
-    for (const pattern of candidatePatterns) {
-      const match = snippet.match(pattern)
-      if (match?.[1]) {
-        return match[1]
+    let depth = 0
+    for (let index = startBraceIndex; index < content.length; index += 1) {
+      const char = content[index]
+      if (char === '{') {
+        depth += 1
+      } else if (char === '}') {
+        depth -= 1
+        if (depth === 0) {
+          return content.slice(startBraceIndex + 1, index)
+        }
       }
     }
 
-    return undefined
-  }
-
-  private extractNestBodyTypeFromSnippet(snippet: string): string | undefined {
-    const match = snippet.match(
-      /@Body\s*\([^)]*\)\s*(?:public\s+|private\s+|protected\s+|readonly\s+)?[A-Za-z_][A-Za-z0-9_]*\s*:\s*([A-Za-z_][A-Za-z0-9_.<>]*)/
-    )
-
-    return this.normalizeTypeName(match?.[1])
+    return null
   }
 
   private extractFastApiBodyTypeFromSnippet(snippet: string, path: string): string | undefined {
@@ -974,44 +1046,144 @@ export class ApiExplorerService {
     return undefined
   }
 
-  private inferModuleName(filePath: string, framework: RepoApiFramework) {
-    const segments = filePath.split('/').filter(Boolean)
-    if (segments.length === 0) {
-      return framework
-    }
+  private extractNestBodyTypeFromSnippet(snippet: string): string | undefined {
+    const match = snippet.match(
+      /@Body\s*\([^)]*\)\s*(?:public\s+|private\s+|protected\s+|readonly\s+)?[A-Za-z_][A-Za-z0-9_]*\s*:\s*([A-Za-z_][A-Za-z0-9_.<>]*)/
+    )
 
-    const lowercase = segments.map(segment => segment.toLowerCase())
-    const markerCandidates = [
-      'modules',
-      'module',
-      'routers',
-      'router',
-      'controllers',
-      'controller',
-      'routes',
-      'route',
-      'views',
-      'view',
-      'blueprints',
-      'blueprint',
-      'apps',
-      'api'
-    ]
+    return this.normalizeTypeName(match?.[1])
+  }
 
-    for (const marker of markerCandidates) {
-      const markerIndex = lowercase.lastIndexOf(marker)
-      if (markerIndex < 0) {
+  private extractPythonObjectSchemas(content: string): Record<string, RepoOpenApiSchema> {
+    const schemas: Record<string, RepoOpenApiSchema> = {}
+    const classPattern = /^class\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*:\s*$/gm
+
+    for (const classMatch of content.matchAll(classPattern)) {
+      const typeName = this.normalizeTypeName(classMatch[1])
+      const bases = classMatch[2] ?? ''
+      if (!typeName || !/\b(BaseModel|Serializer|Schema)\b/.test(bases)) {
         continue
       }
 
-      const nextSegment = segments[markerIndex + 1]
-      if (nextSegment && !nextSegment.includes('.')) {
-        return this.normalizeModuleSegment(nextSegment)
+      const start = classMatch.index ?? 0
+      const afterClass = content.slice(start)
+      const bodyMatch = afterClass.match(/^class[^\n]*\n((?:[ \t]+[^\n]*\n?)*)/m)
+      const body = bodyMatch?.[1] ?? ''
+      const properties: Record<string, RepoOpenApiSchema> = {}
+      const required: string[] = []
+
+      for (const fieldMatch of body.matchAll(/^[ \t]+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([^\n=]+)(?:\s*=\s*(.+))?$/gm)) {
+        const name = fieldMatch[1] ?? ''
+        const rawType = fieldMatch[2] ?? ''
+        if (!name) {
+          continue
+        }
+
+        properties[name] = this.inferSchemaFromTypeHint(rawType)
+
+        const hasDefault = typeof fieldMatch[3] === 'string' && fieldMatch[3].trim().length > 0
+        if (!hasDefault && !/\bOptional\[/i.test(rawType)) {
+          required.push(name)
+        }
+      }
+
+      if (Object.keys(properties).length === 0) {
+        continue
+      }
+
+      schemas[typeName] = {
+        properties,
+        required: required.length > 0 ? required : undefined,
+        type: 'object'
       }
     }
 
-    const fileName = segments[segments.length - 1] ?? framework
-    return this.normalizeModuleSegment(fileName)
+    return schemas
+  }
+
+  private extractSchemasFromFile(file: CanonicalFile): Record<string, RepoOpenApiSchema> {
+    if (!file.content.trim()) {
+      return {}
+    }
+
+    const fromTs = this.extractTypeScriptObjectSchemas(file.content)
+    const fromPy = this.extractPythonObjectSchemas(file.content)
+    return {
+      ...fromTs,
+      ...fromPy
+    }
+  }
+
+  private extractSymbolNameFromSnippet(snippet: string) {
+    const candidatePatterns = [
+      /\basync\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/,
+      /\b([A-Za-z_][A-Za-z0-9_]*)\s*\([^)]*\)\s*\{/,
+      /\bdef\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/
+    ]
+
+    for (const pattern of candidatePatterns) {
+      const match = snippet.match(pattern)
+      if (match?.[1]) {
+        return match[1]
+      }
+    }
+
+    return undefined
+  }
+
+  private extractTypeScriptObjectSchemas(content: string): Record<string, RepoOpenApiSchema> {
+    const schemas: Record<string, RepoOpenApiSchema> = {}
+    const patterns = [
+      /(?:export\s+)?interface\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{/g,
+      /(?:export\s+)?type\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*\{/g,
+      /(?:export\s+)?class\s+([A-Za-z_][A-Za-z0-9_]*)[^{]*\{/g
+    ]
+
+    for (const pattern of patterns) {
+      for (const match of content.matchAll(pattern)) {
+        const typeName = this.normalizeTypeName(match[1])
+        if (!typeName) {
+          continue
+        }
+
+        const braceIndex = (match.index ?? 0) + match[0].lastIndexOf('{')
+        const block = this.extractBracedBlock(content, braceIndex)
+        if (!block) {
+          continue
+        }
+
+        const properties: Record<string, RepoOpenApiSchema> = {}
+        const required: string[] = []
+
+        for (const propertyMatch of block.matchAll(/^\s*([A-Za-z_][A-Za-z0-9_]*)\??\s*:\s*([^;\n]+)[;,]?/gm)) {
+          const name = propertyMatch[1] ?? ''
+          const rawType = propertyMatch[2] ?? ''
+          if (!name || /\breadonly\b/.test(name)) {
+            continue
+          }
+
+          const schema = this.inferSchemaFromTypeHint(rawType)
+          properties[name] = schema
+
+          const isOptional = propertyMatch[0].includes('?:') || /\|\s*undefined\b/.test(rawType)
+          if (!isOptional) {
+            required.push(name)
+          }
+        }
+
+        if (Object.keys(properties).length === 0) {
+          continue
+        }
+
+        schemas[typeName] = {
+          properties,
+          required: required.length > 0 ? required : undefined,
+          type: 'object'
+        }
+      }
+    }
+
+    return schemas
   }
 
   private async fetchRepoSegmentsFromQdrant(repoId: number): Promise<IngestSegmentPayload[]> {
@@ -1085,103 +1257,119 @@ export class ApiExplorerService {
     return payloads
   }
 
-  private async assertRepoOwnership(userId: number, repoId: number): Promise<RepoOwnership> {
-    const [repo] = await this.dbService.dbClient.select({
-      id: repos.id,
-      name: repos.name
-    })
-      .from(repos)
-      .where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
-      .limit(1)
-
-    if (!repo) {
-      throw new NotFoundException('Repository not found')
-    }
-
-    return repo
-  }
-
-  private joinHttpPath(prefix: string, path: string) {
-    const normalizedPrefix = this.normalizeHttpPath(prefix)
-    const normalizedPath = this.normalizeHttpPath(path)
-
-    if (normalizedPrefix === '/') {
-      return normalizedPath
-    }
-
-    if (normalizedPath === '/') {
-      return normalizedPrefix
-    }
-
-    return this.normalizeHttpPath(`${normalizedPrefix}/${normalizedPath}`)
-  }
-
-  private normalizeFilePath(filePath: unknown) {
-    if (typeof filePath !== 'string') {
-      return null
-    }
-
-    const normalized = filePath
-      .trim()
-      .replaceAll('\\', '/')
-      .replace(/^\.\/+/, '')
-      .replace(/\/{2,}/g, '/')
-
-    if (!normalized) {
-      return null
-    }
-
-    return normalized
-  }
-
-  private normalizeHttpPath(path: string) {
-    const trimmed = path.trim()
-    if (!trimmed || trimmed === '.') {
-      return '/'
-    }
-
-    let normalized = trimmed
-      .replaceAll('\\', '/')
-      .replace(/\/{2,}/g, '/')
-      .replace(/^\.\/+/, '')
-
-    if (!normalized.startsWith('/')) {
-      normalized = `/${normalized}`
-    }
-
-    if (normalized.length > 1 && normalized.endsWith('/')) {
-      normalized = normalized.slice(0, -1)
-    }
-
-    return normalized
-  }
-
-  private decodeRunnerResponseBody(data: ArrayBuffer, contentType: string) {
-    const buffer = Buffer.from(data)
-    const normalizedContentType = contentType.toLowerCase()
-
-    if (normalizedContentType.includes('application/json')) {
-      try {
-        return JSON.parse(buffer.toString('utf8'))
-      } catch {
-        return buffer.toString('utf8')
+  private findRuntimePathForStatic(
+    staticPath: string,
+    method: RepoOpenApiOperationMethod,
+    runtimePaths: RepoOpenApiDocument['paths']
+  ) {
+    const candidates = this.buildPathMatchCandidates(staticPath)
+    for (const candidate of candidates) {
+      const operation = runtimePaths[candidate]?.[method]
+      if (operation) {
+        return candidate
       }
     }
 
-    if (
-      normalizedContentType.startsWith('text/')
-      || normalizedContentType.includes('xml')
-      || normalizedContentType.includes('html')
-      || normalizedContentType.includes('javascript')
-    ) {
-      return buffer.toString('utf8')
+    return null
+  }
+
+  private findStaticOperationForRuntimePath(
+    staticPaths: RepoOpenApiDocument['paths'],
+    runtimePath: string,
+    method: RepoOpenApiOperationMethod
+  ) {
+    const candidates = this.buildPathMatchCandidates(runtimePath)
+    for (const candidate of candidates) {
+      const operation = staticPaths[candidate]?.[method]
+      if (operation) {
+        return operation
+      }
     }
 
-    return {
-      base64: buffer.toString('base64'),
-      bytes: buffer.byteLength,
-      contentType: contentType || 'application/octet-stream'
+    return null
+  }
+
+  private inferModuleName(filePath: string, framework: RepoApiFramework) {
+    const segments = filePath.split('/').filter(Boolean)
+    if (segments.length === 0) {
+      return framework
     }
+
+    const lowercase = segments.map(segment => segment.toLowerCase())
+    const markerCandidates = [
+      'modules',
+      'module',
+      'routers',
+      'router',
+      'controllers',
+      'controller',
+      'routes',
+      'route',
+      'views',
+      'view',
+      'blueprints',
+      'blueprint',
+      'apps',
+      'api'
+    ]
+
+    for (const marker of markerCandidates) {
+      const markerIndex = lowercase.lastIndexOf(marker)
+      if (markerIndex < 0) {
+        continue
+      }
+
+      const nextSegment = segments[markerIndex + 1]
+      if (nextSegment && !nextSegment.includes('.')) {
+        return this.normalizeModuleSegment(nextSegment)
+      }
+    }
+
+    const fileName = segments[segments.length - 1] ?? framework
+    return this.normalizeModuleSegment(fileName)
+  }
+
+  private inferSchemaFromTypeHint(rawType: string): RepoOpenApiSchema {
+    const normalized = rawType
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/^\(/, '')
+      .replace(/\)$/, '')
+    const lower = normalized.toLowerCase()
+
+    if (!normalized) {
+      return { type: 'string' }
+    }
+
+    if (lower.startsWith('array<') || /\[\]$/.test(normalized) || lower.startsWith('list[') || lower.startsWith('sequence[')) {
+      return {
+        items: {
+          type: 'string'
+        },
+        type: 'array'
+      }
+    }
+
+    if (/\b(bool|boolean)\b/i.test(normalized)) {
+      return { type: 'boolean' }
+    }
+
+    if (/\b(int|integer|int32|int64)\b/i.test(normalized)) {
+      return { type: 'integer' }
+    }
+
+    if (/\b(number|float|double|decimal)\b/i.test(normalized)) {
+      return { type: 'number' }
+    }
+
+    if (/\b(object|dict|map|record)\b/i.test(normalized)) {
+      return {
+        additionalProperties: true,
+        type: 'object'
+      }
+    }
+
+    return { type: 'string' }
   }
 
   private isAllowedRunnerTarget(urlString: string) {
@@ -1213,6 +1401,24 @@ export class ApiExplorerService {
     return this.isPrivateIpv4Host(hostname)
   }
 
+  private isPrimitiveTypeName(typeName: string) {
+    return new Set([
+      'Any',
+      'Dict',
+      'List',
+      'None',
+      'Optional',
+      'Union',
+      'bool',
+      'dict',
+      'float',
+      'int',
+      'object',
+      'str',
+      'string'
+    ]).has(typeName)
+  }
+
   private isPrivateIpv4Host(hostname: string) {
     const octets = hostname.split('.').map(value => Number.parseInt(value, 10))
     if (octets.length !== 4 || octets.some(value => !Number.isInteger(value) || value < 0 || value > 255)) {
@@ -1235,143 +1441,19 @@ export class ApiExplorerService {
     return false
   }
 
-  private normalizeRunnerHeaders(headers?: Record<string, string>) {
-    const normalized: Record<string, string> = {}
-    if (!headers || typeof headers !== 'object') {
-      return normalized
+  private joinHttpPath(prefix: string, path: string) {
+    const normalizedPrefix = this.normalizeHttpPath(prefix)
+    const normalizedPath = this.normalizeHttpPath(path)
+
+    if (normalizedPrefix === '/') {
+      return normalizedPath
     }
 
-    for (const [rawKey, rawValue] of Object.entries(headers)) {
-      const key = rawKey.trim().toLowerCase()
-      if (!key || ['connection', 'content-length', 'host'].includes(key)) {
-        continue
-      }
-
-      const value = typeof rawValue === 'string' ? rawValue.trim() : String(rawValue)
-      if (!value) {
-        continue
-      }
-
-      normalized[key] = value
+    if (normalizedPath === '/') {
+      return normalizedPrefix
     }
 
-    return normalized
-  }
-
-  private normalizeRunnerTimeout(timeoutMs?: number) {
-    if (!Number.isFinite(timeoutMs)) {
-      return RUNNER_DEFAULT_TIMEOUT_MS
-    }
-
-    return Math.min(RUNNER_MAX_TIMEOUT_MS, Math.max(1_000, Math.trunc(timeoutMs as number)))
-  }
-
-  private normalizeRunnerUrl(url: string) {
-    if (typeof url !== 'string' || !url.trim()) {
-      throw new BadRequestException('Runner URL is required')
-    }
-
-    try {
-      return new URL(url.trim()).toString()
-    } catch {
-      throw new BadRequestException('Runner URL is invalid')
-    }
-  }
-
-  private toPlainHeaders(headers: unknown) {
-    const normalized: Record<string, string> = {}
-    if (!headers || typeof headers !== 'object') {
-      return normalized
-    }
-
-    for (const [rawKey, rawValue] of Object.entries(headers)) {
-      const key = rawKey.toLowerCase()
-      if (!key) {
-        continue
-      }
-
-      if (Array.isArray(rawValue)) {
-        normalized[key] = rawValue.map(value => String(value)).join(', ')
-        continue
-      }
-
-      if (typeof rawValue === 'string') {
-        normalized[key] = rawValue
-        continue
-      }
-
-      if (rawValue === undefined || rawValue === null) {
-        continue
-      }
-
-      normalized[key] = String(rawValue)
-    }
-
-    return normalized
-  }
-
-  private normalizeCollectionConfig(config: RepoApiRunnerCollectionConfig): RepoApiRunnerCollectionConfig {
-    if (!config || typeof config !== 'object') {
-      throw new BadRequestException('Collection config is required')
-    }
-
-    const timeoutMs = Number.isFinite(config.timeoutMs)
-      ? Math.min(RUNNER_MAX_TIMEOUT_MS, Math.max(1_000, Math.trunc(config.timeoutMs)))
-      : RUNNER_DEFAULT_TIMEOUT_MS
-
-    return {
-      auth: this.normalizeRunnerAuthConfig(config.auth),
-      baseUrl: String(config.baseUrl ?? ''),
-      bodyJson: String(config.bodyJson ?? '{}'),
-      endpointId: config.endpointId ? String(config.endpointId) : null,
-      endpointMethod: this.assertMethod(String(config.endpointMethod ?? '')) ?? null,
-      endpointPath: config.endpointPath ? String(config.endpointPath) : null,
-      headersJson: String(config.headersJson ?? '{}'),
-      pathValues: typeof config.pathValues === 'object' && config.pathValues !== null
-        ? Object.fromEntries(
-            Object.entries(config.pathValues).map(([key, value]) => [String(key), String(value)])
-          )
-        : {},
-      queryJson: String(config.queryJson ?? '{}'),
-      timeoutMs
-    }
-  }
-
-  private normalizeName(name: string, maxLength: number, label: string) {
-    const normalizedName = typeof name === 'string' ? name.trim() : ''
-    if (!normalizedName) {
-      throw new BadRequestException(`${label} is required`)
-    }
-    if (normalizedName.length > maxLength) {
-      throw new BadRequestException(`${label} max length is ${maxLength}`)
-    }
-
-    return normalizedName
-  }
-
-  private normalizeCollectionName(name: string) {
-    return this.normalizeName(name, RUNNER_COLLECTION_NAME_MAX_LENGTH, 'Collection name')
-  }
-
-  private normalizeRunnerAuthConfig(input: unknown): RepoApiRunnerAuthConfig {
-    const safeAuth = input && typeof input === 'object'
-      ? (input as Record<string, unknown>)
-      : {}
-
-    const rawMode = String(safeAuth.mode ?? '')
-    const mode: RepoApiRunnerAuthMode = RUNNER_AUTH_MODES.includes(rawMode as RepoApiRunnerAuthMode)
-      ? (rawMode as RepoApiRunnerAuthMode)
-      : 'none'
-
-    return {
-      apiKeyName: String(safeAuth.apiKeyName ?? 'x-api-key'),
-      apiKeyPlacement: safeAuth.apiKeyPlacement === 'query' ? 'query' : 'header',
-      apiKeyValue: String(safeAuth.apiKeyValue ?? ''),
-      basicPassword: String(safeAuth.basicPassword ?? ''),
-      basicUsername: String(safeAuth.basicUsername ?? ''),
-      bearerToken: String(safeAuth.bearerToken ?? ''),
-      mode
-    }
+    return this.normalizeHttpPath(`${normalizedPrefix}/${normalizedPath}`)
   }
 
   private mergeOperationSources(existing: RepoOpenApiOperation, nextOperation: RepoOpenApiOperation) {
@@ -1468,8 +1550,8 @@ export class ApiExplorerService {
     return {
       components: Object.keys(mergedSchemas).length > 0
         ? {
-            schemas: mergedSchemas
-          }
+          schemas: mergedSchemas
+        }
         : undefined,
       info: runtimeSpec.info?.title ? runtimeSpec.info : staticSpec.info,
       openapi: '3.1.0',
@@ -1489,54 +1571,164 @@ export class ApiExplorerService {
     )
   }
 
-  private findRuntimePathForStatic(
-    staticPath: string,
-    method: RepoOpenApiOperationMethod,
-    runtimePaths: RepoOpenApiDocument['paths']
-  ) {
-    const candidates = this.buildPathMatchCandidates(staticPath)
-    for (const candidate of candidates) {
-      const operation = runtimePaths[candidate]?.[method]
-      if (operation) {
-        return candidate
+  private normalizeCollectionConfig(config: RepoApiRunnerCollectionConfig): RepoApiRunnerCollectionConfig {
+    if (!config || typeof config !== 'object') {
+      throw new BadRequestException('Collection config is required')
+    }
+
+    const timeoutMs = Number.isFinite(config.timeoutMs)
+      ? Math.min(RUNNER_MAX_TIMEOUT_MS, Math.max(1_000, Math.trunc(config.timeoutMs)))
+      : RUNNER_DEFAULT_TIMEOUT_MS
+
+    return {
+      auth: this.normalizeRunnerAuthConfig(config.auth),
+      baseUrl: String(config.baseUrl ?? ''),
+      bodyJson: String(config.bodyJson ?? '{}'),
+      endpointId: config.endpointId ? String(config.endpointId) : null,
+      endpointMethod: this.assertMethod(String(config.endpointMethod ?? '')) ?? null,
+      endpointPath: config.endpointPath ? String(config.endpointPath) : null,
+      headersJson: String(config.headersJson ?? '{}'),
+      pathValues: typeof config.pathValues === 'object' && config.pathValues !== null
+        ? Object.fromEntries(
+          Object.entries(config.pathValues).map(([key, value]) => [String(key), String(value)])
+        )
+        : {},
+      queryJson: String(config.queryJson ?? '{}'),
+      timeoutMs
+    }
+  }
+
+  private normalizeCollectionName(name: string) {
+    return this.normalizeName(name, RUNNER_COLLECTION_NAME_MAX_LENGTH, 'Collection name')
+  }
+
+  private normalizeFilePath(filePath: unknown) {
+    if (typeof filePath !== 'string') {
+      return null
+    }
+
+    const normalized = filePath
+      .trim()
+      .replaceAll('\\', '/')
+      .replace(/^\.\/+/, '')
+      .replace(/\/{2,}/g, '/')
+
+    if (!normalized) {
+      return null
+    }
+
+    return normalized
+  }
+
+  private normalizeHttpPath(path: string) {
+    const trimmed = path.trim()
+    if (!trimmed || trimmed === '.') {
+      return '/'
+    }
+
+    let normalized = trimmed
+      .replaceAll('\\', '/')
+      .replace(/\/{2,}/g, '/')
+      .replace(/^\.\/+/, '')
+
+    if (!normalized.startsWith('/')) {
+      normalized = `/${normalized}`
+    }
+
+    if (normalized.length > 1 && normalized.endsWith('/')) {
+      normalized = normalized.slice(0, -1)
+    }
+
+    return normalized
+  }
+
+  private normalizeModuleSegment(segment: string) {
+    const cleaned = segment
+      .replace(/\.[^.]+$/, '')
+      .replace(/(?:\.|_)?(controller|controllers|route|routes|router|routers|view|views|handler|handlers)$/i, '')
+      .replace(/[-_]+/g, ' ')
+      .trim()
+
+    return cleaned.length > 0 ? cleaned : segment
+  }
+
+  private normalizeName(name: string, maxLength: number, label: string) {
+    const normalizedName = typeof name === 'string' ? name.trim() : ''
+    if (!normalizedName) {
+      throw new BadRequestException(`${label} is required`)
+    }
+    if (normalizedName.length > maxLength) {
+      throw new BadRequestException(`${label} max length is ${maxLength}`)
+    }
+
+    return normalizedName
+  }
+
+  private normalizeRunnerAuthConfig(input: unknown): RepoApiRunnerAuthConfig {
+    const safeAuth = input && typeof input === 'object'
+      ? (input as Record<string, unknown>)
+      : {}
+
+    const rawMode = String(safeAuth.mode ?? '')
+    const mode: RepoApiRunnerAuthMode = RUNNER_AUTH_MODES.includes(rawMode as RepoApiRunnerAuthMode)
+      ? (rawMode as RepoApiRunnerAuthMode)
+      : 'none'
+
+    return {
+      apiKeyName: String(safeAuth.apiKeyName ?? 'x-api-key'),
+      apiKeyPlacement: safeAuth.apiKeyPlacement === 'query' ? 'query' : 'header',
+      apiKeyValue: String(safeAuth.apiKeyValue ?? ''),
+      basicPassword: String(safeAuth.basicPassword ?? ''),
+      basicUsername: String(safeAuth.basicUsername ?? ''),
+      bearerToken: String(safeAuth.bearerToken ?? ''),
+      mode
+    }
+  }
+
+  private normalizeRunnerHeaders(headers?: Record<string, string>) {
+    const normalized: Record<string, string> = {}
+    if (!headers || typeof headers !== 'object') {
+      return normalized
+    }
+
+    for (const [rawKey, rawValue] of Object.entries(headers)) {
+      const key = rawKey.trim().toLowerCase()
+      if (!key || ['connection', 'content-length', 'host'].includes(key)) {
+        continue
       }
-    }
 
-    return null
-  }
-
-  private findStaticOperationForRuntimePath(
-    staticPaths: RepoOpenApiDocument['paths'],
-    runtimePath: string,
-    method: RepoOpenApiOperationMethod
-  ) {
-    const candidates = this.buildPathMatchCandidates(runtimePath)
-    for (const candidate of candidates) {
-      const operation = staticPaths[candidate]?.[method]
-      if (operation) {
-        return operation
+      const value = typeof rawValue === 'string' ? rawValue.trim() : String(rawValue)
+      if (!value) {
+        continue
       }
+
+      normalized[key] = value
     }
 
-    return null
+    return normalized
   }
 
-  private buildPathMatchCandidates(path: string) {
-    const normalized = this.normalizeHttpPath(path)
-    const candidates = new Set<string>([normalized])
-
-    if (normalized.startsWith('/api/')) {
-      candidates.add(this.normalizeHttpPath(normalized.slice(4)))
-    } else if (normalized === '/api') {
-      candidates.add('/')
-    } else {
-      candidates.add(this.normalizeHttpPath(`/api${normalized}`))
+  private normalizeRunnerTimeout(timeoutMs?: number) {
+    if (!Number.isFinite(timeoutMs)) {
+      return RUNNER_DEFAULT_TIMEOUT_MS
     }
 
-    return [...candidates]
+    return Math.min(RUNNER_MAX_TIMEOUT_MS, Math.max(1_000, Math.trunc(timeoutMs as number)))
   }
 
-  private normalizeRuntimeOpenApiDocument(input: unknown): RepoOpenApiDocument | null {
+  private normalizeRunnerUrl(url: string) {
+    if (typeof url !== 'string' || !url.trim()) {
+      throw new BadRequestException('Runner URL is required')
+    }
+
+    try {
+      return new URL(url.trim()).toString()
+    } catch {
+      throw new BadRequestException('Runner URL is invalid')
+    }
+  }
+
+  private normalizeRuntimeOpenApiDocument(input: unknown): null | RepoOpenApiDocument {
     if (!input || typeof input !== 'object') {
       return null
     }
@@ -1553,14 +1745,14 @@ export class ApiExplorerService {
     const infoRaw = raw.info && typeof raw.info === 'object' ? raw.info as Record<string, unknown> : {}
     const runtimeTags = Array.isArray(raw.tags)
       ? raw.tags
-          .map(item => {
-            if (!item || typeof item !== 'object') {
-              return null
-            }
-            const name = (item as Record<string, unknown>).name
-            return typeof name === 'string' && name.trim() ? { name: name.trim() } : null
-          })
-          .filter((value): value is { name: string } => value !== null)
+        .map(item => {
+          if (!item || typeof item !== 'object') {
+            return null
+          }
+          const name = (item as Record<string, unknown>).name
+          return typeof name === 'string' && name.trim() ? { name: name.trim() } : null
+        })
+        .filter((value): value is { name: string } => value !== null)
       : undefined
 
     const componentsRaw = raw.components && typeof raw.components === 'object'
@@ -1573,8 +1765,8 @@ export class ApiExplorerService {
     return {
       components: schemasRaw
         ? {
-            schemas: schemasRaw
-          }
+          schemas: schemasRaw
+        }
         : undefined,
       info: {
         description: typeof infoRaw.description === 'string' ? infoRaw.description : '',
@@ -1587,30 +1779,48 @@ export class ApiExplorerService {
     }
   }
 
-  private async tryFetchRuntimeOpenApiDocument(runtimeBaseUrl: string): Promise<null | RepoOpenApiDocument> {
-    for (const candidatePath of RUNTIME_OPENAPI_CANDIDATE_PATHS) {
-      const candidateUrl = new URL(candidatePath, runtimeBaseUrl).toString()
-      try {
-        const response = await axios.request<unknown>({
-          maxContentLength: RUNNER_MAX_RESPONSE_BYTES,
-          method: 'GET',
-          timeout: RUNTIME_OPENAPI_TIMEOUT_MS,
-          url: candidateUrl,
-          validateStatus: status => status >= 200 && status < 300
-        })
-
-        const normalized = this.normalizeRuntimeOpenApiDocument(response.data)
-        if (normalized) {
-          this.logger.log(`Using runtime OpenAPI from ${candidateUrl}`)
-          return normalized
-        }
-      } catch {
-        continue
-      }
+  private normalizeTypeName(value: unknown): string | undefined {
+    if (typeof value !== 'string') {
+      return undefined
     }
 
-    this.logger.warn(`Runtime OpenAPI unavailable for base URL ${runtimeBaseUrl}, using static fallback`)
-    return null
+    const normalized = value
+      .trim()
+      .split(/[\s<>\[\],|]/)[0]
+      ?.replace(/^.*\./, '')
+      ?.replace(/[^A-Za-z0-9_]/g, '')
+
+    if (!normalized || normalized.length === 0) {
+      return undefined
+    }
+
+    return normalized
+  }
+
+  private parseFrameworks(frameworks?: string) {
+    if (!frameworks) {
+      return [] as RepoApiFramework[]
+    }
+
+    const values = frameworks
+      .split(',')
+      .map(value => value.trim().toLowerCase() as RepoApiFramework)
+      .filter(value => SUPPORTED_FRAMEWORKS.includes(value))
+
+    return Array.from(new Set(values))
+  }
+
+  private parseMethods(methods?: string) {
+    if (!methods) {
+      return [] as RepoApiHttpMethod[]
+    }
+
+    const values = methods
+      .split(',')
+      .map(value => this.assertMethod(value))
+      .filter((value): value is RepoApiHttpMethod => value !== null)
+
+    return Array.from(new Set(values))
   }
 
   private parseRuntimeBaseUrl(value: unknown) {
@@ -1633,6 +1843,50 @@ export class ApiExplorerService {
     }
 
     return normalized
+  }
+
+  private parseSearch(search?: string) {
+    if (!search) {
+      return ''
+    }
+
+    return search.trim().toLowerCase()
+  }
+
+  private pushParam(params: RepoApiEndpointParameter[], nextParam: RepoApiEndpointParameter) {
+    if (params.some(param => param.location === nextParam.location && param.name === nextParam.name)) {
+      return
+    }
+
+    params.push(nextParam)
+  }
+
+  private readSnippet(content: string, start: number, size: number) {
+    if (start < 0) {
+      return content.slice(0, size)
+    }
+
+    return content.slice(start, Math.min(content.length, start + size))
+  }
+
+  private readSourceContext(content: string, start: number, size: number): SourceContext {
+    const safeStart = Math.max(0, start)
+    const lineStart = content.slice(0, safeStart).split('\n').length
+    const snippet = this.readSnippet(content, safeStart, size).trim()
+
+    return {
+      lineStart,
+      snippet
+    }
+  }
+
+  private safeString(value: unknown) {
+    if (typeof value !== 'string') {
+      return null
+    }
+
+    const normalized = value.trim()
+    return normalized.length > 0 ? normalized : null
   }
 
   private sourceFromEndpoint(endpoint: RepoApiEndpoint): RepoOpenApiSourceMetadata {
@@ -1697,11 +1951,11 @@ export class ApiExplorerService {
       const schema = requestBodyTypeName && schemaRegistry[requestBodyTypeName]
         ? { $ref: `#/components/schemas/${requestBodyTypeName}` }
         : {
-            additionalProperties: true,
-            properties: bodyProperties,
-            required: requiredBodyProperties.length > 0 ? requiredBodyProperties : undefined,
-            type: 'object' as const
-          }
+          additionalProperties: true,
+          properties: bodyProperties,
+          required: requiredBodyProperties.length > 0 ? requiredBodyProperties : undefined,
+          type: 'object' as const
+        }
 
       operation.requestBody = {
         content: {
@@ -1743,316 +1997,62 @@ export class ApiExplorerService {
     return `${methodPart}_${pathPart}_${filePart}_${symbolPart}`
   }
 
-  private async buildOpenApiSchemaRegistry(repoId: number): Promise<Record<string, RepoOpenApiSchema>> {
-    const segments = await this.fetchRepoSegmentsFromQdrant(repoId)
-    const files = this.buildCanonicalFiles(segments)
-    const schemaRegistry: Record<string, RepoOpenApiSchema> = {}
-
-    for (const file of files.values()) {
-      const nextSchemas = this.extractSchemasFromFile(file)
-      for (const [name, schema] of Object.entries(nextSchemas)) {
-        if (!schemaRegistry[name]) {
-          schemaRegistry[name] = schema
-        }
-      }
+  private toPlainHeaders(headers: unknown) {
+    const normalized: Record<string, string> = {}
+    if (!headers || typeof headers !== 'object') {
+      return normalized
     }
 
-    return schemaRegistry
-  }
-
-  private extractSchemasFromFile(file: CanonicalFile): Record<string, RepoOpenApiSchema> {
-    if (!file.content.trim()) {
-      return {}
-    }
-
-    const fromTs = this.extractTypeScriptObjectSchemas(file.content)
-    const fromPy = this.extractPythonObjectSchemas(file.content)
-    return {
-      ...fromTs,
-      ...fromPy
-    }
-  }
-
-  private extractTypeScriptObjectSchemas(content: string): Record<string, RepoOpenApiSchema> {
-    const schemas: Record<string, RepoOpenApiSchema> = {}
-    const patterns = [
-      /(?:export\s+)?interface\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{/g,
-      /(?:export\s+)?type\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*\{/g,
-      /(?:export\s+)?class\s+([A-Za-z_][A-Za-z0-9_]*)[^{]*\{/g
-    ]
-
-    for (const pattern of patterns) {
-      for (const match of content.matchAll(pattern)) {
-        const typeName = this.normalizeTypeName(match[1])
-        if (!typeName) {
-          continue
-        }
-
-        const braceIndex = (match.index ?? 0) + match[0].lastIndexOf('{')
-        const block = this.extractBracedBlock(content, braceIndex)
-        if (!block) {
-          continue
-        }
-
-        const properties: Record<string, RepoOpenApiSchema> = {}
-        const required: string[] = []
-
-        for (const propertyMatch of block.matchAll(/^\s*([A-Za-z_][A-Za-z0-9_]*)\??\s*:\s*([^;\n]+)[;,]?/gm)) {
-          const name = propertyMatch[1] ?? ''
-          const rawType = propertyMatch[2] ?? ''
-          if (!name || /\breadonly\b/.test(name)) {
-            continue
-          }
-
-          const schema = this.inferSchemaFromTypeHint(rawType)
-          properties[name] = schema
-
-          const isOptional = propertyMatch[0].includes('?:') || /\|\s*undefined\b/.test(rawType)
-          if (!isOptional) {
-            required.push(name)
-          }
-        }
-
-        if (Object.keys(properties).length === 0) {
-          continue
-        }
-
-        schemas[typeName] = {
-          properties,
-          required: required.length > 0 ? required : undefined,
-          type: 'object'
-        }
-      }
-    }
-
-    return schemas
-  }
-
-  private extractPythonObjectSchemas(content: string): Record<string, RepoOpenApiSchema> {
-    const schemas: Record<string, RepoOpenApiSchema> = {}
-    const classPattern = /^class\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*:\s*$/gm
-
-    for (const classMatch of content.matchAll(classPattern)) {
-      const typeName = this.normalizeTypeName(classMatch[1])
-      const bases = classMatch[2] ?? ''
-      if (!typeName || !/\b(BaseModel|Serializer|Schema)\b/.test(bases)) {
+    for (const [rawKey, rawValue] of Object.entries(headers)) {
+      const key = rawKey.toLowerCase()
+      if (!key) {
         continue
       }
 
-      const start = classMatch.index ?? 0
-      const afterClass = content.slice(start)
-      const bodyMatch = afterClass.match(/^class[^\n]*\n((?:[ \t]+[^\n]*\n?)*)/m)
-      const body = bodyMatch?.[1] ?? ''
-      const properties: Record<string, RepoOpenApiSchema> = {}
-      const required: string[] = []
-
-      for (const fieldMatch of body.matchAll(/^[ \t]+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([^\n=]+)(?:\s*=\s*(.+))?$/gm)) {
-        const name = fieldMatch[1] ?? ''
-        const rawType = fieldMatch[2] ?? ''
-        if (!name) {
-          continue
-        }
-
-        properties[name] = this.inferSchemaFromTypeHint(rawType)
-
-        const hasDefault = typeof fieldMatch[3] === 'string' && fieldMatch[3].trim().length > 0
-        if (!hasDefault && !/\bOptional\[/i.test(rawType)) {
-          required.push(name)
-        }
-      }
-
-      if (Object.keys(properties).length === 0) {
+      if (Array.isArray(rawValue)) {
+        normalized[key] = rawValue.map(value => String(value)).join(', ')
         continue
       }
 
-      schemas[typeName] = {
-        properties,
-        required: required.length > 0 ? required : undefined,
-        type: 'object'
+      if (typeof rawValue === 'string') {
+        normalized[key] = rawValue
+        continue
       }
-    }
 
-    return schemas
-  }
-
-  private inferSchemaFromTypeHint(rawType: string): RepoOpenApiSchema {
-    const normalized = rawType
-      .replace(/\s+/g, ' ')
-      .trim()
-      .replace(/^\(/, '')
-      .replace(/\)$/, '')
-    const lower = normalized.toLowerCase()
-
-    if (!normalized) {
-      return { type: 'string' }
-    }
-
-    if (lower.startsWith('array<') || /\[\]$/.test(normalized) || lower.startsWith('list[') || lower.startsWith('sequence[')) {
-      return {
-        items: {
-          type: 'string'
-        },
-        type: 'array'
+      if (rawValue === undefined || rawValue === null) {
+        continue
       }
-    }
 
-    if (/\b(bool|boolean)\b/i.test(normalized)) {
-      return { type: 'boolean' }
-    }
-
-    if (/\b(int|integer|int32|int64)\b/i.test(normalized)) {
-      return { type: 'integer' }
-    }
-
-    if (/\b(number|float|double|decimal)\b/i.test(normalized)) {
-      return { type: 'number' }
-    }
-
-    if (/\b(object|dict|map|record)\b/i.test(normalized)) {
-      return {
-        additionalProperties: true,
-        type: 'object'
-      }
-    }
-
-    return { type: 'string' }
-  }
-
-  private extractBracedBlock(content: string, startBraceIndex: number): string | null {
-    if (startBraceIndex < 0 || startBraceIndex >= content.length || content[startBraceIndex] !== '{') {
-      return null
-    }
-
-    let depth = 0
-    for (let index = startBraceIndex; index < content.length; index += 1) {
-      const char = content[index]
-      if (char === '{') {
-        depth += 1
-      } else if (char === '}') {
-        depth -= 1
-        if (depth === 0) {
-          return content.slice(startBraceIndex + 1, index)
-        }
-      }
-    }
-
-    return null
-  }
-
-  private normalizeTypeName(value: unknown): string | undefined {
-    if (typeof value !== 'string') {
-      return undefined
-    }
-
-    const normalized = value
-      .trim()
-      .split(/[\s<>\[\],|]/)[0]
-      ?.replace(/^.*\./, '')
-      ?.replace(/[^A-Za-z0-9_]/g, '')
-
-    if (!normalized || normalized.length === 0) {
-      return undefined
+      normalized[key] = String(rawValue)
     }
 
     return normalized
   }
 
-  private isPrimitiveTypeName(typeName: string) {
-    return new Set([
-      'Any',
-      'Dict',
-      'List',
-      'None',
-      'Optional',
-      'Union',
-      'bool',
-      'dict',
-      'float',
-      'int',
-      'object',
-      'str',
-      'string'
-    ]).has(typeName)
-  }
+  private async tryFetchRuntimeOpenApiDocument(runtimeBaseUrl: string): Promise<null | RepoOpenApiDocument> {
+    for (const candidatePath of RUNTIME_OPENAPI_CANDIDATE_PATHS) {
+      const candidateUrl = new URL(candidatePath, runtimeBaseUrl).toString()
+      try {
+        const response = await axios.request<unknown>({
+          maxContentLength: RUNNER_MAX_RESPONSE_BYTES,
+          method: 'GET',
+          timeout: RUNTIME_OPENAPI_TIMEOUT_MS,
+          url: candidateUrl,
+          validateStatus: status => status >= 200 && status < 300
+        })
 
-  private normalizeModuleSegment(segment: string) {
-    const cleaned = segment
-      .replace(/\.[^.]+$/, '')
-      .replace(/(?:\.|_)?(controller|controllers|route|routes|router|routers|view|views|handler|handlers)$/i, '')
-      .replace(/[-_]+/g, ' ')
-      .trim()
-
-    return cleaned.length > 0 ? cleaned : segment
-  }
-
-  private parseFrameworks(frameworks?: string) {
-    if (!frameworks) {
-      return [] as RepoApiFramework[]
+        const normalized = this.normalizeRuntimeOpenApiDocument(response.data)
+        if (normalized) {
+          this.logger.log(`Using runtime OpenAPI from ${candidateUrl}`)
+          return normalized
+        }
+      } catch {
+        continue
+      }
     }
 
-    const values = frameworks
-      .split(',')
-      .map(value => value.trim().toLowerCase() as RepoApiFramework)
-      .filter(value => SUPPORTED_FRAMEWORKS.includes(value))
-
-    return Array.from(new Set(values))
-  }
-
-  private parseMethods(methods?: string) {
-    if (!methods) {
-      return [] as RepoApiHttpMethod[]
-    }
-
-    const values = methods
-      .split(',')
-      .map(value => this.assertMethod(value))
-      .filter((value): value is RepoApiHttpMethod => value !== null)
-
-    return Array.from(new Set(values))
-  }
-
-  private parseSearch(search?: string) {
-    if (!search) {
-      return ''
-    }
-
-    return search.trim().toLowerCase()
-  }
-
-  private pushParam(params: RepoApiEndpointParameter[], nextParam: RepoApiEndpointParameter) {
-    if (params.some(param => param.location === nextParam.location && param.name === nextParam.name)) {
-      return
-    }
-
-    params.push(nextParam)
-  }
-
-  private readSnippet(content: string, start: number, size: number) {
-    if (start < 0) {
-      return content.slice(0, size)
-    }
-
-    return content.slice(start, Math.min(content.length, start + size))
-  }
-
-  private readSourceContext(content: string, start: number, size: number): SourceContext {
-    const safeStart = Math.max(0, start)
-    const lineStart = content.slice(0, safeStart).split('\n').length
-    const snippet = this.readSnippet(content, safeStart, size).trim()
-
-    return {
-      lineStart,
-      snippet
-    }
-  }
-
-  private safeString(value: unknown) {
-    if (typeof value !== 'string') {
-      return null
-    }
-
-    const normalized = value.trim()
-    return normalized.length > 0 ? normalized : null
+    this.logger.warn(`Runtime OpenAPI unavailable for base URL ${runtimeBaseUrl}, using static fallback`)
+    return null
   }
 
   private uniqueParams(params: RepoApiEndpointParameter[]) {

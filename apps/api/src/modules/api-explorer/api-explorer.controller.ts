@@ -13,44 +13,6 @@ import { ApiExplorerService } from './api-explorer.service'
 export class ApiExplorerController {
   constructor(private readonly apiExplorerService: ApiExplorerService) {}
 
-  @Get(':repoId/collections')
-  @UseGuards(SessionAuthGuard)
-  async listRunnerCollections(
-    @Req() req: { user: SelectUser },
-    @Param('repoId', ParseIntPipe) repoId: number
-  ) {
-    return await this.apiExplorerService.listRunnerCollections(req.user.id, repoId)
-  }
-
-  @Post(':repoId/collections')
-  @UseGuards(SessionAuthGuard)
-  async saveRunnerCollection(
-    @Req() req: { user: SelectUser },
-    @Param('repoId', ParseIntPipe) repoId: number,
-    @Body() body: RepoApiRunnerSaveCollectionRequest
-  ) {
-    return await this.apiExplorerService.saveRunnerCollection(req.user.id, repoId, body)
-  }
-
-  @Get(':repoId/auth-presets')
-  @UseGuards(SessionAuthGuard)
-  async listRunnerAuthPresets(
-    @Req() req: { user: SelectUser },
-    @Param('repoId', ParseIntPipe) repoId: number
-  ) {
-    return await this.apiExplorerService.listRunnerAuthPresets(req.user.id, repoId)
-  }
-
-  @Post(':repoId/auth-presets')
-  @UseGuards(SessionAuthGuard)
-  async saveRunnerAuthPreset(
-    @Req() req: { user: SelectUser },
-    @Param('repoId', ParseIntPipe) repoId: number,
-    @Body() body: RepoApiRunnerSaveAuthPresetRequest
-  ) {
-    return await this.apiExplorerService.saveRunnerAuthPreset(req.user.id, repoId, body)
-  }
-
   @Delete(':repoId/auth-presets/:presetId')
   @UseGuards(SessionAuthGuard)
   async deleteRunnerAuthPreset(
@@ -71,14 +33,20 @@ export class ApiExplorerController {
     return await this.apiExplorerService.deleteRunnerCollection(req.user.id, repoId, collectionId)
   }
 
-  @Post(':repoId/run')
+  @Get(':repoId')
   @UseGuards(SessionAuthGuard)
-  async runRepoApiRequest(
+  async getRepoInteractiveApi(
     @Req() req: { user: SelectUser },
     @Param('repoId', ParseIntPipe) repoId: number,
-    @Body() body: RepoApiRunnerRequest
+    @Query('frameworks') frameworks?: string,
+    @Query('methods') methods?: string,
+    @Query('search') search?: string
   ) {
-    return await this.apiExplorerService.runApiRequest(req.user.id, repoId, body)
+    return await this.apiExplorerService.getRepoInteractiveApi(req.user.id, repoId, {
+      frameworks,
+      methods,
+      search
+    })
   }
 
   @Get(':repoId/endpoints.json')
@@ -115,19 +83,51 @@ export class ApiExplorerController {
     })
   }
 
-  @Get(':repoId')
+  @Get(':repoId/auth-presets')
   @UseGuards(SessionAuthGuard)
-  async getRepoInteractiveApi(
+  async listRunnerAuthPresets(
+    @Req() req: { user: SelectUser },
+    @Param('repoId', ParseIntPipe) repoId: number
+  ) {
+    return await this.apiExplorerService.listRunnerAuthPresets(req.user.id, repoId)
+  }
+
+  @Get(':repoId/collections')
+  @UseGuards(SessionAuthGuard)
+  async listRunnerCollections(
+    @Req() req: { user: SelectUser },
+    @Param('repoId', ParseIntPipe) repoId: number
+  ) {
+    return await this.apiExplorerService.listRunnerCollections(req.user.id, repoId)
+  }
+
+  @Post(':repoId/run')
+  @UseGuards(SessionAuthGuard)
+  async runRepoApiRequest(
     @Req() req: { user: SelectUser },
     @Param('repoId', ParseIntPipe) repoId: number,
-    @Query('frameworks') frameworks?: string,
-    @Query('methods') methods?: string,
-    @Query('search') search?: string
+    @Body() body: RepoApiRunnerRequest
   ) {
-    return await this.apiExplorerService.getRepoInteractiveApi(req.user.id, repoId, {
-      frameworks,
-      methods,
-      search
-    })
+    return await this.apiExplorerService.runApiRequest(req.user.id, repoId, body)
+  }
+
+  @Post(':repoId/auth-presets')
+  @UseGuards(SessionAuthGuard)
+  async saveRunnerAuthPreset(
+    @Req() req: { user: SelectUser },
+    @Param('repoId', ParseIntPipe) repoId: number,
+    @Body() body: RepoApiRunnerSaveAuthPresetRequest
+  ) {
+    return await this.apiExplorerService.saveRunnerAuthPreset(req.user.id, repoId, body)
+  }
+
+  @Post(':repoId/collections')
+  @UseGuards(SessionAuthGuard)
+  async saveRunnerCollection(
+    @Req() req: { user: SelectUser },
+    @Param('repoId', ParseIntPipe) repoId: number,
+    @Body() body: RepoApiRunnerSaveCollectionRequest
+  ) {
+    return await this.apiExplorerService.saveRunnerCollection(req.user.id, repoId, body)
   }
 }

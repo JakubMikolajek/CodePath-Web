@@ -313,13 +313,13 @@ describe('ApiExplorerService', () => {
     } as never)
 
     const response = await service.runApiRequest(1, 41, {
-      method: 'POST',
-      url: 'http://127.0.0.1:4000/api/test',
       body: { hello: 'world' },
       headers: {
         'X-Test': '1'
       },
-      timeoutMs: 2500
+      method: 'POST',
+      timeoutMs: 2500,
+      url: 'http://127.0.0.1:4000/api/test'
     })
 
     expect(response.ok).toBe(true)

@@ -524,6 +524,7 @@ export default function Page() {
 
     try {
       const saved = await saveRepoRunnerCollection(repoId, {
+        name,
         config: {
           auth: { ...auth },
           baseUrl,
@@ -535,8 +536,7 @@ export default function Page() {
           pathValues: { ...pathValues },
           queryJson,
           timeoutMs
-        },
-        name
+        }
       })
 
       setRunnerCollections(prev => [
