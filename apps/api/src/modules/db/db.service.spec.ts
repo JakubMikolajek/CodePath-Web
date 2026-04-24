@@ -1,4 +1,4 @@
-import { shouldBootstrapLegacyMigrationBaseline } from './db.service'
+import { shouldBootstrapLegacyMigrationBaseline } from './services/db.service'
 
 describe('shouldBootstrapLegacyMigrationBaseline', () => {
   it('returns true when schema looks legacy and migration history is empty', () => {

@@ -5,9 +5,9 @@ import type {
   RepoApiRunnerSaveCollectionRequest
 } from '@workspace/codepath-common/api-explorer'
 
-import { SessionAuthGuard } from '../auth/session-auth.guard'
+import { SessionAuthGuard } from '../auth/guards/session-auth.guard'
 import { SelectUser } from '../db/schema'
-import { ApiExplorerService } from './api-explorer.service'
+import { ApiExplorerService } from './services/api-explorer.service'
 
 @Controller('api-explorer')
 export class ApiExplorerController {

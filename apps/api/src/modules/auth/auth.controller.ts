@@ -10,10 +10,10 @@ import {
 import { FastifyReply } from 'fastify'
 
 import { SelectUser } from '../db/schema'
-import { AuthService } from './auth.service'
 import { LoginDto } from './dto/login.dto'
 import { RegisterDto } from './dto/register.dto'
-import { SessionAuthGuard } from './session-auth.guard'
+import { SessionAuthGuard } from './guards/session-auth.guard'
+import { AuthService } from './services/auth.service'
 
 @Controller('auth')
 export class AuthController {

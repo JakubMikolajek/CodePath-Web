@@ -1,7 +1,8 @@
 import { NotFoundException } from '@nestjs/common'
 import axios from 'axios'
 
-import { ApiExplorerService } from './api-explorer.service'
+import { ApiExplorerService } from './services/api-explorer.service'
+import { ApiRunnerService } from './services/api-runner.service'
 
 jest.mock('axios')
 
@@ -27,6 +28,30 @@ function createDbMocks(repo: null | { id: number, name: string }) {
       selectMock
     }
   }
+}
+
+function createService(dbService: unknown, qdrantService: unknown) {
+  const runnerAuthPresetsRepository = {
+    delete: jest.fn(),
+    list: jest.fn(),
+    save: jest.fn()
+  }
+  const runnerCollectionsRepository = {
+    delete: jest.fn(),
+    list: jest.fn(),
+    save: jest.fn()
+  }
+
+  const runnerService = new ApiRunnerService(
+    runnerAuthPresetsRepository as never,
+    runnerCollectionsRepository as never
+  )
+
+  return new ApiExplorerService(
+    dbService as never,
+    qdrantService as never,
+    runnerService as never
+  )
 }
 
 describe('ApiExplorerService', () => {
@@ -63,7 +88,7 @@ describe('ApiExplorerService', () => {
         ]
       })
     }
-    const service = new ApiExplorerService(dbService as never, qdrantService as never)
+    const service = createService(dbService, qdrantService)
 
     const response = await service.getRepoInteractiveApi(1, 10, {})
     const methodsAndPaths = response.endpoints.map(endpoint => `${endpoint.method} ${endpoint.path}`)
@@ -122,7 +147,7 @@ describe('ApiExplorerService', () => {
         ]
       })
     }
-    const service = new ApiExplorerService(dbService as never, qdrantService as never)
+    const service = createService(dbService, qdrantService)
 
     const response = await service.getRepoInteractiveApi(1, 11, {})
     const changePasswordEndpoint = response.endpoints.find(
@@ -156,7 +181,7 @@ describe('ApiExplorerService', () => {
         ]
       })
     }
-    const service = new ApiExplorerService(dbService as never, qdrantService as never)
+    const service = createService(dbService, qdrantService)
 
     const response = await service.getRepoInteractiveApi(1, 20, {
       methods: 'POST'
@@ -193,7 +218,7 @@ describe('ApiExplorerService', () => {
         ]
       })
     }
-    const service = new ApiExplorerService(dbService as never, qdrantService as never)
+    const service = createService(dbService, qdrantService)
 
     const spec = await service.getRepoOpenApiSpec(1, 30, {})
 
@@ -243,7 +268,7 @@ describe('ApiExplorerService', () => {
         ]
       })
     }
-    const service = new ApiExplorerService(dbService as never, qdrantService as never)
+    const service = createService(dbService, qdrantService)
 
     const spec = await service.getRepoOpenApiSpec(1, 32, {})
     const requestBodySchema = spec.paths['/users']?.post?.requestBody?.content['application/json']?.schema
@@ -282,7 +307,7 @@ describe('ApiExplorerService', () => {
         ]
       })
     }
-    const service = new ApiExplorerService(dbService as never, qdrantService as never)
+    const service = createService(dbService, qdrantService)
 
     const spec = await service.getRepoOpenApiSpec(1, 35, {})
     const requestBodySchema = spec.paths['/orders']?.post?.requestBody?.content['application/json']?.schema
@@ -306,7 +331,7 @@ describe('ApiExplorerService', () => {
         points: []
       })
     }
-    const service = new ApiExplorerService(dbService as never, qdrantService as never)
+    const service = createService(dbService, qdrantService)
 
     await expect(service.getRepoOpenApiSpec(1, 36, {
       runtimeBaseUrl: 'https://example.com'
@@ -336,7 +361,7 @@ describe('ApiExplorerService', () => {
         ]
       })
     }
-    const service = new ApiExplorerService(dbService as never, qdrantService as never)
+    const service = createService(dbService, qdrantService)
 
     jest.mocked(axios.request).mockResolvedValue({
       data: {
@@ -407,7 +432,7 @@ describe('ApiExplorerService', () => {
         ]
       })
     }
-    const service = new ApiExplorerService(dbService as never, qdrantService as never)
+    const service = createService(dbService, qdrantService)
 
     jest.mocked(axios.request).mockRejectedValue(new Error('timeout'))
 
@@ -418,9 +443,9 @@ describe('ApiExplorerService', () => {
     expect(spec.info.title).toContain('repo-runtime-fallback')
     expect(spec.paths['/users/{id}']?.get).toBeDefined()
     expect(spec['x-codepath-metrics']).toMatchObject({
+      runtimeOperationCount: 0,
       sourceMode: 'static',
-      staticOperationCount: 1,
-      runtimeOperationCount: 0
+      staticOperationCount: 1
     })
   })
 
@@ -429,7 +454,7 @@ describe('ApiExplorerService', () => {
     const qdrantService = {
       scroll: jest.fn()
     }
-    const service = new ApiExplorerService(dbService as never, qdrantService as never)
+    const service = createService(dbService, qdrantService)
 
     await expect(service.runApiRequest(1, 40, {
       method: 'GET',
@@ -444,7 +469,7 @@ describe('ApiExplorerService', () => {
     const qdrantService = {
       scroll: jest.fn()
     }
-    const service = new ApiExplorerService(dbService as never, qdrantService as never)
+    const service = createService(dbService, qdrantService)
 
     jest.mocked(axios.request).mockResolvedValue({
       data: Buffer.from(JSON.stringify({ ok: true }), 'utf8'),
@@ -476,7 +501,7 @@ describe('ApiExplorerService', () => {
     const qdrantService = {
       scroll: jest.fn()
     }
-    const service = new ApiExplorerService(dbService as never, qdrantService as never)
+    const service = createService(dbService, qdrantService)
 
     await expect(service.getRepoInteractiveApi(123, 999, {})).rejects.toBeInstanceOf(NotFoundException)
   })

@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid'
 
 import { OrchestratorClientError, requestChatRpc } from '../../lib/orchestrator-client'
 import { emitTelemetry } from '../../lib/telemetry'
-import { ChatService } from './chat.service'
+import { ChatService } from './services/chat.service'
 
 jest.mock('../../lib/orchestrator-client', () => {
   const actual = jest.requireActual('../../lib/orchestrator-client')
@@ -23,10 +23,9 @@ jest.mock('uuid', () => ({
 describe('chat rpc integration', () => {
   const requestChatRpcMock = jest.mocked(requestChatRpc)
   const emitTelemetryMock = jest.mocked(emitTelemetry)
-  const uuidV4Mock = jest.mocked(uuidv4)
+  const uuidV4Mock = uuidv4 as unknown as jest.MockedFunction<() => string>
 
   const service = new ChatService(
-    {} as never,
     { dbClient: {} } as never
   )
 

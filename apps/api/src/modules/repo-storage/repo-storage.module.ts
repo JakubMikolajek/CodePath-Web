@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common'
 
-import { RepoStorageService } from './repo-storage.service'
+import { RepoStorageService } from './services/repo-storage.service'
 
 @Module({
   exports: [RepoStorageService],

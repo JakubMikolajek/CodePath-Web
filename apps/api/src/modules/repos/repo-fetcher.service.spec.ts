@@ -1,4 +1,4 @@
-import { RepoFetcherService } from './repo-fetcher.service'
+import { RepoFetcherService } from './services/repo-fetcher.service'
 
 type CloneConfigShape = {
   cloneUrl: string

@@ -1,10 +1,10 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
 import { and, eq, ne } from 'drizzle-orm'
 
-import { enqueueDocsJob } from '../../lib/orchestrator-client'
-import { emitTelemetry } from '../../lib/telemetry'
-import { DbService } from '../db/db.service'
-import { repos } from '../db/schema'
+import { enqueueDocsJob } from '../../../lib/orchestrator-client'
+import { emitTelemetry } from '../../../lib/telemetry'
+import { repos } from '../../db/schema'
+import { DbService } from '../../db/services/db.service'
 
 @Injectable()
 export class DocsService {

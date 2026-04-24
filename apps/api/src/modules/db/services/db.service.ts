@@ -7,7 +7,7 @@ import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { Pool } from 'pg'
 
-import { env } from '../../config/env'
+import { env } from '../../../config/env'
 
 const LEGACY_REQUIRED_TABLES = ['users', 'repos', 'files', 'dependencies'] as const
 

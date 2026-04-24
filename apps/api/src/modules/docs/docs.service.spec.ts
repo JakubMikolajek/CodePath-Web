@@ -1,7 +1,7 @@
 import { ConflictException, NotFoundException } from '@nestjs/common'
 
 import { enqueueDocsJob } from '../../lib/orchestrator-client'
-import { DocsService } from './docs.service'
+import { DocsService } from './services/docs.service'
 
 jest.mock('../../lib/orchestrator-client', () => ({
   enqueueDocsJob: jest.fn()

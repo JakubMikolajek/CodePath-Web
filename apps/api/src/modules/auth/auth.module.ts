@@ -3,8 +3,8 @@ import { JwtModule } from '@nestjs/jwt'
 
 import { env } from '../../config/env'
 import { AuthController } from './auth.controller'
-import { AuthService } from './auth.service'
-import { SessionAuthGuard } from './session-auth.guard'
+import { SessionAuthGuard } from './guards/session-auth.guard'
+import { AuthService } from './services/auth.service'
 
 @Module({
   controllers: [AuthController],
