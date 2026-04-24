@@ -12,13 +12,13 @@ import NodeRSA from 'node-rsa'
 import path from 'path'
 import simpleGit, { type SimpleGit } from 'simple-git'
 
-import { env } from '../../config/env'
-import { enqueueIngestJob } from '../../lib/orchestrator-client'
-import { emitTelemetry } from '../../lib/telemetry'
-import { IGNORED_DIRS, IGNORED_EXTENSIONS, IGNORED_FILES } from '../../utils/ignores'
-import { DbService } from '../db/db.service'
-import { files, InsertFile, repos, SelectRepo } from '../db/schema'
-import { RepoStorageService } from '../repo-storage/repo-storage.service'
+import { env } from '../../../config/env'
+import { enqueueIngestJob } from '../../../lib/orchestrator-client'
+import { emitTelemetry } from '../../../lib/telemetry'
+import { IGNORED_DIRS, IGNORED_EXTENSIONS, IGNORED_FILES } from '../../../utils/ignores'
+import { files, InsertFile, repos, SelectRepo } from '../../db/schema'
+import { DbService } from '../../db/services/db.service'
+import { RepoStorageService } from '../../repo-storage/services/repo-storage.service'
 
 interface CloneConfig {
   cloneUrl: string

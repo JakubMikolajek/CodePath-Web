@@ -1,4 +1,4 @@
-import { DependenciesService } from './dependencies.service'
+import { DependenciesService } from './services/dependencies.service'
 
 type RepoFixture = {
   id: number
@@ -318,5 +318,46 @@ describe('DependenciesService interactive graph topology resolution', () => {
         type: 'imports'
       })
     ]))
+  })
+
+  it('filters out node_modules files and package imports from JS/TS graph noise', async () => {
+    const repo = { id: 4, name: 'no-node-modules-noise' }
+    const service = createService(repo, [
+      codeFile('/repo/src/app.ts', `
+        import lodash from 'lodash'
+        import { helper } from './helper'
+
+        export function run() {
+          return helper() && lodash
+        }
+      `),
+      codeFile('/repo/src/helper.ts', `
+        export function helper() {
+          return true
+        }
+      `),
+      codeFile('/repo/node_modules/lodash/index.js', `
+        export default {}
+      `, {
+        file_ext: '.js',
+        language: 'javascript'
+      })
+    ])
+
+    const graph = await service.getRepoInteractiveGraph(4, repo.id, {
+      includeSymbols: 'false'
+    })
+
+    expect(graph.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        source: 'file:/repo/src/app.ts',
+        target: 'file:/repo/src/helper.ts',
+        type: 'imports'
+      })
+    ]))
+
+    expect(graph.nodes.some(node => node.label === '/repo/node_modules/lodash/index.js')).toBe(false)
+    expect(graph.nodes.some(node => node.type === 'external_package' && node.label === 'lodash')).toBe(false)
+    expect(graph.edges.some(edge => edge.metadata?.label === 'lodash')).toBe(false)
   })
 })

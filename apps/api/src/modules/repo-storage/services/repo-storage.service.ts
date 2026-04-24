@@ -15,8 +15,8 @@ import {
 } from '@aws-sdk/client-s3'
 import { Injectable, Logger } from '@nestjs/common'
 
-import { env } from '../../config/env'
-import { SelectRepo } from '../db/schema'
+import { env } from '../../../config/env'
+import { SelectRepo } from '../../db/schema'
 
 const execFileAsync = promisify(execFile)
 const projectRoot = path.resolve(__dirname, '../../../../../../')

@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common'
 
-import { SessionAuthGuard } from '../auth/session-auth.guard'
+import { SessionAuthGuard } from '../auth/guards/session-auth.guard'
 import { SelectUser } from '../db/schema'
 import { CreateRepoDto } from './dto/create-repo.dto'
-import { RepoService } from './repo.service'
+import { RepoService } from './services/repo.service'
 
 @Controller('repo')
 export class RepoController {

@@ -37,6 +37,10 @@
     "./ingest": {
       "types": "./ingest.ts",
       "default": "./dist/ingest.js"
+    },
+    "./api-explorer": {
+      "types": "./api-explorer.ts",
+      "default": "./dist/api-explorer.js"
     }
   }
 }

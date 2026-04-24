@@ -3,10 +3,10 @@ import { Nullable } from '@workspace/codepath-common/globals'
 import { eq } from 'drizzle-orm'
 import { pick } from 'lodash'
 
-import { env } from '../../config/env'
-import { DbService } from '../db/db.service'
-import { repos } from '../db/schema'
-import type { RepoAuthType } from './dto/create-repo.dto'
+import { env } from '../../../config/env'
+import { repos } from '../../db/schema'
+import { DbService } from '../../db/services/db.service'
+import type { RepoAuthType } from '../dto/create-repo.dto'
 
 interface CreateRepoPayload {
   accessKey?: string

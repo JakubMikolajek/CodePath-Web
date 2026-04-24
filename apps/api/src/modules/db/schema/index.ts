@@ -1,3 +1,15 @@
+export {
+  apiRunnerAuthPresets,
+  apiRunnerAuthPresetsRelations,
+  type InsertApiRunnerAuthPreset,
+  type SelectApiRunnerAuthPreset
+} from './apiRunnerAuthPresets'
+export {
+  apiRunnerCollections,
+  apiRunnerCollectionsRelations,
+  type InsertApiRunnerCollection,
+  type SelectApiRunnerCollection
+} from './apiRunnerCollections'
 export { chatHistory, chatHistoryRelations, type InsertChatHistory, type SelectChatHistory } from './chatHistory'
 export { chatSessions, chatSessionsRelations, type InsertChatSession, type SelectChatSession } from './chatSessions'
 export { dependencies, dependenciesRelations, type InsertDependencies, type SelectDependencies } from './dependencies'

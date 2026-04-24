@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common'
 
-import { QdrantService } from './qdrant.service'
+import { QdrantService } from './services/qdrant.service'
 
 @Module({
   exports: [QdrantService],

@@ -3,11 +3,11 @@ import { and, desc, eq } from 'drizzle-orm'
 import { map } from 'lodash'
 import { v4 as uuidv4 } from 'uuid'
 
-import { OrchestratorClientError, requestChatRpc } from '../../lib/orchestrator-client'
-import { emitTelemetry } from '../../lib/telemetry'
-import { DbService } from '../db/db.service'
-import { chatHistory, chatSessions, repos } from '../db/schema'
-import { AskDto } from './dto/ask.dto'
+import { OrchestratorClientError, requestChatRpc } from '../../../lib/orchestrator-client'
+import { emitTelemetry } from '../../../lib/telemetry'
+import { chatHistory, chatSessions, repos } from '../../db/schema'
+import { DbService } from '../../db/services/db.service'
+import { AskDto } from '../dto/ask.dto'
 
 @Injectable()
 export class ChatService {

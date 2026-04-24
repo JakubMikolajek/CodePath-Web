@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Post, Req, UseGuards } from '@nestjs/common'
 
-import { SessionAuthGuard } from '../auth/session-auth.guard'
+import { SessionAuthGuard } from '../auth/guards/session-auth.guard'
 import { SelectUser } from '../db/schema'
-import { ChatService } from './chat.service'
 import { AskDto } from './dto/ask.dto'
+import { ChatService } from './services/chat.service'
 
 @Controller('chat')
 export class ChatController {

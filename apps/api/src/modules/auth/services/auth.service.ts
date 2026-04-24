@@ -7,10 +7,10 @@ import axios from 'axios'
 import * as bcrypt from 'bcrypt'
 import { eq, or } from 'drizzle-orm'
 
-import { env } from '../../config/env'
-import { DbService } from '../db/db.service'
-import { InserUser, SelectUser, users } from '../db/schema'
-import { RegisterDto } from './dto/register.dto'
+import { env } from '../../../config/env'
+import { InserUser, SelectUser, users } from '../../db/schema'
+import { DbService } from '../../db/services/db.service'
+import { RegisterDto } from '../dto/register.dto'
 
 interface KeycloakTokenResponse {
   access_token: string

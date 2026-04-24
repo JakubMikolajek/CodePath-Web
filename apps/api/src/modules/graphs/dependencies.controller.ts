@@ -1,8 +1,8 @@
 import { Controller, Get, Param, ParseIntPipe, Query, Req, UseGuards } from '@nestjs/common'
 
-import { SessionAuthGuard } from '../auth/session-auth.guard'
+import { SessionAuthGuard } from '../auth/guards/session-auth.guard'
 import { SelectUser } from '../db/schema'
-import { DependenciesService } from './dependencies.service'
+import { DependenciesService } from './services/dependencies.service'
 
 @Controller('dependencies')
 export class DependenciesController {

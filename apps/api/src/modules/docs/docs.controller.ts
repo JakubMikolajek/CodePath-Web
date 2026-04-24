@@ -1,8 +1,8 @@
 import { Controller, Get, Param, ParseIntPipe, Post, Req, UseGuards } from '@nestjs/common'
 
-import { SessionAuthGuard } from '../auth/session-auth.guard'
+import { SessionAuthGuard } from '../auth/guards/session-auth.guard'
 import { SelectUser } from '../db/schema'
-import { DocsService } from './docs.service'
+import { DocsService } from './services/docs.service'
 
 @Controller('docs')
 export class DocsController {

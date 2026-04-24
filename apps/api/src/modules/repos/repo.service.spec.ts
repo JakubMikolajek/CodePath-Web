@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common'
 
-import { RepoService } from './repo.service'
+import { RepoService } from './services/repo.service'
 
 function createDbMocks(returningRows: unknown[] = [{
   cloneStatus: 'pending',

@@ -50,7 +50,7 @@ function createInMemoryChannel(): {
         durable: options?.durable ?? false,
         type
       })
-      return {} as amqp.Replies.Empty
+      return { exchange } as amqp.Replies.AssertExchange
     }),
     assertQueue: jest.fn(async (queue: string, options?: amqp.Options.AssertQueue) => {
       state.queues.set(queue, {

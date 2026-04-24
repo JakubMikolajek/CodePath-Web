@@ -4,9 +4,9 @@ import { Nullable } from '@workspace/codepath-common/globals'
 import { eq } from 'drizzle-orm'
 import { ExtractJwt, Strategy } from 'passport-jwt'
 
-import { env } from '../../config/env'
-import { DbService } from '../db/db.service'
-import { SelectUser, users } from '../db/schema'
+import { env } from '../../../config/env'
+import { SelectUser, users } from '../../db/schema'
+import { DbService } from '../../db/services/db.service'
 
 interface JWTPayload {
   email: string
