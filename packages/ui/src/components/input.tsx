@@ -8,9 +8,9 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
       type={type}
       data-slot="input"
       className={cn(
-        "file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-        "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+        "file:text-foreground placeholder:text-muted-foreground/75 selection:bg-primary selection:text-primary-foreground flex h-11 w-full min-w-0 rounded-xl border border-input bg-input/70 px-4 py-2 text-base text-foreground shadow-[inset_0_1px_0_oklch(1_0_0/0.05)] transition-[border-color,box-shadow,background,color] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+        "focus-visible:border-primary/80 focus-visible:bg-input focus-visible:ring-[3px] focus-visible:ring-primary/25 focus-visible:shadow-[0_0_28px_oklch(0.62_0.24_270/0.22)]",
+        "aria-invalid:border-destructive/80 aria-invalid:ring-destructive/25",
         className
       )}
       {...props}

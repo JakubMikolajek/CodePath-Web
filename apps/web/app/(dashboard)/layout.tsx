@@ -5,6 +5,7 @@ import { cookies } from 'next/headers'
 import type { ReactNode } from 'react'
 
 import AppSidebar from '@/components/AppSideBar'
+import { GsapAurora } from '@/components/GsapAurora'
 import { getCurrentUser } from '@/lib/auth/server'
 import { getRepos } from '@/lib/repos/server'
 
@@ -21,10 +22,17 @@ export default async function DashboardLayout({ children }: Readonly<DashboardLa
 
   return (
     <SidebarProvider defaultOpen>
-      <AppSidebar fetchedRepos={repos} me={me} />
-      <SidebarInset>
-        <div className="flex flex-1 flex-col gap-4 p-4 bg-background min-h-screen">{children}</div>
-      </SidebarInset>
+      <div className="aurora-shell flex min-h-svh w-full">
+        <GsapAurora className="opacity-70" />
+        <AppSidebar fetchedRepos={repos} me={me} />
+        <SidebarInset className="min-w-0 bg-transparent">
+          <main className="min-h-svh w-full px-4 py-4 md:px-6 lg:px-8">
+            <div className="mx-auto min-h-[calc(100svh-2rem)] w-full max-w-[96rem] rounded-[2rem] border border-border/50 bg-background/38 p-5 shadow-[inset_0_1px_0_oklch(1_0_0/0.06),0_28px_90px_rgb(0_0_0/0.28)] backdrop-blur-2xl md:p-8">
+              {children}
+            </div>
+          </main>
+        </SidebarInset>
+      </div>
     </SidebarProvider>
   )
 }

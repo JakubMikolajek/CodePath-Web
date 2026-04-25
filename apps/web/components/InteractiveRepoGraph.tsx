@@ -6,6 +6,7 @@ import type {
   RepoGraphNodeType,
   RepoInteractiveGraph
 } from '@workspace/codepath-common/graph'
+import { Button } from '@workspace/ui/components/button'
 import { type PointerEventHandler, useMemo, useState, type WheelEventHandler } from 'react'
 
 interface InteractiveRepoGraphProps {
@@ -24,11 +25,11 @@ type PositionedGraph = {
 
 const NODE_TYPE_ORDER: RepoGraphNodeType[] = ['repo', 'module', 'file', 'symbol', 'external_package']
 const NODE_TYPE_COLORS: Record<RepoGraphNodeType, { fill: string, stroke: string }> = {
-  external_package: { fill: '#fef3c7', stroke: '#f59e0b' },
-  file: { fill: '#dbeafe', stroke: '#2563eb' },
-  module: { fill: '#dcfce7', stroke: '#16a34a' },
-  repo: { fill: '#e2e8f0', stroke: '#334155' },
-  symbol: { fill: '#f5d0fe', stroke: '#a21caf' }
+  external_package: { fill: '#3d2b0b', stroke: '#f59e0b' },
+  file: { fill: '#09245a', stroke: '#2f7dff' },
+  module: { fill: '#0b3a25', stroke: '#34d399' },
+  repo: { fill: '#12254f', stroke: '#8b5cf6' },
+  symbol: { fill: '#2b155f', stroke: '#a855f7' }
 }
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
@@ -416,65 +417,63 @@ export default function InteractiveRepoGraph({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <button
-          className="rounded-md border border-border px-2 py-1"
+        <Button
           onClick={() => setViewport(prev => ({ ...prev, scale: clamp(prev.scale * ZOOM_IN_FACTOR, MIN_SCALE, MAX_SCALE) }))}
+          size="sm"
           type="button"
+          variant="glass"
         >
           Zoom in
-        </button>
-        <button
-          className="rounded-md border border-border px-2 py-1"
+        </Button>
+        <Button
           onClick={() => setViewport(prev => ({ ...prev, scale: clamp(prev.scale * ZOOM_OUT_FACTOR, MIN_SCALE, MAX_SCALE) }))}
+          size="sm"
           type="button"
+          variant="glass"
         >
           Zoom out
-        </button>
-        <button
-          className="rounded-md border border-border px-2 py-1"
-          onClick={() => setViewport(DEFAULT_VIEWPORT)}
-          type="button"
-        >
+        </Button>
+        <Button onClick={() => setViewport(DEFAULT_VIEWPORT)} size="sm" type="button" variant="glass">
           Reset view
-        </button>
-        <button
-          className="rounded-md border border-border px-2 py-1"
-          onClick={() => onFocusNode(null)}
-          type="button"
-        >
+        </Button>
+        <Button onClick={() => onFocusNode(null)} size="sm" type="button" variant="glass">
           Clear focus
-        </button>
+        </Button>
         <span className="text-muted-foreground">Layout:</span>
-        <button
+        <Button
           aria-pressed={layoutMode === 'coreRings'}
-          className={`rounded-md border px-2 py-1 ${
+          className={
             layoutMode === 'coreRings'
-              ? 'border-primary/60 bg-primary/10 text-primary'
-              : 'border-border'
-          }`}
+              ? 'border-primary/60 bg-primary/15 text-primary'
+              : ''
+          }
           onClick={() => setLayoutMode('coreRings')}
+          size="sm"
           type="button"
+          variant="glass"
         >
           Core Rings
-        </button>
-        <button
+        </Button>
+        <Button
           aria-pressed={layoutMode === 'layered'}
-          className={`rounded-md border px-2 py-1 ${
+          className={
             layoutMode === 'layered'
-              ? 'border-primary/60 bg-primary/10 text-primary'
-              : 'border-border'
-          }`}
+              ? 'border-primary/60 bg-primary/15 text-primary'
+              : ''
+          }
           onClick={() => setLayoutMode('layered')}
+          size="sm"
           type="button"
+          variant="glass"
         >
           Layered
-        </button>
+        </Button>
         <span className="text-muted-foreground">Nodes: {visibleNodes.length}</span>
         <span className="text-muted-foreground">Edges: {visibleEdges.length}</span>
       </div>
 
       <div
-        className="relative h-[72vh] min-h-[580px] overflow-hidden rounded-md border border-border bg-muted/20"
+        className="relative h-[72vh] min-h-[580px] overflow-hidden rounded-[1.5rem] border border-white/10 bg-[radial-gradient(circle_at_50%_45%,oklch(0.35_0.18_250/0.24),transparent_34%),linear-gradient(135deg,oklch(0.16_0.05_255/0.94),oklch(0.08_0.03_260/0.98))]"
         onPointerDown={handlePointerDown}
         onPointerLeave={handlePointerUp}
         onPointerMove={handlePointerMove}
@@ -489,8 +488,15 @@ export default function InteractiveRepoGraph({
         >
           <defs>
             <marker id="arrow" markerHeight="6" markerWidth="6" orient="auto-start-reverse" refX="6" refY="3">
-              <path d="M0,0 L6,3 L0,6 z" fill="#64748b" />
+              <path d="M0,0 L6,3 L0,6 z" fill="#60a5fa" />
             </marker>
+            <filter height="180%" id="nodeGlow" width="180%" x="-40%" y="-40%">
+              <feGaussianBlur result="coloredBlur" stdDeviation="4" />
+              <feMerge>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
           </defs>
 
           <g transform={`translate(${viewport.x}, ${viewport.y}) scale(${viewport.scale})`}>
@@ -503,12 +509,12 @@ export default function InteractiveRepoGraph({
 
               const emphasis = getEdgeEmphasis(edge)
               const stroke = emphasis === 'focused'
-                ? '#2563eb'
+                ? '#8b5cf6'
                 : emphasis === 'neighbor'
-                  ? '#0284c7'
+                  ? '#22d3ee'
                   : emphasis === 'dim'
-                    ? '#94a3b833'
-                    : '#64748b'
+                    ? '#94a3b82e'
+                    : '#2563eb99'
 
               const strokeWidth = emphasis === 'focused' ? 2.8 : emphasis === 'neighbor' ? 2 : 1.2
               const midpointX = (sourcePos.x + targetPos.x) / 2
@@ -563,6 +569,7 @@ export default function InteractiveRepoGraph({
                 >
                   <rect
                     fill={fill}
+                    filter={emphasis === 'dim' ? undefined : 'url(#nodeGlow)'}
                     height={34}
                     rx={10}
                     stroke={stroke}
@@ -572,7 +579,7 @@ export default function InteractiveRepoGraph({
                     y={-17}
                   />
                   <text
-                    className="fill-foreground text-[11px] font-medium"
+                    className="fill-white text-[11px] font-semibold"
                     textAnchor="middle"
                     x={0}
                     y={4}

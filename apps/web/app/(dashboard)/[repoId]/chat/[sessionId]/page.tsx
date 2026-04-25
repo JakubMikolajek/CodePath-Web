@@ -4,7 +4,7 @@ import 'highlight.js/styles/github-dark-dimmed.css'
 import { Button } from '@workspace/ui/components/button'
 import { Card, CardContent } from '@workspace/ui/components/card'
 import { Input } from '@workspace/ui/components/input'
-import { Bot, Check, Copy, Send, User } from 'lucide-react'
+import { Bot, Check, Copy, Send, Sparkles, User } from 'lucide-react'
 import { useParams } from 'next/navigation'
 import type React from 'react'
 import { useEffect, useMemo, useState } from 'react'
@@ -12,6 +12,7 @@ import Markdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 
+import { PageHeader } from '@/components/PageHeader'
 import { getFirstRouteParam } from '@/lib/route-params'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { getSessionDetails, sendMessage } from '@/redux/slices/chatSlice'
@@ -23,9 +24,9 @@ export default function ChatPage() {
   const repoId = useMemo(() => Number(getFirstRouteParam(params.repoId)), [params.repoId])
   const sessionId = useMemo(() => getFirstRouteParam(params.sessionId) ?? '', [params.sessionId])
   const hasValidRouteParams = Number.isFinite(repoId) && sessionId.length > 0
+  const [copiedId, setCopiedId] = useState<null | string>(null)
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [copiedId, setCopiedId] = useState<null | string>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -72,101 +73,125 @@ export default function ChatPage() {
   }, [dispatch, hasValidRouteParams, repoId, sessionId])
 
   return (
-    <div className="w-full relative bg-background">
-      <div className="flex flex-col h-screen max-w-6xl mx-auto">
-        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+    <div className="flex min-h-[calc(100svh-4rem)] flex-col gap-6">
+      <PageHeader
+        description="Repository-aware assistant for DTOs, endpoints, documentation and code navigation context."
+        eyebrow={`Repo ${Number.isFinite(repoId) ? repoId : 'unknown'}`}
+        title="AI Chat"
+      />
+
+      <section
+        aria-label="Chat conversation"
+        className="glass-panel-strong flex min-h-[620px] flex-1 flex-col overflow-hidden rounded-[2rem]"
+      >
+        <div className="flex-1 space-y-6 overflow-y-auto p-4 md:p-6">
+          {sessionDetails.length === 0 && !isLoading && (
+            <Card className="mx-auto mt-12 max-w-2xl border-primary/20 bg-primary/5 py-0">
+              <CardContent className="p-8 text-center">
+                <div className="mx-auto grid size-14 place-items-center rounded-2xl border border-primary/30 bg-primary/15 text-primary shadow-[0_0_28px_oklch(0.62_0.24_270/0.3)]">
+                  <Sparkles className="size-6" />
+                </div>
+                <h2 className="mt-5 text-2xl font-semibold tracking-[-0.04em] text-white">Ask about this repository</h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Start with a concrete question, for example about DTO shape, endpoint behaviour or module responsibilities.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           {sessionDetails.map(detail => (
             <div className="space-y-4" key={detail.id}>
               {detail.role === 'user' ? (
                 <div className="flex justify-end">
-                  <div className="flex items-start space-x-3 max-w-[70%]">
-                    <Card className="bg-muted/50 border-r-4 border-r-blue-500 py-0">
-                      <CardContent className="p-4">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <User className="w-4 h-4" />
-                          <span className="text-sm font-medium">Ty</span>
-                        </div>
-                        <p className="text-sm leading-relaxed">{detail.content}</p>
-                      </CardContent>
-                    </Card>
-                  </div>
+                  <Card className="max-w-[min(760px,88%)] border-cyan-300/25 bg-cyan-400/10 py-0 shadow-[0_0_32px_oklch(0.74_0.17_220/0.12)]">
+                    <CardContent className="p-4 md:p-5">
+                      <div className="mb-3 flex items-center gap-2 text-sm font-medium text-cyan-100">
+                        <span className="grid size-8 place-items-center rounded-full bg-cyan-300/15 text-cyan-200">
+                          <User className="size-4" />
+                        </span>
+                        Ty
+                      </div>
+                      <p className="text-sm leading-relaxed text-foreground/90 md:text-base">{detail.content}</p>
+                    </CardContent>
+                  </Card>
                 </div>
               ) : (
                 <div className="flex justify-start">
-                  <div className="flex items-start space-x-3 max-w-[85%]">
-                    <Card className="bg-muted/50 border-l-4 border-l-blue-500 py-0">
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-2">
-                            <Bot className="w-4 h-4 text-blue-500" />
-                            <span className="text-sm font-medium">Asystent AI</span>
-                          </div>
-                          <Button
-                            className="h-8 w-8 p-0"
-                            onClick={() => copyToClipboard(detail.content, detail.id)}
-                            size="sm"
-                            variant="ghost"
-                          >
-                            {copiedId === detail.id ? (
-                              <Check className="w-3 h-3 text-green-500" />
-                            ) : (
-                              <Copy className="w-3 h-3" />
-                            )}
-                          </Button>
+                  <Card className="max-w-[min(920px,94%)] border-primary/35 bg-primary/10 py-0 shadow-[0_0_38px_oklch(0.62_0.24_270/0.16)]">
+                    <CardContent className="p-4 md:p-5">
+                      <div className="mb-4 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-sm font-medium text-primary-foreground">
+                          <span className="grid size-8 place-items-center rounded-full bg-primary/20 text-primary">
+                            <Bot className="size-4" />
+                          </span>
+                          Asystent AI
                         </div>
-                        <article className="prose prose-sm dark:prose-invert max-w-none prose-pre:bg-gray-900 prose-pre:text-gray-100">
-                          <Markdown
-                            components={{
-                              blockquote: ({ children }) => (
-                                <blockquote className="border-l-4 border-blue-500 pl-4 italic bg-blue-50 dark:bg-blue-950/20 py-2 my-4">
-                                  {children}
-                                </blockquote>
-                              ),
-                              code: ({ children, className, ...props }) => {
-                                const match = /language-(\w+)/.exec(className || '')
-                                return match ? (
-                                  <div className="relative">
-                                    <div className="absolute top-2 right-2 text-xs text-gray-400 bg-gray-800 px-2 py-1 rounded">
-                                      {match[1]}
-                                    </div>
-                                    <code className={className} {...props}>
-                                      {children}
-                                    </code>
+                        <Button
+                          aria-label="Skopiuj odpowiedź"
+                          className="size-9"
+                          onClick={() => copyToClipboard(detail.content, detail.id)}
+                          size="icon"
+                          variant="ghost"
+                        >
+                          {copiedId === detail.id ? (
+                            <Check className="size-4 text-emerald-300" />
+                          ) : (
+                            <Copy className="size-4" />
+                          )}
+                        </Button>
+                      </div>
+                      <article className="prose prose-sm max-w-none prose-pre:border prose-pre:border-white/10 prose-pre:bg-slate-950/80 prose-pre:text-gray-100 dark:prose-invert">
+                        <Markdown
+                          components={{
+                            blockquote: ({ children }) => (
+                              <blockquote className="my-4 border-l-4 border-primary bg-primary/10 py-2 pl-4 italic">
+                                {children}
+                              </blockquote>
+                            ),
+                            code: ({ children, className, ...props }) => {
+                              const match = /language-(\w+)/.exec(className || '')
+                              return match ? (
+                                <div className="relative">
+                                  <div className="absolute right-2 top-2 rounded bg-slate-950/90 px-2 py-1 text-xs text-cyan-200">
+                                    {match[1]}
                                   </div>
-                                ) : (
-                                  <code
-                                    className="bg-gray-200 dark:bg-gray-800 px-1 py-0.5 rounded text-sm"
-                                    {...props}
-                                  >
+                                  <code className={className} {...props}>
                                     {children}
                                   </code>
-                                )
-                              },
-                              table: ({ children }) => (
-                                <div className="overflow-x-auto">
-                                  <table className="min-w-full border-collapse border border-gray-300 dark:border-gray-600">
-                                    {children}
-                                  </table>
                                 </div>
-                              ),
-                              td: ({ children }) => (
-                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-2">{children}</td>
-                              ),
-                              th: ({ children }) => (
-                                <th className="border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800 px-4 py-2 text-left font-semibold">
+                              ) : (
+                                <code
+                                  className="rounded border border-white/10 bg-white/10 px-1 py-0.5 text-sm text-cyan-100"
+                                  {...props}
+                                >
                                   {children}
-                                </th>
+                                </code>
                               )
-                            }}
-                            rehypePlugins={[rehypeHighlight]}
-                            remarkPlugins={[remarkGfm]}
-                          >
-                            {detail.content}
-                          </Markdown>
-                        </article>
-                      </CardContent>
-                    </Card>
-                  </div>
+                            },
+                            table: ({ children }) => (
+                              <div className="overflow-x-auto rounded-xl border border-white/10">
+                                <table className="min-w-full border-collapse">
+                                  {children}
+                                </table>
+                              </div>
+                            ),
+                            td: ({ children }) => (
+                              <td className="border border-white/10 px-4 py-2">{children}</td>
+                            ),
+                            th: ({ children }) => (
+                              <th className="border border-white/10 bg-white/10 px-4 py-2 text-left font-semibold">
+                                {children}
+                              </th>
+                            )
+                          }}
+                          rehypePlugins={[rehypeHighlight]}
+                          remarkPlugins={[remarkGfm]}
+                        >
+                          {detail.content}
+                        </Markdown>
+                      </article>
+                    </CardContent>
+                  </Card>
                 </div>
               )}
             </div>
@@ -174,70 +199,64 @@ export default function ChatPage() {
 
           {isLoading && (
             <div className="flex justify-start">
-              <div className="flex items-start space-x-3 max-w-[85%]">
-                <Card className="bg-muted/50 border-l-4 border-l-blue-500">
-                  <CardContent className="p-4">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Bot className="w-4 h-4 text-blue-500" />
-                      <span className="text-sm font-medium">Asystent AI</span>
+              <Card className="max-w-[min(680px,92%)] border-primary/30 bg-primary/10 py-0">
+                <CardContent className="p-5">
+                  <div className="mb-3 flex items-center gap-2 text-sm font-medium">
+                    <span className="grid size-8 place-items-center rounded-full bg-primary/20 text-primary">
+                      <Bot className="size-4" />
+                    </span>
+                    Asystent AI
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div aria-hidden="true" className="flex gap-1">
+                      <span className="size-2 animate-bounce rounded-full bg-primary" />
+                      <span className="size-2 animate-bounce rounded-full bg-primary [animation-delay:120ms]" />
+                      <span className="size-2 animate-bounce rounded-full bg-primary [animation-delay:240ms]" />
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                        <div
-                          className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
-                          style={{ animationDelay: '0.1s' }}
-                        ></div>
-                        <div
-                          className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
-                          style={{ animationDelay: '0.2s' }}
-                        ></div>
-                      </div>
-                      <span className="text-sm text-muted-foreground">Pisze odpowiedź...</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+                    <span className="text-sm text-muted-foreground">Pisze odpowiedź...</span>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
         </div>
 
-        <div className="border-t bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
-          <div className="p-4">
-            <form className="flex items-end space-x-2" onSubmit={handleSubmit}>
-              <div className="flex-1">
-                <Input
-                  className="min-h-11 resize-none"
-                  disabled={isLoading || !hasValidRouteParams}
-                  onChange={e => setInputValue(e.target.value)}
-                  onKeyDown={async e => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      await handleSubmit(e)
-                    }
-                  }}
-                  placeholder="Zadaj pytanie..."
-                  value={inputValue}
-                />
-              </div>
-              <Button
-                className="h-11 w-11"
-                disabled={isLoading || !inputValue.trim() || !hasValidRouteParams}
-                size="icon"
-                type="submit"
-              >
-                <Send className="w-4 h-4" />
-                <span className="sr-only">Wyślij wiadomość</span>
-              </Button>
-            </form>
-            <p className="text-xs text-muted-foreground mt-2 text-center">
-              {hasValidRouteParams
-                ? 'Naciśnij Enter aby wysłać, Shift+Enter dla nowej linii'
-                : 'Nieprawidłowe parametry sesji czatu'}
-            </p>
-          </div>
+        <div className="border-t border-white/10 bg-slate-950/55 p-4 backdrop-blur-xl">
+          <form className="glass-panel flex items-end gap-3 rounded-2xl p-2" onSubmit={handleSubmit}>
+            <div className="flex-1">
+              <Input
+                aria-label="Treść wiadomości"
+                className="min-h-12 border-transparent bg-transparent shadow-none"
+                disabled={isLoading || !hasValidRouteParams}
+                onChange={e => setInputValue(e.target.value)}
+                onKeyDown={async e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    await handleSubmit(e)
+                  }
+                }}
+                placeholder="Ask a question..."
+                value={inputValue}
+              />
+            </div>
+            <Button
+              aria-label="Wyślij wiadomość"
+              className="size-12"
+              disabled={isLoading || !inputValue.trim() || !hasValidRouteParams}
+              size="icon"
+              type="submit"
+              variant="glow"
+            >
+              <Send className="size-5" />
+            </Button>
+          </form>
+          <p className="mt-3 text-center text-xs text-muted-foreground">
+            {hasValidRouteParams
+              ? 'Enter wysyła wiadomość, Shift+Enter dodaje nową linię.'
+              : 'Nieprawidłowe parametry sesji czatu.'}
+          </p>
         </div>
-      </div>
+      </section>
     </div>
   )
 }

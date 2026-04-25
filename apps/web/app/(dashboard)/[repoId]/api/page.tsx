@@ -12,9 +12,14 @@ import type {
   RepoApiRunnerResponse,
   RepoInteractiveApi
 } from '@workspace/codepath-common/api-explorer'
+import { Button } from '@workspace/ui/components/button'
+import { Input } from '@workspace/ui/components/input'
+import { Textarea } from '@workspace/ui/components/textarea'
+import { Download, Filter, RefreshCw, RotateCcw, Search } from 'lucide-react'
 import { useParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { PageHeader } from '@/components/PageHeader'
 import {
   createDefaultRunnerAuthConfig,
   deleteRepoRunnerAuthPreset,
@@ -52,14 +57,17 @@ const METHOD_OPTIONS: RepoApiHttpMethod[] = [
 const METHOD_WITH_BODY = new Set<RepoApiHttpMethod>(['PATCH', 'POST', 'PUT'])
 
 const methodClasses: Record<RepoApiHttpMethod, string> = {
-  DELETE: 'bg-red-100 text-red-700',
-  GET: 'bg-green-100 text-green-700',
-  HEAD: 'bg-slate-100 text-slate-700',
-  OPTIONS: 'bg-zinc-100 text-zinc-700',
-  PATCH: 'bg-orange-100 text-orange-700',
-  POST: 'bg-blue-100 text-blue-700',
-  PUT: 'bg-purple-100 text-purple-700'
+  DELETE: 'border-red-400/40 bg-red-400/10 text-red-200',
+  GET: 'border-cyan-300/40 bg-cyan-300/10 text-cyan-200',
+  HEAD: 'border-slate-300/30 bg-slate-300/10 text-slate-200',
+  OPTIONS: 'border-zinc-300/30 bg-zinc-300/10 text-zinc-200',
+  PATCH: 'border-amber-300/40 bg-amber-300/10 text-amber-200',
+  POST: 'border-emerald-300/40 bg-emerald-300/10 text-emerald-200',
+  PUT: 'border-violet-300/40 bg-violet-300/10 text-violet-200'
 }
+
+const fieldClassName = 'h-11 rounded-xl border-input bg-input/70 px-4 text-sm text-foreground shadow-[inset_0_1px_0_oklch(1_0_0/0.05)] transition-[border-color,box-shadow,background,color] focus-visible:border-ring focus-visible:bg-input focus-visible:ring-[3px] focus-visible:ring-ring/50'
+const runnerPanelClassName = 'space-y-3 rounded-2xl border border-white/10 bg-white/[0.035] p-4'
 
 const resolveErrorMessage = (error: unknown) => {
   if (typeof error === 'object' && error !== null && 'response' in error) {
@@ -295,9 +303,9 @@ function EndpointRow({
   onUse: (endpoint: RepoApiEndpoint) => void
 }) {
   return (
-    <tr className="border-b border-border">
+    <tr className={`border-b border-white/10 transition hover:bg-white/[0.04] ${isActive ? 'bg-primary/10' : ''}`}>
       <td className="px-3 py-2 align-top">
-        <span className={`rounded px-2 py-1 text-xs font-semibold ${methodClasses[endpoint.method]}`}>
+        <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${methodClasses[endpoint.method]}`}>
           {endpoint.method}
         </span>
       </td>
@@ -312,7 +320,7 @@ function EndpointRow({
           <div className="flex flex-wrap gap-1">
             {endpoint.params.map(param => (
               <span
-                className="rounded border border-border bg-muted px-1.5 py-0.5"
+                className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5"
                 key={`${endpoint.id}:${param.location}:${param.name}`}
               >
                 {param.location}:{param.name}{param.required ? '*' : ''}
@@ -327,7 +335,7 @@ function EndpointRow({
             <summary className="cursor-pointer text-primary">
               Show code{endpoint.sourceLineStart ? ` (L${endpoint.sourceLineStart})` : ''}
             </summary>
-            <pre className="mt-2 max-h-44 overflow-auto rounded bg-muted p-2 font-mono text-[11px] leading-relaxed">
+            <pre className="mt-2 max-h-44 overflow-auto rounded-xl border border-white/10 bg-slate-950/80 p-3 font-mono text-[11px] leading-relaxed text-slate-100">
               {endpoint.sourceSnippet}
             </pre>
           </details>
@@ -337,7 +345,7 @@ function EndpointRow({
       </td>
       <td className="px-3 py-2 align-top">
         <button
-          className={`rounded-md border px-2 py-1 text-xs ${isActive ? 'border-primary text-primary' : 'border-border'}`}
+          className={`rounded-full border px-3 py-1.5 text-xs transition ${isActive ? 'border-primary/60 bg-primary/15 text-primary' : 'border-white/10 bg-white/[0.03] text-muted-foreground hover:border-primary/40 hover:text-white'}`}
           onClick={() => onUse(endpoint)}
           type="button"
         >
@@ -769,122 +777,115 @@ export default function Page() {
   }, [runnerResult])
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">API Explorer</h1>
-        <p className="text-muted-foreground">
-          Repo: {Number.isFinite(repoId) ? repoId : String(getFirstRouteParam(params.repoId))}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Endpoints: {data?.metadata.endpointCount ?? 0} | Segments scanned: {data?.metadata.segmentCount ?? 0}
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        description="Explore detected backend endpoints, generated request payloads, OpenAPI exports and workspace-shared runner presets."
+        eyebrow={`Repo ${Number.isFinite(repoId) ? repoId : 'unknown'}`}
+        title="API Explorer"
+      />
 
-      <div className="rounded-md border border-border bg-card p-4 space-y-4">
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium" htmlFor="api-search">Search</label>
-          <input
-            className="rounded-md border border-border bg-background px-3 py-2 text-sm"
-            id="api-search"
-            onChange={event => setSearch(event.target.value)}
-            placeholder="path, file, method, framework..."
-            value={search}
-          />
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium" htmlFor="runtime-openapi-base-url">
-            Runtime OpenAPI Base URL (optional)
+      <section aria-label="API explorer filters" className="glass-panel rounded-3xl p-4 md:p-5">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,420px)]">
+          <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="api-search">
+            <span className="flex items-center gap-2 text-white">
+              <Search className="size-4 text-cyan-300" />
+              Search
+            </span>
+            <Input
+              id="api-search"
+              onChange={event => setSearch(event.target.value)}
+              placeholder="path, file, method, framework..."
+              value={search}
+            />
           </label>
-          <input
-            className="rounded-md border border-border bg-background px-3 py-2 text-sm"
-            id="runtime-openapi-base-url"
-            onChange={event => setRuntimeOpenApiBaseUrl(event.target.value)}
-            placeholder="http://127.0.0.1:3001"
-            value={runtimeOpenApiBaseUrl}
-          />
-          <p className="text-xs text-muted-foreground">
-            OpenAPI export: runtime-first from this URL, with static fallback from code.
-          </p>
+
+          <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="runtime-openapi-base-url">
+            <span className="text-white">Runtime OpenAPI Base URL (optional)</span>
+            <Input
+              id="runtime-openapi-base-url"
+              onChange={event => setRuntimeOpenApiBaseUrl(event.target.value)}
+              placeholder="http://127.0.0.1:3001"
+              value={runtimeOpenApiBaseUrl}
+            />
+            <span className="text-xs font-normal text-muted-foreground">
+              OpenAPI export is runtime-first from this URL, with static fallback from code.
+            </span>
+          </label>
         </div>
 
-        <div className="space-y-2">
-          <p className="text-xs font-medium uppercase text-muted-foreground">Methods</p>
-          <div className="flex flex-wrap gap-3 text-sm">
-            {METHOD_OPTIONS.map(method => (
-              <label className="flex items-center gap-2" key={method}>
-                <input
-                  checked={selectedMethods.includes(method)}
-                  onChange={() => toggleMethod(method)}
-                  type="checkbox"
-                />
-                <span>{method}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <p className="text-xs font-medium uppercase text-muted-foreground">Frameworks</p>
-          <div className="flex flex-wrap gap-3 text-sm">
-            {FRAMEWORK_OPTIONS.map(framework => {
-              const enabled = availableFrameworks.length === 0 || availableFrameworks.includes(framework)
-              return (
-                <label className={`flex items-center gap-2 ${enabled ? '' : 'opacity-40'}`} key={framework}>
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Methods</p>
+            <div className="flex flex-wrap gap-2 text-sm">
+              {METHOD_OPTIONS.map(method => (
+                <label
+                  className={`flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 transition ${selectedMethods.includes(method) ? 'border-primary/50 bg-primary/15 text-white' : 'border-white/10 bg-white/[0.03] text-muted-foreground hover:border-primary/40 hover:text-white'}`}
+                  key={method}
+                >
                   <input
-                    checked={selectedFrameworks.includes(framework)}
-                    onChange={() => toggleFramework(framework)}
+                    checked={selectedMethods.includes(method)}
+                    className="size-3.5 accent-primary"
+                    onChange={() => toggleMethod(method)}
                     type="checkbox"
                   />
-                  <span>{framework}</span>
+                  <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${methodClasses[method]}`}>{method}</span>
                 </label>
-              )
-            })}
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Frameworks</p>
+            <div className="flex flex-wrap gap-2 text-sm">
+              {FRAMEWORK_OPTIONS.map(framework => {
+                const enabled = availableFrameworks.length === 0 || availableFrameworks.includes(framework)
+                return (
+                  <label
+                    className={`flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 transition ${selectedFrameworks.includes(framework) ? 'border-cyan-300/40 bg-cyan-300/10 text-cyan-100' : 'border-white/10 bg-white/[0.03] text-muted-foreground hover:border-cyan-300/30 hover:text-white'} ${enabled ? '' : 'opacity-40'}`}
+                    key={framework}
+                  >
+                    <input
+                      checked={selectedFrameworks.includes(framework)}
+                      className="size-3.5 accent-primary"
+                      onChange={() => toggleFramework(framework)}
+                      type="checkbox"
+                    />
+                    <span>{framework}</span>
+                  </label>
+                )
+              })}
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <button
-            className="rounded-md border border-border px-3 py-2 text-sm"
-            onClick={loadExplorer}
-            type="button"
-          >
+        <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">
+          <Button onClick={loadExplorer} type="button" variant="glow">
+            <Filter className="size-4" />
             Apply filters
-          </button>
-          <button
-            className="rounded-md border border-border px-3 py-2 text-sm"
-            onClick={resetFilters}
-            type="button"
-          >
+          </Button>
+          <Button onClick={resetFilters} type="button" variant="glass">
+            <RotateCcw className="size-4" />
             Reset
-          </button>
-          <button
-            className="rounded-md border border-border px-3 py-2 text-sm"
-            onClick={loadExplorer}
-            type="button"
-          >
+          </Button>
+          <Button onClick={loadExplorer} type="button" variant="glass">
+            <RefreshCw className="size-4" />
             Refresh
-          </button>
-          <button
-            className="rounded-md border border-border px-3 py-2 text-sm"
-            disabled={exportingEndpoints}
-            onClick={handleExportEndpointsJson}
-            type="button"
-          >
+          </Button>
+          <Button disabled={exportingEndpoints} onClick={handleExportEndpointsJson} type="button" variant="glass">
+            <Download className="size-4" />
             {exportingEndpoints ? 'Exporting...' : 'Export Endpoints JSON'}
-          </button>
-          <button
-            className="rounded-md border border-border px-3 py-2 text-sm"
-            disabled={exportingOpenApi}
-            onClick={handleExportOpenApi}
-            type="button"
-          >
+          </Button>
+          <Button disabled={exportingOpenApi} onClick={handleExportOpenApi} type="button" variant="glass">
+            <Download className="size-4" />
             {exportingOpenApi ? 'Exporting...' : 'Export OpenAPI JSON'}
-          </button>
+          </Button>
+          <span className="ml-auto text-xs text-muted-foreground">
+            Endpoints: {data?.metadata.endpointCount ?? 0} | Segments scanned: {data?.metadata.segmentCount ?? 0}
+          </span>
         </div>
-      </div>
+      </section>
 
-      <div className="rounded-md border border-border bg-card p-4 space-y-3">
+      <section aria-label="API runner" className="glass-panel rounded-3xl p-4 space-y-3 md:p-5">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">API Runner (MVP)</h2>
           {selectedEndpoint && (
@@ -895,11 +896,11 @@ export default function Page() {
         </div>
 
         {selectedEndpoint?.sourceSnippet && (
-          <details className="rounded-md border border-border p-2 text-xs">
+          <details className="rounded-2xl border border-white/10 bg-white/[0.035] p-3 text-xs">
             <summary className="cursor-pointer text-primary">
               Source fragment{selectedEndpoint.sourceLineStart ? ` (L${selectedEndpoint.sourceLineStart})` : ''}
             </summary>
-            <pre className="mt-2 max-h-40 overflow-auto rounded bg-muted p-2 font-mono text-[11px] leading-relaxed">
+            <pre className="mt-2 max-h-40 overflow-auto rounded-xl border border-white/10 bg-slate-950/80 p-3 font-mono text-[11px] leading-relaxed text-slate-100">
               {selectedEndpoint.sourceSnippet}
             </pre>
           </details>
@@ -909,7 +910,7 @@ export default function Page() {
           <label className="flex flex-col gap-1 text-sm">
             <span>Base URL</span>
             <input
-              className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+              className={fieldClassName}
               onChange={event => setBaseUrl(event.target.value)}
               placeholder="http://127.0.0.1:3000"
               value={baseUrl}
@@ -918,7 +919,7 @@ export default function Page() {
           <label className="flex flex-col gap-1 text-sm">
             <span>Timeout (ms)</span>
             <input
-              className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+              className={fieldClassName}
               min={1000}
               onChange={event => setTimeoutMs(Number(event.target.value))}
               type="number"
@@ -927,13 +928,13 @@ export default function Page() {
           </label>
         </div>
 
-        <div className="space-y-2 rounded-md border border-border p-3">
+        <div className={runnerPanelClassName}>
           <p className="text-xs font-medium uppercase text-muted-foreground">Auth preset</p>
           <div className="grid gap-3 md:grid-cols-2">
             <label className="flex flex-col gap-1 text-sm">
               <span>Mode</span>
               <select
-                className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+                className={fieldClassName}
                 onChange={event => setAuth(prev => ({ ...prev, mode: event.target.value as RepoApiRunnerAuthMode }))}
                 value={auth.mode}
               >
@@ -949,7 +950,7 @@ export default function Page() {
             <label className="flex flex-col gap-1 text-sm">
               <span>Bearer token</span>
               <input
-                className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+                className={fieldClassName}
                 onChange={event => setAuth(prev => ({ ...prev, bearerToken: event.target.value }))}
                 placeholder="eyJhbGciOi..."
                 value={auth.bearerToken}
@@ -962,7 +963,7 @@ export default function Page() {
               <label className="flex flex-col gap-1 text-sm">
                 <span>Username</span>
                 <input
-                  className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  className={fieldClassName}
                   onChange={event => setAuth(prev => ({ ...prev, basicUsername: event.target.value }))}
                   value={auth.basicUsername}
                 />
@@ -970,7 +971,7 @@ export default function Page() {
               <label className="flex flex-col gap-1 text-sm">
                 <span>Password</span>
                 <input
-                  className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  className={fieldClassName}
                   onChange={event => setAuth(prev => ({ ...prev, basicPassword: event.target.value }))}
                   type="password"
                   value={auth.basicPassword}
@@ -984,7 +985,7 @@ export default function Page() {
               <label className="flex flex-col gap-1 text-sm">
                 <span>Key name</span>
                 <input
-                  className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  className={fieldClassName}
                   onChange={event => setAuth(prev => ({ ...prev, apiKeyName: event.target.value }))}
                   value={auth.apiKeyName}
                 />
@@ -992,7 +993,7 @@ export default function Page() {
               <label className="flex flex-col gap-1 text-sm">
                 <span>Key value</span>
                 <input
-                  className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  className={fieldClassName}
                   onChange={event => setAuth(prev => ({ ...prev, apiKeyValue: event.target.value }))}
                   type="password"
                   value={auth.apiKeyValue}
@@ -1001,7 +1002,7 @@ export default function Page() {
               <label className="flex flex-col gap-1 text-sm">
                 <span>Placement</span>
                 <select
-                  className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  className={fieldClassName}
                   onChange={event => setAuth(prev => ({ ...prev, apiKeyPlacement: event.target.value as RepoApiRunnerApiKeyPlacement }))}
                   value={auth.apiKeyPlacement}
                 >
@@ -1013,17 +1014,17 @@ export default function Page() {
           )}
         </div>
 
-        <div className="space-y-2 rounded-md border border-border p-3">
+        <div className={runnerPanelClassName}>
           <p className="text-xs font-medium uppercase text-muted-foreground">Auth presets (workspace-shared)</p>
           <div className="flex flex-wrap gap-2">
             <input
-              className="min-w-[220px] flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm"
+              className={`${fieldClassName} min-w-[220px] flex-1`}
               onChange={event => setAuthPresetNameInput(event.target.value)}
               placeholder="Auth preset name"
               value={authPresetNameInput}
             />
             <button
-              className="rounded-md border border-border px-3 py-2 text-sm"
+              className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-muted-foreground transition hover:border-primary/40 hover:text-white"
               onClick={handleSaveAuthPreset}
               type="button"
             >
@@ -1035,7 +1036,7 @@ export default function Page() {
           ) : (
             <div className="max-h-44 overflow-auto space-y-1">
               {runnerAuthPresets.map(preset => (
-                <div className="flex items-center justify-between gap-2 rounded-md border border-border px-2 py-1" key={preset.id}>
+                <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2" key={preset.id}>
                   <div className="min-w-0">
                     <p className="truncate text-sm">{preset.name}</p>
                     <p className="truncate text-xs text-muted-foreground">
@@ -1044,14 +1045,14 @@ export default function Page() {
                   </div>
                   <div className="flex gap-1">
                     <button
-                      className="rounded-md border border-border px-2 py-1 text-xs"
+                      className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-white"
                       onClick={() => handleLoadAuthPreset(preset)}
                       type="button"
                     >
                       Load
                     </button>
                     <button
-                      className="rounded-md border border-border px-2 py-1 text-xs"
+                      className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-white"
                       onClick={() => handleDeleteAuthPreset(preset.id)}
                       type="button"
                     >
@@ -1064,17 +1065,17 @@ export default function Page() {
           )}
         </div>
 
-        <div className="space-y-2 rounded-md border border-border p-3">
+        <div className={runnerPanelClassName}>
           <p className="text-xs font-medium uppercase text-muted-foreground">Request collections (workspace-shared)</p>
           <div className="flex flex-wrap gap-2">
             <input
-              className="min-w-[220px] flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm"
+              className={`${fieldClassName} min-w-[220px] flex-1`}
               onChange={event => setCollectionNameInput(event.target.value)}
               placeholder="Collection name"
               value={collectionNameInput}
             />
             <button
-              className="rounded-md border border-border px-3 py-2 text-sm"
+              className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-muted-foreground transition hover:border-primary/40 hover:text-white"
               onClick={handleSaveCollection}
               type="button"
             >
@@ -1086,7 +1087,7 @@ export default function Page() {
           ) : (
             <div className="max-h-52 overflow-auto space-y-1">
               {runnerCollections.map(collection => (
-                <div className="flex items-center justify-between gap-2 rounded-md border border-border px-2 py-1" key={collection.id}>
+                <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2" key={collection.id}>
                   <div className="min-w-0">
                     <p className="truncate text-sm">{collection.name}</p>
                     <p className="truncate text-xs text-muted-foreground">
@@ -1095,14 +1096,14 @@ export default function Page() {
                   </div>
                   <div className="flex gap-1">
                     <button
-                      className="rounded-md border border-border px-2 py-1 text-xs"
+                      className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-white"
                       onClick={() => handleLoadCollection(collection)}
                       type="button"
                     >
                       Load
                     </button>
                     <button
-                      className="rounded-md border border-border px-2 py-1 text-xs"
+                      className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-white"
                       onClick={() => handleDeleteCollection(collection.id)}
                       type="button"
                     >
@@ -1125,7 +1126,7 @@ export default function Page() {
                     <label className="flex flex-col gap-1 text-sm" key={name}>
                       <span>{name}</span>
                       <input
-                        className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+                        className={fieldClassName}
                         onChange={event => setPathValues(prev => ({ ...prev, [name]: event.target.value }))}
                         value={value}
                       />
@@ -1138,24 +1139,24 @@ export default function Page() {
             <div className="grid gap-3 md:grid-cols-3">
               <label className="flex flex-col gap-1 text-sm">
                 <span>Query JSON</span>
-                <textarea
-                  className="h-36 rounded-md border border-border bg-background px-3 py-2 font-mono text-xs"
+                <Textarea
+                  className="h-40 font-mono text-xs"
                   onChange={event => setQueryJson(event.target.value)}
                   value={queryJson}
                 />
               </label>
               <label className="flex flex-col gap-1 text-sm">
                 <span>Body JSON</span>
-                <textarea
-                  className="h-36 rounded-md border border-border bg-background px-3 py-2 font-mono text-xs"
+                <Textarea
+                  className="h-40 font-mono text-xs"
                   onChange={event => setBodyJson(event.target.value)}
                   value={bodyJson}
                 />
               </label>
               <label className="flex flex-col gap-1 text-sm">
                 <span>Headers JSON</span>
-                <textarea
-                  className="h-36 rounded-md border border-border bg-background px-3 py-2 font-mono text-xs"
+                <Textarea
+                  className="h-40 font-mono text-xs"
                   onChange={event => setHeadersJson(event.target.value)}
                   value={headersJson}
                 />
@@ -1163,21 +1164,21 @@ export default function Page() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <button
-                className="rounded-md border border-border px-3 py-2 text-sm"
+              <Button
                 onClick={() => initializeRunnerForEndpoint(selectedEndpoint)}
                 type="button"
+                variant="glass"
               >
                 Regenerate test payload
-              </button>
-              <button
-                className="rounded-md border border-border px-3 py-2 text-sm"
+              </Button>
+              <Button
                 disabled={runningRequest}
                 onClick={handleRunRequest}
                 type="button"
+                variant="glow"
               >
                 {runningRequest ? 'Sending...' : 'Send request'}
-              </button>
+              </Button>
             </div>
 
             {runnerError && (
@@ -1185,7 +1186,7 @@ export default function Page() {
             )}
 
             {runnerResult && (
-              <div className="space-y-2 rounded-md border border-border bg-background p-3">
+              <div className="space-y-3 rounded-2xl border border-white/10 bg-slate-950/60 p-4">
                 <p className="text-sm">
                   Status: <span className={runnerResult.ok ? 'text-green-600' : 'text-red-600'}>{runnerResult.status}</span>
                   {' '}| Duration: {runnerResult.durationMs}ms
@@ -1193,11 +1194,11 @@ export default function Page() {
                 <p className="text-xs text-muted-foreground font-mono break-all">{runnerResult.url}</p>
                 <details className="text-xs">
                   <summary className="cursor-pointer">Response headers</summary>
-                  <pre className="mt-2 overflow-x-auto rounded bg-muted p-2">
+                  <pre className="mt-2 overflow-x-auto rounded-xl border border-white/10 bg-slate-950/80 p-3">
                     {JSON.stringify(runnerResult.headers, null, 2)}
                   </pre>
                 </details>
-                <pre className="max-h-80 overflow-auto rounded bg-muted p-2 text-xs">
+                <pre className="max-h-80 overflow-auto rounded-xl border border-white/10 bg-slate-950/80 p-3 text-xs text-slate-100">
                   {runnerDataPreview}
                 </pre>
               </div>
@@ -1208,7 +1209,7 @@ export default function Page() {
             Pick endpoint from the table using "Use in runner".
           </p>
         )}
-      </div>
+      </section>
 
       {loading && <p className="text-sm text-muted-foreground">Loading interactive API...</p>}
       {error && <p className="text-sm text-red-500">{error}</p>}
@@ -1220,9 +1221,9 @@ export default function Page() {
       )}
 
       {!loading && !error && endpoints.length > 0 && (
-        <div className="overflow-x-auto rounded-md border border-border">
+        <div className="glass-panel overflow-x-auto rounded-3xl border border-white/10">
           <table className="min-w-full">
-            <thead className="bg-muted/60">
+            <thead className="bg-white/[0.04]">
               <tr className="text-left text-xs uppercase text-muted-foreground">
                 <th className="px-3 py-2">Method</th>
                 <th className="px-3 py-2">Path</th>

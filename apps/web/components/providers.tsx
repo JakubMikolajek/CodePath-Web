@@ -11,10 +11,11 @@ export function Providers({ children }: { children: ReactNode }) {
     <Provider store={store}>
       <NextThemesProvider
         attribute="class"
-        defaultTheme="system"
+        defaultTheme="dark"
         disableTransitionOnChange
         enableColorScheme
-        enableSystem
+        enableSystem={false}
+        forcedTheme={undefined}
       >
         {children}
       </NextThemesProvider>
