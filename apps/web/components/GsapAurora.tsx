@@ -10,27 +10,22 @@ interface GsapAuroraProps {
   density?: 'default' | 'hero'
 }
 
-const buildWaveDots = (count: number, amplitude: number, phase: number) => {
-  return Array.from({ length: count }, (_, index) => {
-    const progress = index / Math.max(count - 1, 1)
-    const wave = Math.sin(progress * Math.PI * 2.15 + phase)
-    const ripple = Math.sin(progress * Math.PI * 7 + phase * 0.7)
-
-    return {
-      opacity: 0.22 + Math.abs(wave) * 0.56,
-      radius: 1.4 + Math.abs(ripple) * 1.35,
-      x: 20 + progress * 1040,
-      y: 112 + wave * amplitude + ripple * 9
-    }
-  })
+const heroOpacity = {
+  base: 'opacity-100',
+  ribbon: 'opacity-95',
+  texture: 'opacity-55'
 }
 
-const leftWaveDots = buildWaveDots(82, 62, 0.15)
-const rightWaveDots = buildWaveDots(88, 74, 1.85)
-const lowerWaveDots = buildWaveDots(70, 44, 3.3)
+const appOpacity = {
+  base: 'opacity-70',
+  ribbon: 'opacity-70',
+  texture: 'opacity-32'
+}
 
 export function GsapAurora({ className, density = 'default' }: GsapAuroraProps) {
   const rootRef = useRef<HTMLDivElement>(null)
+  const isHero = density === 'hero'
+  const opacity = isHero ? heroOpacity : appOpacity
 
   useGSAP(() => {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -38,150 +33,204 @@ export function GsapAurora({ className, density = 'default' }: GsapAuroraProps) 
       return
     }
 
-    const waves = gsap.utils.toArray<HTMLElement>('[data-aurora-wave]')
+    const ribbons = gsap.utils.toArray<SVGGElement>('[data-aurora-ribbon]')
+    const crests = gsap.utils.toArray<SVGPathElement>('[data-aurora-crest]')
+    const textures = gsap.utils.toArray<SVGGElement>('[data-aurora-texture]')
     const glows = gsap.utils.toArray<HTMLElement>('[data-aurora-glow]')
     const particles = gsap.utils.toArray<HTMLElement>('[data-aurora-particle]')
-    const dotWaves = gsap.utils.toArray<SVGGElement>('[data-aurora-dot-wave]')
-    const dots = gsap.utils.toArray<SVGCircleElement>('[data-aurora-dot]')
 
-    gsap.set([...waves, ...glows, ...particles], { transformOrigin: '50% 50%' })
-    gsap.set(dotWaves, { transformOrigin: '50% 50%' })
-    gsap.set(dots, { transformOrigin: '50% 50%' })
+    gsap.set([...ribbons, ...textures], { transformOrigin: '50% 50%' })
+    gsap.set(crests, { strokeDasharray: '14 28', strokeDashoffset: 0, transformOrigin: '50% 50%' })
+    gsap.set([...glows, ...particles], { transformOrigin: '50% 50%' })
 
-    waves.forEach((wave, index) => {
-      gsap.to(wave, {
-        duration: density === 'hero' ? 9 + index * 1.8 : 13 + index * 2.5,
+    ribbons.forEach((ribbon, index) => {
+      gsap.to(ribbon, {
+        duration: isHero ? 10 + index * 1.8 : 15 + index * 2.5,
         ease: 'sine.inOut',
-        opacity: index % 2 === 0 ? 0.96 : 0.82,
         repeat: -1,
-        rotate: index % 2 === 0 ? 4 : -5,
-        scaleX: index % 2 === 0 ? 1.12 : 1.18,
-        scaleY: index % 2 === 0 ? 1.08 : 1.12,
-        x: index % 2 === 0 ? 92 : -84,
-        y: index % 2 === 0 ? -38 : 44,
+        rotate: index % 2 === 0 ? 1.8 : -1.5,
+        scaleX: 1.03 + index * 0.012,
+        scaleY: 1.035,
+        x: index % 2 === 0 ? 28 : -34,
+        y: index % 2 === 0 ? -18 : 22,
+        yoyo: true
+      })
+    })
+
+    crests.forEach((crest, index) => {
+      gsap.to(crest, {
+        duration: isHero ? 5.8 + index * 0.7 : 8.8 + index,
+        ease: 'none',
+        repeat: -1,
+        strokeDashoffset: index % 2 === 0 ? -90 : 90
+      })
+    })
+
+    textures.forEach((texture, index) => {
+      gsap.to(texture, {
+        duration: isHero ? 7.5 + index : 11 + index * 1.4,
+        ease: 'sine.inOut',
+        opacity: index === 1 ? 0.72 : 0.58,
+        repeat: -1,
+        x: index % 2 === 0 ? 22 : -24,
+        y: index % 2 === 0 ? -10 : 12,
         yoyo: true
       })
     })
 
     glows.forEach((glow, index) => {
       gsap.to(glow, {
-        duration: density === 'hero' ? 8 + index * 1.5 : 12 + index * 2,
+        duration: isHero ? 8 + index * 1.4 : 13 + index * 1.8,
         ease: 'sine.inOut',
-        opacity: index % 2 === 0 ? 0.72 : 0.58,
+        opacity: index % 2 === 0 ? 0.72 : 0.54,
         repeat: -1,
-        scale: 1.22,
-        x: index % 2 === 0 ? 54 : -58,
-        y: index % 2 === 0 ? 34 : -30,
+        scale: 1.14,
+        x: index % 2 === 0 ? 34 : -38,
+        y: index % 2 === 0 ? 22 : -26,
         yoyo: true
       })
-    })
-
-    dotWaves.forEach((wave, index) => {
-      gsap.to(wave, {
-        duration: density === 'hero' ? 6.5 + index * 1.3 : 10 + index * 1.8,
-        ease: 'sine.inOut',
-        opacity: index === 1 ? 0.92 : 0.76,
-        repeat: -1,
-        rotate: index % 2 === 0 ? 1.8 : -2.4,
-        scale: index === 1 ? 1.06 : 1.04,
-        x: index % 2 === 0 ? 78 : -68,
-        y: index % 2 === 0 ? -18 : 24,
-        yoyo: true
-      })
-    })
-
-    gsap.to(dots, {
-      duration: 2.8,
-      ease: 'sine.inOut',
-      opacity: '+=0.22',
-      repeat: -1,
-      scale: 1.45,
-      yoyo: true,
-      stagger: {
-        amount: 2.2,
-        from: 'random'
-      }
     })
 
     particles.forEach((particle, index) => {
       gsap.to(particle, {
-        duration: 4.2 + index * 0.7,
+        duration: 4.5 + index * 0.8,
         ease: 'sine.inOut',
-        opacity: 0.9,
+        opacity: 0.88,
         repeat: -1,
-        scale: 1.45,
-        x: index % 2 === 0 ? 34 : -34,
-        y: index % 3 === 0 ? -38 : 32,
+        scale: 1.35,
+        x: index % 2 === 0 ? 24 : -26,
+        y: index % 3 === 0 ? -30 : 24,
         yoyo: true
       })
     })
-  }, { dependencies: [density], scope: rootRef })
-
-  const isHero = density === 'hero'
+  }, { dependencies: [isHero], scope: rootRef })
 
   return (
     <div aria-hidden="true" className={cn('pointer-events-none absolute inset-0 overflow-hidden', className)} ref={rootRef}>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,oklch(0.2_0.08_255/0.22),transparent_28rem),linear-gradient(180deg,#030919_0%,#05132c_45%,#020617_100%)]" />
-      <svg className="absolute inset-0 h-full w-full" preserveAspectRatio="none" viewBox="0 0 1200 675">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_52%_42%,oklch(0.18_0.075_252/0.2),transparent_31rem),linear-gradient(180deg,#030819_0%,#05132b_48%,#020617_100%)]" />
+      <div className="absolute left-[-8%] top-[24%] h-[24rem] w-[46rem] rounded-full bg-violet-500/12 blur-[76px]" data-aurora-glow="" />
+      <div className="absolute right-[-4%] top-[32%] h-[28rem] w-[52rem] rounded-full bg-cyan-400/13 blur-[84px]" data-aurora-glow="" />
+      <div className="absolute bottom-[-16%] left-[18%] h-[24rem] w-[44rem] rounded-full bg-blue-500/9 blur-[90px]" data-aurora-glow="" />
+
+      <svg className={cn('absolute inset-0 h-full w-full', opacity.base)} preserveAspectRatio="none" viewBox="0 0 1600 900">
         <defs>
-          <filter height="220%" id="dotWaveGlow" width="220%" x="-60%" y="-60%">
-            <feGaussianBlur result="blur" stdDeviation="4" />
+          <linearGradient id="leftRibbonFill" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stopColor="#b06cff" stopOpacity="0.52" />
+            <stop offset="0.42" stopColor="#4b6dff" stopOpacity="0.26" />
+            <stop offset="1" stopColor="#0b2a65" stopOpacity="0" />
+          </linearGradient>
+          <linearGradient id="rightRibbonFill" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stopColor="#0c2f7a" stopOpacity="0" />
+            <stop offset="0.42" stopColor="#0aa7e5" stopOpacity="0.36" />
+            <stop offset="0.72" stopColor="#6267ff" stopOpacity="0.28" />
+            <stop offset="1" stopColor="#8a4fff" stopOpacity="0.22" />
+          </linearGradient>
+          <linearGradient id="lowerRibbonFill" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stopColor="#113a91" stopOpacity="0" />
+            <stop offset="0.38" stopColor="#1457ce" stopOpacity="0.18" />
+            <stop offset="0.86" stopColor="#0aa7e5" stopOpacity="0.13" />
+          </linearGradient>
+          <linearGradient id="leftCrest" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stopColor="#b987ff" stopOpacity="0.08" />
+            <stop offset="0.28" stopColor="#bf8cff" stopOpacity="0.72" />
+            <stop offset="0.62" stopColor="#6d7cff" stopOpacity="0.28" />
+            <stop offset="1" stopColor="#3ba4ff" stopOpacity="0" />
+          </linearGradient>
+          <linearGradient id="rightCrest" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stopColor="#21d9ff" stopOpacity="0" />
+            <stop offset="0.28" stopColor="#36ddff" stopOpacity="0.72" />
+            <stop offset="0.62" stopColor="#7d73ff" stopOpacity="0.4" />
+            <stop offset="1" stopColor="#a177ff" stopOpacity="0.05" />
+          </linearGradient>
+          <filter height="220%" id="softRibbonGlow" width="220%" x="-60%" y="-60%">
+            <feGaussianBlur result="blur" stdDeviation="18" />
+            <feColorMatrix in="blur" result="tint" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1.3 0 0  0 0 0 0.62 0" />
+            <feMerge>
+              <feMergeNode in="tint" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <filter height="180%" id="crestGlow" width="180%" x="-40%" y="-40%">
+            <feGaussianBlur result="blur" stdDeviation="6" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
+          <pattern height="16" id="violetDotMesh" patternUnits="userSpaceOnUse" width="16">
+            <circle cx="4" cy="4" fill="#d8c2ff" opacity="0.35" r="1.15" />
+          </pattern>
+          <pattern height="15" id="cyanDotMesh" patternUnits="userSpaceOnUse" width="15">
+            <circle cx="5" cy="5" fill="#92efff" opacity="0.36" r="1.05" />
+          </pattern>
+          <pattern height="18" id="blueDotMesh" patternUnits="userSpaceOnUse" width="18">
+            <circle cx="6" cy="6" fill="#8ab7ff" opacity="0.24" r="0.95" />
+          </pattern>
         </defs>
-        <g className={isHero ? 'opacity-90' : 'opacity-45'} data-aurora-dot-wave="" filter="url(#dotWaveGlow)" transform="translate(-250 210) rotate(-7)">
-          {leftWaveDots.map(dot => (
-            <circle className="fill-violet-300" cx={dot.x} cy={dot.y} data-aurora-dot="" key={`left-${dot.x}`} opacity={dot.opacity} r={dot.radius} />
-          ))}
+
+        <g className={opacity.ribbon} data-aurora-ribbon="">
+          <path
+            d="M-140 565 C70 430 230 354 430 382 C594 405 658 492 824 500 C650 552 496 631 304 702 C128 768 -24 812 -170 838 Z"
+            fill="url(#leftRibbonFill)"
+            filter="url(#softRibbonGlow)"
+          />
+          <g className={opacity.texture} data-aurora-texture="">
+            <path
+              d="M-132 540 C82 420 240 370 430 393 C555 410 642 466 782 488 C620 526 458 584 286 648 C120 710 -36 760 -160 790 Z"
+              fill="url(#violetDotMesh)"
+            />
+          </g>
+          <path
+            d="M-118 535 C86 418 246 365 432 388 C560 404 650 468 810 492"
+            data-aurora-crest=""
+            fill="none"
+            filter="url(#crestGlow)"
+            stroke="url(#leftCrest)"
+            strokeLinecap="round"
+            strokeWidth="7"
+          />
         </g>
-        <g className={isHero ? 'opacity-95' : 'opacity-50'} data-aurora-dot-wave="" filter="url(#dotWaveGlow)" transform="translate(520 278) rotate(-5)">
-          {rightWaveDots.map(dot => (
-            <circle className="fill-cyan-300" cx={dot.x} cy={dot.y} data-aurora-dot="" key={`right-${dot.x}`} opacity={dot.opacity} r={dot.radius} />
-          ))}
+
+        <g className={opacity.ribbon} data-aurora-ribbon="">
+          <path
+            d="M682 610 C852 506 958 385 1140 368 C1305 352 1436 407 1644 490 L1644 666 C1415 590 1280 552 1116 590 C934 632 824 744 658 734 Z"
+            fill="url(#rightRibbonFill)"
+            filter="url(#softRibbonGlow)"
+          />
+          <g className={opacity.texture} data-aurora-texture="">
+            <path
+              d="M734 594 C888 512 982 418 1148 396 C1308 375 1428 424 1624 502 L1624 625 C1398 556 1270 524 1128 560 C962 602 842 704 704 710 Z"
+              fill="url(#cyanDotMesh)"
+            />
+          </g>
+          <path
+            d="M712 602 C866 512 978 404 1148 386 C1308 370 1436 424 1628 500"
+            data-aurora-crest=""
+            fill="none"
+            filter="url(#crestGlow)"
+            stroke="url(#rightCrest)"
+            strokeLinecap="round"
+            strokeWidth="8"
+          />
         </g>
-        <g className={isHero ? 'opacity-55' : 'opacity-30'} data-aurora-dot-wave="" filter="url(#dotWaveGlow)" transform="translate(80 470) rotate(-10)">
-          {lowerWaveDots.map(dot => (
-            <circle className="fill-blue-300" cx={dot.x} cy={dot.y} data-aurora-dot="" key={`lower-${dot.x}`} opacity={dot.opacity} r={dot.radius} />
-          ))}
+
+        <g className={isHero ? 'opacity-70' : 'opacity-45'} data-aurora-ribbon="">
+          <path
+            d="M180 704 C348 616 504 604 660 642 C806 678 928 760 1100 748 C1266 736 1402 646 1608 674 L1608 812 C1364 780 1244 856 1068 862 C874 868 744 772 574 742 C430 716 304 744 168 832 Z"
+            fill="url(#lowerRibbonFill)"
+            filter="url(#softRibbonGlow)"
+          />
+          <g className={opacity.texture} data-aurora-texture="">
+            <path
+              d="M220 706 C372 636 506 626 654 660 C808 696 928 774 1090 768 C1254 760 1378 700 1588 710 L1588 790 C1366 770 1246 836 1070 840 C874 844 752 754 582 728 C444 706 320 740 198 802 Z"
+              fill="url(#blueDotMesh)"
+            />
+          </g>
         </g>
       </svg>
-      <div
-        className={cn(
-          'absolute rounded-[100%] bg-[radial-gradient(ellipse_at_35%_50%,oklch(0.77_0.24_292/0.5),oklch(0.58_0.22_270/0.28)_34%,oklch(0.36_0.14_250/0.16)_58%,transparent_74%)] blur-2xl',
-          isHero
-            ? 'left-[-28vw] top-[25%] h-[29rem] w-[72vw] -rotate-[13deg] md:h-[35rem]'
-            : 'left-[-24rem] top-[8%] h-72 w-[52rem] -rotate-[10deg]'
-        )}
-        data-aurora-wave=""
-      />
-      <div
-        className={cn(
-          'absolute rounded-[100%] bg-[radial-gradient(ellipse_at_45%_50%,oklch(0.74_0.18_225/0.52),oklch(0.52_0.18_245/0.3)_38%,oklch(0.34_0.15_265/0.16)_62%,transparent_78%)] blur-2xl',
-          isHero
-            ? 'right-[-26vw] top-[34%] h-[31rem] w-[74vw] rotate-[10deg] md:h-[37rem]'
-            : 'right-[-18rem] top-[28%] h-80 w-[58rem] rotate-[10deg]'
-        )}
-        data-aurora-wave=""
-      />
-      <div
-        className={cn(
-          'absolute rounded-[100%] bg-[radial-gradient(ellipse_at_50%_50%,oklch(0.56_0.22_258/0.35),transparent_68%)] blur-3xl',
-          isHero
-            ? 'bottom-[-16rem] left-[12%] h-[28rem] w-[60vw] -rotate-[7deg]'
-            : 'bottom-[-16rem] left-[20%] h-80 w-[42rem]'
-        )}
-        data-aurora-glow=""
-      />
-      <div
-        className="absolute right-[12%] top-[18%] h-[24rem] w-[32rem] rounded-full bg-cyan-400/10 blur-3xl"
-        data-aurora-glow=""
-      />
-      <span className="absolute left-[28%] top-[22%] size-2 rounded-full bg-cyan-200/80 shadow-[0_0_24px_oklch(0.82_0.15_220/0.9)]" data-aurora-particle="" />
-      <span className="absolute right-[18%] top-[34%] size-1.5 rounded-full bg-violet-200/80 shadow-[0_0_22px_oklch(0.78_0.22_292/0.9)]" data-aurora-particle="" />
-      <span className="absolute bottom-[28%] left-[47%] size-1 rounded-full bg-blue-100/80 shadow-[0_0_18px_oklch(0.72_0.2_255/0.85)]" data-aurora-particle="" />
+
+      <span className="absolute left-[30%] top-[22%] size-1.5 rounded-full bg-cyan-200/80 shadow-[0_0_24px_oklch(0.82_0.15_220/0.9)]" data-aurora-particle="" />
+      <span className="absolute right-[18%] top-[35%] size-1 rounded-full bg-violet-100/75 shadow-[0_0_22px_oklch(0.78_0.22_292/0.9)]" data-aurora-particle="" />
     </div>
   )
 }
