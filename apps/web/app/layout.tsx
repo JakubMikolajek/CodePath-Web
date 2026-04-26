@@ -3,7 +3,7 @@ import '@workspace/ui/styles/globals.css'
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 
-import { Providers } from '@/components/providers'
+import { Providers } from '@/components/Providers'
 
 interface RootLayoutProps {
   children: ReactNode

@@ -19,6 +19,7 @@ export default function PopoverWrapper({ asChild, children, trigger }: PopoverWr
       <PopoverTrigger asChild={asChild} onClick={stopPropagation} onPointerDown={stopPropagation}>
         {trigger}
       </PopoverTrigger>
+
       <PopoverContent onClick={stopPropagation} onPointerDown={stopPropagation}>
         {children}
       </PopoverContent>

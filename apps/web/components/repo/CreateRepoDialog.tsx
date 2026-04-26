@@ -36,8 +36,9 @@ interface CreateRepoDialogProps {
 
 export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
   const dispatch = useAppDispatch()
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const [dialogOpen, setDialogOpen] = useState<boolean>(false)
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
 
   const form = useForm<CreateRepoFormData>({
     resolver: zodResolver(createRepoFormSchema),
@@ -51,6 +52,7 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
       name: ''
     }
   })
+
   const authType = form.watch('authType')
 
   const handleSubmit = async (data: CreateRepoFormData) => {
@@ -70,6 +72,7 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
 
   const handleDialogChange = (open: boolean) => {
     setDialogOpen(open)
+
     if (!open) {
       form.reset()
     }
@@ -78,15 +81,20 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
   return (
     <Dialog onOpenChange={handleDialogChange} open={dialogOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="glass-panel-strong overflow-hidden rounded-[2rem] border-primary/30 p-0 sm:max-w-2xl">
+
+      <DialogContent className="glass-panel-strong overflow-hidden rounded-4xl border-primary/30 p-0 sm:max-w-2xl">
         <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-20 size-56 rounded-full bg-primary/20 blur-3xl" />
+
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 -left-24 size-64 rounded-full bg-cyan-400/10 blur-3xl" />
+
         <div className="relative p-6 md:p-7">
           <DialogHeader>
             <div className="mb-2 grid size-12 place-items-center rounded-2xl border border-primary/35 bg-primary/15 text-primary shadow-[0_0_28px_oklch(0.62_0.24_270/0.28)]">
               <Plus className="size-5" />
             </div>
+
             <DialogTitle className="text-2xl tracking-[-0.05em] text-white">Add New Repository</DialogTitle>
+
             <DialogDescription className="text-muted-foreground">
               Add a new repository to your workspace. Fill in the repository details below.
             </DialogDescription>
@@ -101,9 +109,11 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Repository Name</FormLabel>
+
                       <FormControl>
                         <Input placeholder="my-awesome-repo" {...field} />
                       </FormControl>
+
                       <FormMessage />
                     </FormItem>
                   )}
@@ -118,9 +128,11 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
                         <GitBranch className="size-4 text-cyan-300" />
                         Branch (optional)
                       </FormLabel>
+
                       <FormControl>
                         <Input placeholder="develop / main / master" {...field} />
                       </FormControl>
+
                       <FormMessage />
                     </FormItem>
                   )}
@@ -133,9 +145,11 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Git URL</FormLabel>
+
                     <FormControl>
                       <Input placeholder="https://github.com/organization/repository.git" {...field} />
                     </FormControl>
+
                     <FormMessage />
                   </FormItem>
                 )}
@@ -147,16 +161,20 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Auth Method</FormLabel>
+
                     <FormControl>
                       <select
                         className="flex h-11 w-full rounded-xl border border-input bg-input/70 px-4 py-2 text-sm text-foreground shadow-[inset_0_1px_0_oklch(1_0_0/0.05)] outline-none transition-[border-color,box-shadow,background,color] focus-visible:border-ring focus-visible:bg-input focus-visible:ring-[3px] focus-visible:ring-ring/50"
                         {...field}
                       >
                         <option value="https_token">HTTPS Token (recommended)</option>
+
                         <option value="ssh_key">SSH Private Key (legacy)</option>
+
                         <option value="none">No auth (public repository)</option>
                       </select>
                     </FormControl>
+
                     <FormMessage />
                   </FormItem>
                 )}
@@ -172,9 +190,11 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
                         <ShieldCheck className="size-4 text-emerald-300" />
                         Auth Username
                       </FormLabel>
+
                       <FormControl>
                         <Input placeholder="oauth2 / x-access-token / your-user" {...field} />
                       </FormControl>
+
                       <FormMessage />
                     </FormItem>
                   )}
@@ -191,11 +211,11 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
                         {authType === 'ssh_key' ? <LockKeyhole className="size-4 text-amber-300" /> : <KeyRound className="size-4 text-amber-300" />}
                         {authType === 'ssh_key' ? 'SSH Private Key' : 'Deploy Token / PAT'}
                       </FormLabel>
+
                       <FormControl>
-                        {authType === 'ssh_key'
-                          ? <Textarea className="max-h-40" placeholder="-----BEGIN ... PRIVATE KEY-----" {...field} />
-                          : <Input placeholder="Enter token" type="password" {...field} />}
+                        {authType === 'ssh_key' ? <Textarea className="max-h-40" placeholder="-----BEGIN ... PRIVATE KEY-----" {...field} /> : <Input placeholder="Enter token" type="password" {...field} />}
                       </FormControl>
+
                       <FormMessage />
                     </FormItem>
                   )}
@@ -206,6 +226,7 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
                 <Button disabled={isSubmitting} onClick={() => setDialogOpen(false)} type="button" variant="outline">
                   Cancel
                 </Button>
+
                 <Button disabled={isSubmitting} type="submit" variant="glow">
                   {isSubmitting ? 'Adding...' : 'Add Repository'}
                 </Button>

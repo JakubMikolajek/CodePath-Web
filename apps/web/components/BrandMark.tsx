@@ -12,6 +12,7 @@ export function BrandMark({ className, compact = false, label = 'CodePath' }: Br
       <div aria-hidden="true" className="brand-mark-icon">
         <span className="brand-mark-core" />
       </div>
+
       {!compact && (
         <span className="font-display font-bold leading-none tracking-[-0.045em] text-white">
           {label}

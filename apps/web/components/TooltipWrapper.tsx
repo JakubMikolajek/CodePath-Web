@@ -12,9 +12,8 @@ export default function TooltipWrapper({ children, trigger }: TooltipWrapperProp
   return (
     <Tooltip>
       <TooltipTrigger>{trigger}</TooltipTrigger>
-      <TooltipContent>
-        {children}
-      </TooltipContent>
+
+      <TooltipContent>{children}</TooltipContent>
     </Tooltip>
   )
 }

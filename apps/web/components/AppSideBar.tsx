@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 
 import { BrandMark } from '@/components/BrandMark'
 import CreateRepoDialog from '@/components/repo/CreateRepoDialog'
@@ -41,15 +41,17 @@ const REPOS_REFRESH_INTERVAL_MS = 7_500
 export default function AppSidebar({ fetchedRepos, me }: AppSideBarProps) {
   const dispatch = useAppDispatch()
   const pathname = usePathname()
+
   const repos = useAppSelector(state => state.repos.repos)
   const syncError = useAppSelector(state => state.repos.syncError)
   const syncErrorNonce = useAppSelector(state => state.repos.syncErrorNonce)
-  const [showSyncErrorToast, setShowSyncErrorToast] = React.useState(false)
+
+  const [showSyncErrorToast, setShowSyncErrorToast] = useState<boolean>(false)
 
   useEffect(() => {
     dispatch(setMe(me))
     dispatch(setRepos(fetchedRepos))
-  }, [dispatch, fetchedRepos, me])
+  }, [fetchedRepos, me])
 
   useEffect(() => {
     void dispatch(getRepos())
@@ -59,7 +61,7 @@ export default function AppSidebar({ fetchedRepos, me }: AppSideBarProps) {
     }, REPOS_REFRESH_INTERVAL_MS)
 
     return () => clearInterval(interval)
-  }, [dispatch])
+  }, [])
 
   useEffect(() => {
     if (!syncError) {
@@ -68,6 +70,7 @@ export default function AppSidebar({ fetchedRepos, me }: AppSideBarProps) {
     }
 
     setShowSyncErrorToast(true)
+
     const timeout = setTimeout(() => {
       setShowSyncErrorToast(false)
     }, 6000)
@@ -81,6 +84,7 @@ export default function AppSidebar({ fetchedRepos, me }: AppSideBarProps) {
         <SidebarHeader className="px-5 py-7">
           <BrandMark />
         </SidebarHeader>
+
         <SidebarContent className="px-4 pb-4">
           <SidebarGroup className="gap-2 p-0">
             <SidebarMenu>
@@ -88,6 +92,7 @@ export default function AppSidebar({ fetchedRepos, me }: AppSideBarProps) {
                 <SidebarMenuButton asChild className="h-12" isActive={pathname === '/dashboard'} size="lg" tooltip="Dashboard">
                   <Link href="/dashboard">
                     <LayoutDashboard className="size-5" />
+
                     <span>Dashboard</span>
                   </Link>
                 </SidebarMenuButton>
@@ -99,17 +104,21 @@ export default function AppSidebar({ fetchedRepos, me }: AppSideBarProps) {
             <SidebarGroupLabel className="px-3 text-[0.68rem] uppercase tracking-[0.22em] text-muted-foreground/85">
               Repositories
             </SidebarGroupLabel>
+
             <SidebarMenu className="mt-2 gap-2">
               <CreateRepoDialog>
                 <SidebarMenuButton className="h-11" tooltip="Add repository">
                   <FolderGit2 className="size-4" />
+
                   <span>Add repo</span>
                 </SidebarMenuButton>
               </CreateRepoDialog>
+
               {repos.map(item => <RepoItem item={item} key={item.id} />)}
             </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
+
         <SidebarFooter className="border-t border-sidebar-border/70 p-4">
           <SidebarMenu>
             <SidebarMenuItem>
@@ -117,19 +126,20 @@ export default function AppSidebar({ fetchedRepos, me }: AppSideBarProps) {
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>
+
         <SidebarRail />
       </Sidebar>
+
       {showSyncErrorToast && syncError && (
-        <div
-          aria-live="polite"
-          className="glass-panel fixed bottom-4 right-4 z-50 w-[22rem] rounded-2xl border-destructive/50 p-4 shadow-2xl"
-          role="alert"
-        >
+        <div aria-live="polite" className="glass-panel fixed bottom-4 right-4 z-50 w-88 rounded-2xl border-destructive/50 p-4 shadow-2xl" role="alert">
           <div className="flex items-start gap-3">
             <div className="flex-1">
               <p className="text-sm font-semibold text-red-100">Repository sync failed</p>
+
               <p className="mt-1 text-xs text-red-100/80">{syncError}</p>
+
               <div className="mt-3 flex gap-2">
+                {/* FIXME create button component for that */}
                 <button
                   className="rounded-lg border border-red-300/30 px-3 py-1.5 text-xs text-red-100 hover:bg-red-400/10"
                   onClick={() => {
@@ -139,6 +149,8 @@ export default function AppSidebar({ fetchedRepos, me }: AppSideBarProps) {
                 >
                   Retry now
                 </button>
+
+                {/* FIXME create button component for that */}
                 <button
                   className="rounded-lg border border-red-300/30 px-3 py-1.5 text-xs text-red-100 hover:bg-red-400/10"
                   onClick={() => {
@@ -150,6 +162,8 @@ export default function AppSidebar({ fetchedRepos, me }: AppSideBarProps) {
                 </button>
               </div>
             </div>
+
+            {/* FIXME create button component for that */}
             <button
               aria-label="Close sync error notification"
               className="rounded-lg p-1 text-red-100 hover:bg-red-400/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
