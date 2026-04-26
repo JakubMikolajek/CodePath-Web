@@ -1,19 +1,19 @@
-import { Hexagon } from 'lucide-react'
+import { cn } from '@workspace/ui/lib/utils'
 
 interface BrandMarkProps {
+  className?: string
   compact?: boolean
   label?: string
 }
 
-export function BrandMark({ compact = false, label = 'CodePath' }: BrandMarkProps) {
+export function BrandMark({ className, compact = false, label = 'CodePath' }: BrandMarkProps) {
   return (
-    <div className="flex items-center gap-3">
-      <div className="relative grid size-10 place-items-center rounded-2xl border border-primary/45 bg-primary/15 shadow-[0_0_28px_oklch(0.62_0.24_270/0.38)]">
-        <Hexagon className="size-6 fill-primary/25 text-primary" strokeWidth={2.4} />
-        <span className="absolute size-2.5 rounded-full bg-cyan-300 shadow-[0_0_14px_oklch(0.78_0.16_220/0.7)]" />
+    <div className={cn('flex items-center gap-[0.7em] text-lg', className)}>
+      <div aria-hidden="true" className="brand-mark-icon">
+        <span className="brand-mark-core" />
       </div>
       {!compact && (
-        <span className="font-display text-lg font-bold tracking-[-0.04em] text-white">
+        <span className="font-display font-bold leading-none tracking-[-0.045em] text-white">
           {label}
         </span>
       )}

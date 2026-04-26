@@ -216,6 +216,41 @@
       linear-gradient(135deg, #020817 0%, #06152f 46%, #020617 100%);
   }
 
+  .app-aurora-shell {
+    background:
+      radial-gradient(circle at 14% 24%, oklch(0.35 0.16 286 / 0.14), transparent 28rem),
+      radial-gradient(circle at 92% 28%, oklch(0.35 0.14 228 / 0.12), transparent 30rem),
+      linear-gradient(135deg, #020817 0%, #061328 46%, #020617 100%);
+  }
+
+  .app-aurora-shell::before {
+    opacity: 0.34;
+    filter: blur(36px);
+  }
+
+  .app-aurora-shell::after {
+    opacity: 0.46;
+    mask-image: linear-gradient(to bottom, black, transparent 84%);
+  }
+
+  .aurora-login {
+    background:
+      radial-gradient(circle at 50% 42%, oklch(0.22 0.09 254 / 0.28), transparent 32rem),
+      radial-gradient(circle at 18% 46%, oklch(0.42 0.18 282 / 0.2), transparent 34rem),
+      radial-gradient(circle at 84% 48%, oklch(0.4 0.17 226 / 0.18), transparent 36rem),
+      linear-gradient(180deg, #020718 0%, #06142d 48%, #020617 100%);
+  }
+
+  .aurora-login::after {
+    opacity: 0.18;
+    mask-image: radial-gradient(ellipse at center, black 0%, black 38%, transparent 74%);
+  }
+
+  .login-artboard {
+    width: min(100vw, calc(100svh * 16 / 9));
+    min-height: min(100svh, calc(100vw * 9 / 16));
+  }
+
   .aurora-shell::before {
     content: "";
     position: fixed;
@@ -258,6 +293,56 @@
       var(--glass-strong);
     box-shadow: inset 0 1px 0 oklch(0.95 0.02 260 / 0.13), var(--glow-violet), 0 24px 100px rgb(0 0 0 / 0.42);
     backdrop-filter: blur(26px) saturate(150%);
+  }
+
+  .brand-mark-icon {
+    position: relative;
+    display: grid;
+    width: 2.08em;
+    height: 2.08em;
+    place-items: center;
+    clip-path: polygon(25% 7%, 75% 7%, 100% 50%, 75% 93%, 25% 93%, 0 50%);
+    background:
+      linear-gradient(135deg, oklch(0.76 0.18 248), oklch(0.62 0.26 270) 42%, oklch(0.58 0.26 292));
+    box-shadow:
+      0 0 0 0.08em oklch(0.9 0.06 250 / 0.28),
+      0 0 1.25em oklch(0.62 0.24 270 / 0.46),
+      0 0 2.1em oklch(0.55 0.22 250 / 0.24);
+  }
+
+  .brand-mark-icon::before {
+    content: "";
+    position: absolute;
+    inset: 0.17em;
+    clip-path: inherit;
+    background:
+      radial-gradient(circle at 52% 46%, oklch(0.85 0.08 235 / 0.28), transparent 0.22em),
+      linear-gradient(145deg, oklch(0.17 0.06 262), oklch(0.09 0.04 268));
+  }
+
+  .brand-mark-core {
+    position: relative;
+    z-index: 1;
+    width: 0.48em;
+    height: 0.48em;
+    border-radius: 999px;
+    background: #050b1d;
+    box-shadow:
+      inset 0 0 0 0.08em oklch(0.62 0.22 270 / 0.72),
+      0 0 0.72em oklch(0.64 0.24 270 / 0.62);
+  }
+
+  .login-card {
+    border: 1px solid oklch(0.72 0.18 258 / 0.52);
+    background:
+      radial-gradient(circle at 16% 16%, oklch(0.7 0.2 265 / 0.26), transparent 18rem),
+      linear-gradient(145deg, oklch(0.27 0.075 260 / 0.66), oklch(0.1 0.035 263 / 0.88));
+    box-shadow:
+      inset 0 1px 0 oklch(0.96 0.02 260 / 0.16),
+      0 0 0 1px oklch(0.72 0.18 258 / 0.1),
+      0 0 44px oklch(0.62 0.24 270 / 0.42),
+      0 30px 110px rgb(0 0 0 / 0.48);
+    backdrop-filter: blur(28px) saturate(155%);
   }
 
   .neon-border {

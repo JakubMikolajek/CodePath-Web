@@ -3,7 +3,7 @@
 import type { RepoGraphEdgeType } from '@workspace/codepath-common/graph'
 import { Button } from '@workspace/ui/components/button'
 import { Input } from '@workspace/ui/components/input'
-import { Focus, GitBranch, GitFork, Layers3, RotateCcw, SlidersHorizontal, Target } from 'lucide-react'
+import { Focus, GitFork, Layers3, Maximize2, RotateCcw, Search, SlidersHorizontal, Target } from 'lucide-react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
@@ -228,54 +228,56 @@ export default function Page() {
             </Button>
           </>
         )}
-        description="Visualize first-party repository logic, relationships and focused traversal without external dependency noise."
+        description="Visualize dependencies and relationships"
         eyebrow={`Repo ${Number.isFinite(repoId) ? repoId : 'unknown'}`}
         title="Repository Graph"
       />
 
-      <section aria-label="Graph filters" className="glass-panel rounded-3xl p-4 md:p-5">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3 text-sm">
-              <label className="flex min-h-11 items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-muted-foreground transition hover:border-primary/40 hover:text-white">
-                <input
-                  checked={scopeToFocus}
-                  className="size-4 accent-primary"
-                  onChange={event => setScopeToFocus(event.target.checked)}
-                  type="checkbox"
-                />
-                <Target className="size-4 text-primary" />
-                Scope to focused node
-              </label>
+      <section aria-label="Graph controls" className="rounded-3xl border border-primary/25 bg-slate-950/30 p-4 shadow-[inset_0_1px_0_oklch(1_0_0/0.06)] backdrop-blur-xl">
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex min-h-12 items-center gap-3 rounded-2xl border border-primary/20 bg-white/[0.04] px-4 text-sm text-muted-foreground transition hover:border-primary/45 hover:text-white">
+            <input
+              checked={scopeToFocus}
+              className="size-4 accent-primary"
+              onChange={event => setScopeToFocus(event.target.checked)}
+              type="checkbox"
+            />
+            <Target className="size-4 text-primary" />
+            Focus mode
+          </label>
 
-              <label className="flex min-h-11 items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-muted-foreground transition hover:border-primary/40 hover:text-white">
-                <input
-                  checked={includeSymbols}
-                  className="size-4 accent-primary"
-                  onChange={event => setIncludeSymbols(event.target.checked)}
-                  type="checkbox"
-                />
-                <Layers3 className="size-4 text-cyan-300" />
-                Include symbols
-              </label>
+          <label className="flex min-h-12 items-center gap-3 rounded-2xl border border-primary/20 bg-white/[0.04] px-4 text-sm text-muted-foreground">
+            Depth:
+            <Input
+              aria-label="Graph traversal depth"
+              className="h-8 w-16 rounded-xl bg-slate-950/50 px-2 text-center"
+              max={5}
+              min={1}
+              onChange={event => setDepth(Number(event.target.value))}
+              type="number"
+              value={depth}
+            />
+          </label>
 
-              <label className="flex min-h-11 items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm text-muted-foreground">
-                Depth
-                <Input
-                  aria-label="Graph traversal depth"
-                  className="h-8 w-20 bg-slate-950/50 px-2"
-                  max={5}
-                  min={1}
-                  onChange={event => setDepth(Number(event.target.value))}
-                  type="number"
-                  value={depth}
-                />
-              </label>
-            </div>
+          <label className="flex min-h-12 items-center gap-3 rounded-2xl border border-primary/20 bg-white/[0.04] px-4 text-sm text-muted-foreground transition hover:border-primary/45 hover:text-white">
+            <input
+              checked={includeSymbols}
+              className="size-4 accent-primary"
+              onChange={event => setIncludeSymbols(event.target.checked)}
+              type="checkbox"
+            />
+            <Layers3 className="size-4 text-cyan-300" />
+            Include symbols
+          </label>
 
-            <div className="space-y-2">
+          <details className="group relative">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 rounded-2xl border border-primary/20 bg-white/[0.04] px-4 text-sm text-muted-foreground transition hover:border-primary/45 hover:text-white">
+              <SlidersHorizontal className="size-4" />
+              Filters
+            </summary>
+            <div className="absolute left-0 top-14 z-20 w-[min(38rem,calc(100vw-3rem))] rounded-3xl border border-primary/25 bg-slate-950/95 p-4 shadow-2xl backdrop-blur-xl">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Relation filters</p>
-              <div className="flex flex-wrap gap-2 text-sm">
+              <div className="mt-3 flex flex-wrap gap-2 text-sm">
                 {EDGE_TYPE_OPTIONS.map(relationType => {
                   const isAvailable = availableRelationTypes.includes(relationType)
                   const isSelected = selectedRelationTypes.includes(relationType)
@@ -295,51 +297,45 @@ export default function Page() {
                   )
                 })}
               </div>
-            </div>
-          </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-white">
-              <GitBranch className="size-4 text-cyan-300" />
-              Graph summary
+              {moduleNodes.length > 0 && (
+                <div className="mt-4 space-y-2 border-t border-white/10 pt-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Expand / collapse modules</p>
+                  <div className="flex max-h-44 flex-wrap gap-2 overflow-auto pr-1">
+                    {moduleNodes.map(moduleNode => {
+                      const collapsed = collapsedModuleIds.includes(moduleNode.id)
+                      return (
+                        <button
+                          className={`rounded-full border px-3 py-1.5 text-xs transition ${collapsed ? 'border-amber-300/50 bg-amber-300/10 text-amber-200' : 'border-white/10 bg-white/[0.03] text-muted-foreground hover:border-primary/40 hover:text-white'}`}
+                          key={moduleNode.id}
+                          onClick={() => toggleModuleCollapse(moduleNode.id)}
+                          type="button"
+                        >
+                          {collapsed ? 'Expand' : 'Collapse'} {moduleNode.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
-            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <dt className="text-muted-foreground">Nodes</dt>
-                <dd className="mt-1 text-2xl font-bold tracking-[-0.05em] text-white">{interactiveGraph?.nodes.length ?? 0}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Edges</dt>
-                <dd className="mt-1 text-2xl font-bold tracking-[-0.05em] text-white">{interactiveGraph?.edges.length ?? 0}</dd>
-              </div>
-            </dl>
-            {focusedNodeId && (
-              <p className="mt-4 break-all rounded-xl border border-primary/25 bg-primary/10 p-3 text-xs text-muted-foreground">
-                Focused: <span className="font-medium text-white">{focusedNodeId}</span>
-              </p>
-            )}
-          </div>
+          </details>
+
+          <label className="relative min-w-64 flex-1">
+            <span className="sr-only">Search nodes</span>
+            <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
+            <Input className="h-12 rounded-2xl pl-12" disabled placeholder="Search nodes..." />
+          </label>
+
+          <Button aria-label="Fullscreen graph" className="h-12 w-12 p-0" type="button" variant="glass">
+            <Maximize2 className="size-5" />
+          </Button>
         </div>
 
-        {moduleNodes.length > 0 && (
-          <div className="mt-5 space-y-2 border-t border-white/10 pt-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Expand / collapse modules</p>
-            <div className="flex flex-wrap gap-2">
-              {moduleNodes.map(moduleNode => {
-                const collapsed = collapsedModuleIds.includes(moduleNode.id)
-                return (
-                  <button
-                    className={`rounded-full border px-3 py-1.5 text-xs transition ${collapsed ? 'border-amber-300/50 bg-amber-300/10 text-amber-200' : 'border-white/10 bg-white/[0.03] text-muted-foreground hover:border-primary/40 hover:text-white'}`}
-                    key={moduleNode.id}
-                    onClick={() => toggleModuleCollapse(moduleNode.id)}
-                    type="button"
-                  >
-                    {collapsed ? 'Expand' : 'Collapse'} {moduleNode.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+        {focusedNodeId && (
+          <p className="mt-3 break-all rounded-2xl border border-primary/25 bg-primary/10 p-3 text-xs text-muted-foreground">
+            Focused: <span className="font-medium text-white">{focusedNodeId}</span>
+          </p>
         )}
       </section>
 

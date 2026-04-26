@@ -60,12 +60,12 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
   }
 
   return (
-    <Card className="glass-panel-strong neon-border overflow-hidden rounded-[2rem] px-2 py-9 md:px-5 md:py-11">
-      <CardContent className="px-5 md:px-8">
+    <Card className="login-card overflow-hidden rounded-[1.65rem] px-4 py-9 md:rounded-[2rem] md:px-14 md:py-12">
+      <CardContent className="px-0">
         <div className="mb-8 flex flex-col items-center text-center">
-          <BrandMark />
-          <h1 className="mt-8 text-3xl font-bold tracking-[-0.055em] text-white md:text-4xl">Create account</h1>
-          <p className="mt-2 text-base text-muted-foreground">Set up your CodePath workspace</p>
+          <BrandMark className="justify-center text-2xl md:text-3xl" />
+          <h1 className="mt-10 text-4xl font-bold tracking-[-0.06em] text-white md:text-[2.4rem]">Create account</h1>
+          <p className="mt-3 text-lg text-muted-foreground">Set up your CodePath workspace</p>
         </div>
 
         <form className="space-y-5" onSubmit={handleSubmit}>
@@ -84,7 +84,7 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
             <Label className="text-sm text-white" htmlFor="email">Email</Label>
             <div className="relative">
               <AtSign className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
-              <Input className="h-13 pl-12" disabled={loading} id="email" onChange={e => handleInputChange('email', e.target.value)} placeholder="you@example.com" required type="email" value={formData.email} />
+              <Input className="h-14 rounded-2xl pl-12 text-base" disabled={loading} id="email" onChange={e => handleInputChange('email', e.target.value)} placeholder="you@example.com" required type="email" value={formData.email} />
             </div>
           </div>
 
@@ -92,7 +92,7 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
             <Label className="text-sm text-white" htmlFor="login">Login</Label>
             <div className="relative">
               <UserRound className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
-              <Input className="h-13 pl-12" disabled={loading} id="login" onChange={e => handleInputChange('login', e.target.value)} placeholder="workspace-owner" required type="text" value={formData.login} />
+              <Input className="h-14 rounded-2xl pl-12 text-base" disabled={loading} id="login" onChange={e => handleInputChange('login', e.target.value)} placeholder="workspace-owner" required type="text" value={formData.login} />
             </div>
           </div>
 
@@ -100,7 +100,7 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
             <Label className="text-sm text-white" htmlFor="register-password">Password</Label>
             <div className="relative">
               <Lock className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
-              <Input className="h-13 pl-12" disabled={loading} id="register-password" onChange={e => handleInputChange('password', e.target.value)} placeholder="Enter your password" required type="password" value={formData.password} />
+              <Input className="h-14 rounded-2xl pl-12 text-base" disabled={loading} id="register-password" onChange={e => handleInputChange('password', e.target.value)} placeholder="Enter your password" required type="password" value={formData.password} />
             </div>
           </div>
 

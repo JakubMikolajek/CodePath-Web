@@ -7,6 +7,7 @@ import type {
   RepoInteractiveGraph
 } from '@workspace/codepath-common/graph'
 import { Button } from '@workspace/ui/components/button'
+import { Maximize2, Minus, Plus, X } from 'lucide-react'
 import { type PointerEventHandler, useMemo, useState, type WheelEventHandler } from 'react'
 
 interface InteractiveRepoGraphProps {
@@ -25,20 +26,61 @@ type PositionedGraph = {
 
 const NODE_TYPE_ORDER: RepoGraphNodeType[] = ['repo', 'module', 'file', 'symbol', 'external_package']
 const NODE_TYPE_COLORS: Record<RepoGraphNodeType, { fill: string, stroke: string }> = {
-  external_package: { fill: '#3d2b0b', stroke: '#f59e0b' },
-  file: { fill: '#09245a', stroke: '#2f7dff' },
-  module: { fill: '#0b3a25', stroke: '#34d399' },
-  repo: { fill: '#12254f', stroke: '#8b5cf6' },
-  symbol: { fill: '#2b155f', stroke: '#a855f7' }
+  external_package: { fill: '#322f45', stroke: '#7f8fca' },
+  file: { fill: '#08285f', stroke: '#2778ff' },
+  module: { fill: '#341172', stroke: '#8b3dff' },
+  repo: { fill: '#075c2f', stroke: '#29d967' },
+  symbol: { fill: '#7a3208', stroke: '#fb923c' }
 }
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 const truncate = (value: string, maxLength: number) => value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value
+const OVERVIEW_NODE_LIMIT = 72
 const MIN_SCALE = 0.22
 const MAX_SCALE = 7
 const ZOOM_IN_FACTOR = 1.16
 const ZOOM_OUT_FACTOR = 0.86
-const DEFAULT_VIEWPORT = { scale: 1, x: 80, y: 56 }
+const DEFAULT_VIEWPORT = { scale: 1, x: 0, y: 0 }
+
+function getDegreeByNode(edges: RepoGraphEdge[]) {
+  const degreeByNode = new Map<string, number>()
+  for (const edge of edges) {
+    degreeByNode.set(edge.source, (degreeByNode.get(edge.source) ?? 0) + 1)
+    degreeByNode.set(edge.target, (degreeByNode.get(edge.target) ?? 0) + 1)
+  }
+  return degreeByNode
+}
+
+function getOverviewNodes(nodes: RepoGraphNode[], edges: RepoGraphEdge[], focusedNodeId: null | string) {
+  if (nodes.length <= OVERVIEW_NODE_LIMIT || focusedNodeId) {
+    return nodes
+  }
+
+  const degreeByNode = getDegreeByNode(edges)
+  const typeWeight: Record<RepoGraphNodeType, number> = {
+    external_package: 90,
+    file: 130,
+    module: 520,
+    repo: 900,
+    symbol: 60
+  }
+
+  const selectedIds = new Set(
+    [...nodes]
+      .sort((a, b) => {
+        const scoreA = (degreeByNode.get(a.id) ?? 0) * 9 + typeWeight[a.type]
+        const scoreB = (degreeByNode.get(b.id) ?? 0) * 9 + typeWeight[b.type]
+        if (scoreA !== scoreB) {
+          return scoreB - scoreA
+        }
+        return a.label.localeCompare(b.label)
+      })
+      .slice(0, OVERVIEW_NODE_LIMIT)
+      .map(node => node.id)
+  )
+
+  return nodes.filter(node => selectedIds.has(node.id))
+}
 
 function buildLayeredLayout(visibleNodes: RepoGraphNode[]): PositionedGraph {
   const grouped = new Map<RepoGraphNodeType, RepoGraphNode[]>()
@@ -128,10 +170,7 @@ function buildCoreRingsLayout(visibleNodes: RepoGraphNode[], visibleEdges: RepoG
     return degree * 3 + (typePriority[node.type] ?? 0)
   }
 
-  const coreCount = Math.min(
-    visibleNodes.length,
-    clamp(Math.round(Math.sqrt(Math.max(visibleNodes.length, 1))), 1, 14)
-  )
+  const coreCount = 1
   const sortedByScore = [...visibleNodes].sort((a, b) => {
     const scoreDelta = nodeScore(b) - nodeScore(a)
     if (scoreDelta !== 0) {
@@ -312,15 +351,27 @@ export default function InteractiveRepoGraph({
     return ids
   }, [collapsedModuleIds, focusedNodeId, graph.nodes])
 
-  const visibleNodes = useMemo(() => {
+  const rawVisibleNodes = useMemo(() => {
     return graph.nodes.filter(node => !hiddenNodeIds.has(node.id))
   }, [graph.nodes, hiddenNodeIds])
+
+  const rawVisibleNodeIdSet = useMemo(() => new Set(rawVisibleNodes.map(node => node.id)), [rawVisibleNodes])
+
+  const rawVisibleEdges = useMemo(() => {
+    return graph.edges.filter(edge => rawVisibleNodeIdSet.has(edge.source) && rawVisibleNodeIdSet.has(edge.target))
+  }, [graph.edges, rawVisibleNodeIdSet])
+
+  const visibleNodes = useMemo(() => {
+    return getOverviewNodes(rawVisibleNodes, rawVisibleEdges, focusedNodeId)
+  }, [focusedNodeId, rawVisibleEdges, rawVisibleNodes])
+
+  const overviewHiddenCount = rawVisibleNodes.length - visibleNodes.length
 
   const visibleNodeIdSet = useMemo(() => new Set(visibleNodes.map(node => node.id)), [visibleNodes])
 
   const visibleEdges = useMemo(() => {
-    return graph.edges.filter(edge => visibleNodeIdSet.has(edge.source) && visibleNodeIdSet.has(edge.target))
-  }, [graph.edges, visibleNodeIdSet])
+    return rawVisibleEdges.filter(edge => visibleNodeIdSet.has(edge.source) && visibleNodeIdSet.has(edge.target))
+  }, [rawVisibleEdges, visibleNodeIdSet])
 
   const positioned = useMemo(() => {
     if (layoutMode === 'coreRings') {
@@ -415,14 +466,15 @@ export default function InteractiveRepoGraph({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2 text-sm">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
         <Button
           onClick={() => setViewport(prev => ({ ...prev, scale: clamp(prev.scale * ZOOM_IN_FACTOR, MIN_SCALE, MAX_SCALE) }))}
           size="sm"
           type="button"
           variant="glass"
         >
+          <Plus className="size-3.5" />
           Zoom in
         </Button>
         <Button
@@ -431,12 +483,14 @@ export default function InteractiveRepoGraph({
           type="button"
           variant="glass"
         >
+          <Minus className="size-3.5" />
           Zoom out
         </Button>
         <Button onClick={() => setViewport(DEFAULT_VIEWPORT)} size="sm" type="button" variant="glass">
           Reset view
         </Button>
-        <Button onClick={() => onFocusNode(null)} size="sm" type="button" variant="glass">
+        <Button disabled={!focusedNodeId} onClick={() => onFocusNode(null)} size="sm" type="button" variant="glass">
+          <X className="size-3.5" />
           Clear focus
         </Button>
         <span className="text-muted-foreground">Layout:</span>
@@ -468,18 +522,24 @@ export default function InteractiveRepoGraph({
         >
           Layered
         </Button>
-        <span className="text-muted-foreground">Nodes: {visibleNodes.length}</span>
+        <span className="text-muted-foreground">Nodes: {visibleNodes.length}{overviewHiddenCount > 0 ? `/${rawVisibleNodes.length}` : ''}</span>
         <span className="text-muted-foreground">Edges: {visibleEdges.length}</span>
+        {overviewHiddenCount > 0 && (
+          <span className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-primary">
+            Overview hides {overviewHiddenCount} low-signal nodes
+          </span>
+        )}
       </div>
 
       <div
-        className="relative h-[72vh] min-h-[580px] overflow-hidden rounded-[1.5rem] border border-white/10 bg-[radial-gradient(circle_at_50%_45%,oklch(0.35_0.18_250/0.24),transparent_34%),linear-gradient(135deg,oklch(0.16_0.05_255/0.94),oklch(0.08_0.03_260/0.98))]"
+        className="relative h-[72vh] min-h-[640px] overflow-hidden rounded-[1.75rem] border border-primary/30 bg-[radial-gradient(circle_at_50%_46%,oklch(0.22_0.13_250/0.22),transparent_34%),radial-gradient(circle_at_46%_56%,oklch(0.2_0.12_152/0.12),transparent_24%),linear-gradient(135deg,oklch(0.12_0.045_258/0.98),oklch(0.055_0.025_264/0.99))] shadow-[inset_0_1px_0_oklch(1_0_0/0.07),0_0_50px_oklch(0.55_0.22_268/0.18)]"
         onPointerDown={handlePointerDown}
         onPointerLeave={handlePointerUp}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onWheel={handleWheel}
       >
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(oklch(0.95_0.03_250/0.045)_1px,transparent_1px)] bg-[length:18px_18px] opacity-45" />
         <svg
           aria-label="Interactive repository graph"
           className="h-full w-full"
@@ -556,9 +616,9 @@ export default function InteractiveRepoGraph({
               const fill = emphasis === 'dim' ? `${palette.fill}66` : palette.fill
               const stroke = emphasis === 'focused' ? '#1d4ed8' : palette.stroke
               const strokeWidth = emphasis === 'focused' ? 3 : emphasis === 'neighbor' ? 2.5 : 2
-              const maxLabelLength = viewport.scale >= 3 ? 56 : viewport.scale >= 2 ? 40 : viewport.scale >= 1.3 ? 30 : 24
+              const maxLabelLength = viewport.scale >= 3 ? 56 : viewport.scale >= 2 ? 42 : viewport.scale >= 1.3 ? 32 : 26
               const label = truncate(node.label, maxLabelLength)
-              const nodeWidth = Math.max(94, Math.min(290, label.length * 6.6 + 30))
+              const nodeWidth = Math.max(126, Math.min(320, label.length * 7.2 + 42))
 
               return (
                 <g
@@ -570,19 +630,19 @@ export default function InteractiveRepoGraph({
                   <rect
                     fill={fill}
                     filter={emphasis === 'dim' ? undefined : 'url(#nodeGlow)'}
-                    height={34}
-                    rx={10}
+                    height={42}
+                    rx={14}
                     stroke={stroke}
                     strokeWidth={strokeWidth}
                     width={nodeWidth}
                     x={-nodeWidth / 2}
-                    y={-17}
+                    y={-21}
                   />
                   <text
-                    className="fill-white text-[11px] font-semibold"
+                    className="fill-white text-[12.5px] font-semibold"
                     textAnchor="middle"
                     x={0}
-                    y={4}
+                    y={5}
                   >
                     {label}
                   </text>
@@ -592,6 +652,50 @@ export default function InteractiveRepoGraph({
             })}
           </g>
         </svg>
+        <div className="pointer-events-none absolute bottom-6 left-6 hidden w-64 rounded-3xl border border-primary/25 bg-slate-950/55 p-4 shadow-[0_0_30px_oklch(0.56_0.2_260/0.16)] backdrop-blur-xl lg:block">
+          <div className="relative h-24 overflow-hidden rounded-2xl border border-white/10 bg-slate-950/70">
+            <div className="absolute left-7 top-5 h-1.5 w-16 rounded-full bg-blue-500 shadow-[0_0_12px_#2778ff]" />
+            <div className="absolute left-16 top-9 h-1.5 w-20 rounded-full bg-violet-500 shadow-[0_0_12px_#8b3dff]" />
+            <div className="absolute left-11 top-14 h-1.5 w-28 rounded-full bg-emerald-500 shadow-[0_0_12px_#29d967]" />
+            <div className="absolute left-24 top-20 h-1.5 w-24 rounded-full bg-amber-500 shadow-[0_0_12px_#f59e0b]" />
+            <div className="absolute inset-x-8 bottom-4 h-10 rounded border border-dashed border-white/35" />
+          </div>
+          <div className="absolute right-4 top-4 grid gap-2">
+            <button
+              aria-label="Zoom graph in"
+              className="pointer-events-auto grid size-9 place-items-center rounded-xl border border-white/10 bg-white/[0.05] text-white"
+              onClick={() => setViewport(prev => ({ ...prev, scale: clamp(prev.scale * ZOOM_IN_FACTOR, MIN_SCALE, MAX_SCALE) }))}
+              type="button"
+            >
+              <Plus className="size-4" />
+            </button>
+            <button
+              aria-label="Zoom graph out"
+              className="pointer-events-auto grid size-9 place-items-center rounded-xl border border-white/10 bg-white/[0.05] text-white"
+              onClick={() => setViewport(prev => ({ ...prev, scale: clamp(prev.scale * ZOOM_OUT_FACTOR, MIN_SCALE, MAX_SCALE) }))}
+              type="button"
+            >
+              <Minus className="size-4" />
+            </button>
+            <button
+              aria-label="Reset graph view"
+              className="pointer-events-auto grid size-9 place-items-center rounded-xl border border-white/10 bg-white/[0.05] text-white"
+              onClick={() => setViewport(DEFAULT_VIEWPORT)}
+              type="button"
+            >
+              <Maximize2 className="size-4" />
+            </button>
+          </div>
+        </div>
+        <div className="pointer-events-none absolute right-6 top-1/2 hidden -translate-y-1/2 rounded-3xl border border-primary/25 bg-slate-950/55 p-6 shadow-[0_0_30px_oklch(0.56_0.2_260/0.16)] backdrop-blur-xl xl:block">
+          <div className="space-y-5 text-sm font-medium text-slate-200">
+            <div className="flex items-center gap-3"><span className="size-3 rounded-full bg-blue-500 shadow-[0_0_12px_#2778ff]" />Core</div>
+            <div className="flex items-center gap-3"><span className="size-3 rounded-full bg-emerald-400 shadow-[0_0_12px_#29d967]" />Services</div>
+            <div className="flex items-center gap-3"><span className="size-3 rounded-full bg-violet-500 shadow-[0_0_12px_#8b3dff]" />Modules</div>
+            <div className="flex items-center gap-3"><span className="size-3 rounded-full bg-orange-400 shadow-[0_0_12px_#fb923c]" />Utils</div>
+            <div className="flex items-center gap-3"><span className="size-3 rounded-full bg-slate-500 shadow-[0_0_12px_#7f8fca]" />External</div>
+          </div>
+        </div>
       </div>
     </div>
   )
