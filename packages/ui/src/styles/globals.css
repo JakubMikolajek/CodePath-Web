@@ -242,7 +242,7 @@
   }
 
   .aurora-login::after {
-    opacity: 0.18;
+    opacity: 0.06;
     mask-image: radial-gradient(ellipse at center, black 0%, black 38%, transparent 74%);
   }
 
@@ -333,18 +333,19 @@
   }
 
   .login-card {
-    border: 1px solid oklch(0.72 0.18 258 / 0.58);
+    border: 1px solid oklch(0.76 0.16 258 / 0.48);
     background:
-      radial-gradient(circle at 14% 12%, oklch(0.72 0.19 258 / 0.2), transparent 16rem),
-      radial-gradient(circle at 80% 92%, oklch(0.6 0.22 284 / 0.1), transparent 15rem),
-      linear-gradient(145deg, oklch(0.25 0.072 260 / 0.48), oklch(0.08 0.032 263 / 0.66));
+      radial-gradient(circle at 14% 12%, oklch(0.72 0.19 258 / 0.16), transparent 16rem),
+      radial-gradient(circle at 82% 90%, oklch(0.62 0.22 284 / 0.08), transparent 15rem),
+      linear-gradient(145deg, oklch(0.25 0.072 260 / 0.32), oklch(0.08 0.032 263 / 0.46));
     box-shadow:
-      inset 0 1px 0 oklch(0.96 0.02 260 / 0.2),
-      inset 0 0 56px oklch(0.5 0.16 250 / 0.1),
+      inset 0 1px 0 oklch(0.96 0.02 260 / 0.24),
+      inset 0 0 68px oklch(0.5 0.16 250 / 0.12),
       0 0 0 1px oklch(0.72 0.18 258 / 0.12),
-      0 0 52px oklch(0.62 0.24 270 / 0.44),
+      0 0 58px oklch(0.62 0.24 270 / 0.42),
       0 30px 120px rgb(0 0 0 / 0.5);
-    backdrop-filter: blur(32px) saturate(165%);
+    -webkit-backdrop-filter: blur(34px) saturate(175%);
+    backdrop-filter: blur(34px) saturate(175%);
   }
 
   .neon-border {

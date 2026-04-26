@@ -84,7 +84,7 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
             <Label className="text-sm text-white" htmlFor="email">Email</Label>
             <div className="relative">
               <AtSign className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
-              <Input className="h-14 rounded-2xl pl-12 text-base" disabled={loading} id="email" onChange={e => handleInputChange('email', e.target.value)} placeholder="you@example.com" required type="email" value={formData.email} />
+              <Input className="h-14 rounded-2xl bg-slate-950/24 pl-12 text-base backdrop-blur-xl" disabled={loading} id="email" onChange={e => handleInputChange('email', e.target.value)} placeholder="you@example.com" required type="email" value={formData.email} />
             </div>
           </div>
 
@@ -92,7 +92,7 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
             <Label className="text-sm text-white" htmlFor="login">Login</Label>
             <div className="relative">
               <UserRound className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
-              <Input className="h-14 rounded-2xl pl-12 text-base" disabled={loading} id="login" onChange={e => handleInputChange('login', e.target.value)} placeholder="workspace-owner" required type="text" value={formData.login} />
+              <Input className="h-14 rounded-2xl bg-slate-950/24 pl-12 text-base backdrop-blur-xl" disabled={loading} id="login" onChange={e => handleInputChange('login', e.target.value)} placeholder="workspace-owner" required type="text" value={formData.login} />
             </div>
           </div>
 
@@ -100,7 +100,7 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
             <Label className="text-sm text-white" htmlFor="register-password">Password</Label>
             <div className="relative">
               <Lock className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
-              <Input className="h-14 rounded-2xl pl-12 text-base" disabled={loading} id="register-password" onChange={e => handleInputChange('password', e.target.value)} placeholder="Enter your password" required type="password" value={formData.password} />
+              <Input className="h-14 rounded-2xl bg-slate-950/24 pl-12 text-base backdrop-blur-xl" disabled={loading} id="register-password" onChange={e => handleInputChange('password', e.target.value)} placeholder="Enter your password" required type="password" value={formData.password} />
             </div>
           </div>
 

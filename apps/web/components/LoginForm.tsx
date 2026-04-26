@@ -72,7 +72,7 @@ export default function LoginForm({ handleShowRegisterForm }: LoginFormProps) {
               <Input
                 aria-invalid={Boolean(currentError)}
                 autoComplete="username"
-                className="h-[4.1rem] rounded-2xl pl-16 text-xl"
+                className="h-[4.1rem] rounded-2xl bg-slate-950/24 pl-16 text-xl backdrop-blur-xl"
                 disabled={loading}
                 id="identifier"
                 onChange={e => handleInputChange('identifier', e.target.value)}
@@ -91,7 +91,7 @@ export default function LoginForm({ handleShowRegisterForm }: LoginFormProps) {
               <Input
                 aria-invalid={Boolean(currentError)}
                 autoComplete="current-password"
-                className="h-[4.1rem] rounded-2xl pl-16 pr-14 text-xl"
+                className="h-[4.1rem] rounded-2xl bg-slate-950/24 pl-16 pr-14 text-xl backdrop-blur-xl"
                 disabled={loading}
                 id="password"
                 onChange={e => handleInputChange('password', e.target.value)}
