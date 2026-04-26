@@ -17,8 +17,10 @@ import { getGraphs } from '@/redux/slices/graphsSlice'
 export default function Page() {
   const params = useParams()
   const dispatch = useAppDispatch()
+
   const graphId = useMemo(() => Number(getFirstRouteParam(params.graphId)), [params.graphId])
   const repoId = useMemo(() => Number(getFirstRouteParam(params.repoId)), [params.repoId])
+
   const [activeGraph, setActiveGraph] = useState<Nullable<Graph>>(null)
 
   const graphs = useAppSelector(state => state.graphs.graphs)
@@ -30,7 +32,7 @@ export default function Page() {
     }
 
     void dispatch(getGraphs(repoId))
-  }, [dispatch, repoId])
+  }, [repoId])
 
   useEffect(() => {
     setActiveGraph(graphs.find(graph => graph.id === graphId) ?? null)
@@ -63,17 +65,20 @@ export default function Page() {
           <div className="mx-auto grid size-14 place-items-center rounded-2xl border border-amber-300/30 bg-amber-300/10 text-amber-200">
             <TriangleAlert className="size-6" />
           </div>
+
           <h2 className="mt-4 text-xl font-semibold tracking-[-0.04em] text-white">Graph not found</h2>
+
           <p className="mt-2 text-sm text-muted-foreground">Selected repository does not expose this legacy per-file graph.</p>
         </div>
       )}
 
       {activeGraph && (
-        <section aria-label="Legacy Mermaid graph" className="glass-panel-strong rounded-[2rem] p-4">
+        <section aria-label="Legacy Mermaid graph" className="glass-panel-strong rounded-4xl p-4">
           <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
             <GitFork className="size-4 text-cyan-300" />
             Mermaid graph preview
           </div>
+
           <MermaidGraph graph={activeGraph.graph} key={activeGraph.id} />
         </section>
       )}

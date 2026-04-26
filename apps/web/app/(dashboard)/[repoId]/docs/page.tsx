@@ -1,5 +1,6 @@
 'use client'
 
+import type { Nullable } from '@workspace/codepath-common/globals'
 import { Button } from '@workspace/ui/components/button'
 import { Card, CardContent } from '@workspace/ui/components/card'
 import { BookOpen, CheckCircle2, Clock3, FileText, RefreshCw, Sparkles, TriangleAlert } from 'lucide-react'
@@ -55,12 +56,14 @@ const getStatusTone = (status?: string) => {
 
 export default function Page() {
   const params = useParams()
+
   const repoId = useMemo(() => Number(getFirstRouteParam(params.repoId)), [params.repoId])
-  const [error, setError] = useState<null | string>(null)
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [status, setStatus] = useState<null | RepoDocsStatusResponse>(null)
-  const [text, setText] = useState('')
+
+  const [error, setError] = useState<Nullable<string>>(null)
+  const [isGenerating, setIsGenerating] = useState<boolean>(false)
+  const [loading, setLoading] = useState<boolean>(false)
+  const [status, setStatus] = useState<Nullable<RepoDocsStatusResponse>>(null)
+  const [text, setText] = useState<string>('')
 
   const fetchDocs = useCallback(async () => {
     if (!Number.isFinite(repoId)) {
@@ -68,6 +71,7 @@ export default function Page() {
     }
 
     const data = await getRepoDocs(repoId)
+
     setText(typeof data === 'string' ? data : '')
   }, [repoId])
 
@@ -89,8 +93,10 @@ export default function Page() {
 
     setLoading(true)
     setError(null)
+
     try {
       const nextStatus = await fetchStatus()
+
       if (nextStatus?.docsStatus === 'ready') {
         await fetchDocs()
       } else {
@@ -110,9 +116,12 @@ export default function Page() {
 
     setIsGenerating(true)
     setError(null)
+
     try {
       await generateRepoDocs(repoId)
+
       const nextStatus = await fetchStatus()
+
       if (nextStatus?.docsStatus !== 'ready') {
         setText('')
       } else {
@@ -138,6 +147,7 @@ export default function Page() {
       void (async () => {
         try {
           const nextStatus = await fetchStatus()
+
           if (nextStatus?.docsStatus === 'ready') {
             await fetchDocs()
           }
@@ -150,19 +160,13 @@ export default function Page() {
     return () => clearInterval(interval)
   }, [fetchDocs, fetchStatus, repoId, status?.docsStatus])
 
-  const canGenerate = status
-    ? status.cloneStatus === 'cloned'
-      && status.embeddingStatus === 'embedded'
-      && status.docsStatus !== 'processing'
-    : false
+  const canGenerate = status ? status.cloneStatus === 'cloned' && status.embeddingStatus === 'embedded' && status.docsStatus !== 'processing' : false
 
-  const statusItems = status
-    ? [
-      { label: 'Clone', value: status.cloneStatus },
-      { label: 'Embeddings', value: status.embeddingStatus },
-      { label: 'Docs', value: status.docsStatus }
-    ]
-    : []
+  const statusItems = status ? [
+    { label: 'Clone', value: status.cloneStatus },
+    { label: 'Embeddings', value: status.embeddingStatus },
+    { label: 'Docs', value: status.docsStatus }
+  ] : []
 
   return (
     <div className="space-y-6">
@@ -173,6 +177,7 @@ export default function Page() {
               <Sparkles className="size-4" />
               {isGenerating ? 'Starting...' : 'Generate docs'}
             </Button>
+
             <Button onClick={loadPageState} type="button" variant="glass">
               <RefreshCw className="size-4" />
               Refresh
@@ -190,8 +195,10 @@ export default function Page() {
             <CardContent className="flex items-center justify-between gap-4 p-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{item.label}</p>
+
                 <p className="mt-2 text-lg font-semibold capitalize text-white">{formatStatus(item.value)}</p>
               </div>
+
               <span className={`rounded-full border px-3 py-1 text-xs font-medium capitalize ${getStatusTone(item.value)}`}>
                 {formatStatus(item.value)}
               </span>
@@ -213,8 +220,10 @@ export default function Page() {
             <BookOpen className="size-4 text-primary" />
             Documentation
           </div>
+
           <nav aria-label="Documentation sections" className="space-y-2 text-sm">
             {['Introduction', 'Architecture', 'Core Modules', 'API Surface', 'Deployment', 'Examples'].map((item, index) => (
+              // FIXME create button component for that
               <button
                 className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left transition ${index === 0 ? 'bg-primary/20 text-white shadow-[0_0_22px_oklch(0.62_0.24_270/0.2)]' : 'text-muted-foreground hover:bg-white/5 hover:text-white'}`}
                 key={item}
@@ -226,7 +235,7 @@ export default function Page() {
             ))}
           </nav>
 
-          <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-xs text-muted-foreground">
+          <div className="mt-6 rounded-2xl border border-white/10 bg-white/3 p-3 text-xs text-muted-foreground">
             {status?.docsStatus === 'ready' ? (
               <span className="flex items-center gap-2 text-emerald-200">
                 <CheckCircle2 className="size-4" />
@@ -242,10 +251,11 @@ export default function Page() {
         </aside>
 
         <main className="min-w-0" id="documentation-content">
-          <Card className="min-h-[620px] py-0">
+          <Card className="min-h-155 py-0">
             <CardContent className="p-5 md:p-8">
               <div aria-live="polite">
                 {loading && <p className="text-sm text-muted-foreground">Loading documentation state...</p>}
+
                 {error && (
                   <p className="flex items-center gap-2 text-sm text-red-300" role="alert">
                     <TriangleAlert className="size-4" />
@@ -284,11 +294,13 @@ export default function Page() {
                       ),
                       code: ({ children, className, ...props }) => {
                         const match = /language-(\w+)/.exec(className || '')
+
                         return match ? (
                           <div className="relative">
                             <div className="absolute right-2 top-2 rounded bg-slate-950/90 px-2 py-1 text-xs text-cyan-200">
                               {match[1]}
                             </div>
+
                             <code className={className} {...props}>
                               {children}
                             </code>
@@ -325,9 +337,11 @@ export default function Page() {
                   </Markdown>
                 </article>
               ) : !loading && !error && (
-                <div className="mt-8 rounded-3xl border border-dashed border-white/15 bg-white/[0.03] p-10 text-center">
+                <div className="mt-8 rounded-3xl border border-dashed border-white/15 bg-white/3 p-10 text-center">
                   <FileText className="mx-auto size-10 text-muted-foreground" />
+
                   <h2 className="mt-4 text-xl font-semibold tracking-[-0.04em] text-white">No generated document yet</h2>
+
                   <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
                     Generate docs after repository cloning and embedding stages are complete.
                   </p>

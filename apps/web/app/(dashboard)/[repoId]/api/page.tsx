@@ -12,6 +12,7 @@ import type {
   RepoApiRunnerResponse,
   RepoInteractiveApi
 } from '@workspace/codepath-common/api-explorer'
+import type { Nullable } from '@workspace/codepath-common/globals'
 import { Button } from '@workspace/ui/components/button'
 import { Input } from '@workspace/ui/components/input'
 import { Textarea } from '@workspace/ui/components/textarea'
@@ -91,6 +92,7 @@ const resolveErrorMessage = (error: unknown) => {
 
 const hashString = (value: string) => {
   let hash = 0
+
   for (let i = 0; i < value.length; i += 1) {
     hash = ((hash << 5) - hash) + value.charCodeAt(i)
     hash |= 0
@@ -114,7 +116,7 @@ const parsePathParamNames = (path: string) => {
     }
   }
 
-  for (const match of path.matchAll(/<(?:(?:[A-Za-z0-9_]+):)?([A-Za-z0-9_]+)>/g)) {
+  for (const match of path.matchAll(/<(?:[A-Za-z0-9_]+:)?([A-Za-z0-9_]+)>/g)) {
     if (match[1]) {
       names.push(match[1])
     }
@@ -167,9 +169,11 @@ const generateSampleValue = (name: string, seed: string) => {
 const parseJsonObjectInput = (raw: string, label: string) => {
   try {
     const parsed = JSON.parse(raw)
+
     if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
       throw new Error(`${label} must be a JSON object`)
     }
+
     return parsed as Record<string, unknown>
   } catch (error) {
     if (error instanceof Error) {
@@ -194,12 +198,14 @@ const parseJsonInput = (raw: string, label: string) => {
 
 const normalizeBaseUrl = (value: string) => {
   const trimmed = value.trim()
+
   if (!trimmed) {
     throw new Error('Base URL is required')
   }
 
   try {
     const parsed = new URL(trimmed)
+
     return parsed.toString()
   } catch {
     throw new Error('Base URL is invalid')
@@ -211,10 +217,11 @@ const resolvePathTemplate = (template: string, pathParams: Record<string, string
 
   for (const [name, value] of Object.entries(pathParams)) {
     const encoded = encodeURIComponent(value)
+
     resolved = resolved
       .replace(new RegExp(`:${name}(?=/|$)`, 'g'), encoded)
       .replace(new RegExp(`\\{${name}(?::[^}]*)?\\}`, 'g'), encoded)
-      .replace(new RegExp(`<(?:(?:[A-Za-z0-9_]+):)?${name}>`, 'g'), encoded)
+      .replace(new RegExp(`<(?:[A-Za-z0-9_]+:)?${name}>`, 'g'), encoded)
   }
 
   return resolved
@@ -233,11 +240,13 @@ const buildRunnerUrl = (baseUrl: string, path: string, query: Record<string, unk
       for (const item of value) {
         finalUrl.searchParams.append(key, String(item))
       }
+
       continue
     }
 
     if (typeof value === 'object') {
       finalUrl.searchParams.set(key, JSON.stringify(value))
+
       continue
     }
 
@@ -255,12 +264,14 @@ const buildAuthArtifacts = (auth: RepoApiRunnerCollectionConfig['auth']) => {
     if (!auth.bearerToken.trim()) {
       throw new Error('Bearer token is required')
     }
+
     headers.Authorization = `Bearer ${auth.bearerToken.trim()}`
   }
 
   if (auth.mode === 'basic') {
     const username = auth.basicUsername.trim()
     const password = auth.basicPassword
+
     if (!username) {
       throw new Error('Basic username is required')
     }
@@ -273,9 +284,11 @@ const buildAuthArtifacts = (auth: RepoApiRunnerCollectionConfig['auth']) => {
   if (auth.mode === 'apiKey') {
     const keyName = auth.apiKeyName.trim()
     const keyValue = auth.apiKeyValue.trim()
+
     if (!keyName) {
       throw new Error('API key name is required')
     }
+
     if (!keyValue) {
       throw new Error('API key value is required')
     }
@@ -287,32 +300,30 @@ const buildAuthArtifacts = (auth: RepoApiRunnerCollectionConfig['auth']) => {
     }
   }
 
-  return {
-    headers,
-    query
-  }
+  return { headers, query }
 }
 
-function EndpointRow({
-  endpoint,
-  isActive,
-  onUse
-}: {
+function EndpointRow({ endpoint, isActive, onUse }: {
   endpoint: RepoApiEndpoint
   isActive: boolean
   onUse: (endpoint: RepoApiEndpoint) => void
 }) {
   return (
-    <tr className={`border-b border-white/10 transition hover:bg-white/[0.04] ${isActive ? 'bg-primary/10' : ''}`}>
+    <tr className={`border-b border-white/10 transition hover:bg-white/4 ${isActive ? 'bg-primary/10' : ''}`}>
       <td className="px-3 py-2 align-top">
         <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${methodClasses[endpoint.method]}`}>
           {endpoint.method}
         </span>
       </td>
+
       <td className="px-3 py-2 align-top font-mono text-xs">{endpoint.path}</td>
+
       <td className="px-3 py-2 align-top text-sm">{endpoint.framework}</td>
+
       <td className="px-3 py-2 align-top text-sm">{endpoint.moduleName ?? '-'}</td>
+
       <td className="px-3 py-2 align-top font-mono text-xs">{endpoint.filePath}</td>
+
       <td className="px-3 py-2 align-top text-xs">
         {endpoint.params.length === 0 ? (
           <span className="text-muted-foreground">-</span>
@@ -320,7 +331,7 @@ function EndpointRow({
           <div className="flex flex-wrap gap-1">
             {endpoint.params.map(param => (
               <span
-                className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5"
+                className="rounded-full border border-white/10 bg-white/4 px-2 py-0.5"
                 key={`${endpoint.id}:${param.location}:${param.name}`}
               >
                 {param.location}:{param.name}{param.required ? '*' : ''}
@@ -329,12 +340,14 @@ function EndpointRow({
           </div>
         )}
       </td>
+
       <td className="px-3 py-2 align-top text-xs">
         {endpoint.sourceSnippet ? (
           <details>
             <summary className="cursor-pointer text-primary">
               Show code{endpoint.sourceLineStart ? ` (L${endpoint.sourceLineStart})` : ''}
             </summary>
+
             <pre className="mt-2 max-h-44 overflow-auto rounded-xl border border-white/10 bg-slate-950/80 p-3 font-mono text-[11px] leading-relaxed text-slate-100">
               {endpoint.sourceSnippet}
             </pre>
@@ -343,9 +356,10 @@ function EndpointRow({
           <span className="text-muted-foreground">-</span>
         )}
       </td>
+
       <td className="px-3 py-2 align-top">
         <button
-          className={`rounded-full border px-3 py-1.5 text-xs transition ${isActive ? 'border-primary/60 bg-primary/15 text-primary' : 'border-white/10 bg-white/[0.03] text-muted-foreground hover:border-primary/40 hover:text-white'}`}
+          className={`rounded-full border px-3 py-1.5 text-xs transition ${isActive ? 'border-primary/60 bg-primary/15 text-primary' : 'border-white/10 bg-white/3 text-muted-foreground hover:border-primary/40 hover:text-white'}`}
           onClick={() => onUse(endpoint)}
           type="button"
         >
@@ -358,33 +372,33 @@ function EndpointRow({
 
 export default function Page() {
   const params = useParams()
+
   const repoId = useMemo(() => Number(getFirstRouteParam(params.repoId)), [params.repoId])
 
-  const [data, setData] = useState<null | RepoInteractiveApi>(null)
-  const [loading, setLoading] = useState(false)
-  const [exportingEndpoints, setExportingEndpoints] = useState(false)
-  const [exportingOpenApi, setExportingOpenApi] = useState(false)
-  const [error, setError] = useState<null | string>(null)
-  const [search, setSearch] = useState('')
-  const [runtimeOpenApiBaseUrl, setRuntimeOpenApiBaseUrl] = useState('')
+  const [data, setData] = useState<Nullable<RepoInteractiveApi>>(null)
+  const [loading, setLoading] = useState<boolean>(false)
+  const [exportingEndpoints, setExportingEndpoints] = useState<boolean>(false)
+  const [exportingOpenApi, setExportingOpenApi] = useState<boolean>(false)
+  const [error, setError] = useState<Nullable<string>>(null)
+  const [search, setSearch] = useState<string>('')
+  const [runtimeOpenApiBaseUrl, setRuntimeOpenApiBaseUrl] = useState<string>('')
   const [selectedMethods, setSelectedMethods] = useState<RepoApiHttpMethod[]>([])
   const [selectedFrameworks, setSelectedFrameworks] = useState<RepoApiFramework[]>([])
-
-  const [baseUrl, setBaseUrl] = useState('http://127.0.0.1:3000')
-  const [timeoutMs, setTimeoutMs] = useState(10_000)
-  const [selectedEndpoint, setSelectedEndpoint] = useState<null | RepoApiEndpoint>(null)
+  const [baseUrl, setBaseUrl] = useState<string>('http://127.0.0.1:3000')
+  const [timeoutMs, setTimeoutMs] = useState<number>(10_000)
+  const [selectedEndpoint, setSelectedEndpoint] = useState<Nullable<RepoApiEndpoint>>(null)
   const [pathValues, setPathValues] = useState<Record<string, string>>({})
-  const [queryJson, setQueryJson] = useState('{}')
-  const [bodyJson, setBodyJson] = useState('{}')
-  const [headersJson, setHeadersJson] = useState('{\n  "Accept": "application/json"\n}')
-  const [runningRequest, setRunningRequest] = useState(false)
-  const [runnerError, setRunnerError] = useState<null | string>(null)
-  const [runnerResult, setRunnerResult] = useState<null | RepoApiRunnerResponse>(null)
+  const [queryJson, setQueryJson] = useState<string>('{}')
+  const [bodyJson, setBodyJson] = useState<string>('{}')
+  const [headersJson, setHeadersJson] = useState<string>('{\n  "Accept": "application/json"\n}')
+  const [runningRequest, setRunningRequest] = useState<boolean>(false)
+  const [runnerError, setRunnerError] = useState<Nullable<string>>(null)
+  const [runnerResult, setRunnerResult] = useState<Nullable<RepoApiRunnerResponse>>(null)
   const [auth, setAuth] = useState<RepoApiRunnerCollectionConfig['auth']>(createDefaultRunnerAuthConfig())
   const [runnerAuthPresets, setRunnerAuthPresets] = useState<RepoApiRunnerAuthPreset[]>([])
-  const [authPresetNameInput, setAuthPresetNameInput] = useState('')
+  const [authPresetNameInput, setAuthPresetNameInput] = useState<string>('')
   const [runnerCollections, setRunnerCollections] = useState<RepoApiRunnerCollection[]>([])
-  const [collectionNameInput, setCollectionNameInput] = useState('')
+  const [collectionNameInput, setCollectionNameInput] = useState<string>('')
 
   const loadExplorer = useCallback(async () => {
     if (!Number.isFinite(repoId)) {
@@ -394,12 +408,14 @@ export default function Page() {
 
     setLoading(true)
     setError(null)
+
     try {
       const response = await getRepoInteractiveApi(repoId, {
         frameworks: selectedFrameworks.length > 0 ? selectedFrameworks : undefined,
         methods: selectedMethods.length > 0 ? selectedMethods : undefined,
         search
       })
+
       setData(response)
     } catch (nextError) {
       setError(resolveErrorMessage(nextError))
@@ -454,16 +470,19 @@ export default function Page() {
     ])
 
     const nextPathValues: Record<string, string> = {}
+
     for (const name of pathParamNames) {
       nextPathValues[name] = String(generateSampleValue(name, seed))
     }
 
     const nextQuery: Record<string, unknown> = {}
+
     for (const param of endpoint.params.filter(param => param.location === 'query')) {
       nextQuery[param.name] = generateSampleValue(param.name, seed)
     }
 
     const nextBody: Record<string, unknown> = {}
+
     for (const param of endpoint.params.filter(param => param.location === 'body')) {
       const key = param.name === 'body' ? 'payload' : param.name
       nextBody[key] = generateSampleValue(key, seed)
@@ -493,17 +512,13 @@ export default function Page() {
 
   const toggleMethod = (method: RepoApiHttpMethod) => {
     setSelectedMethods(prev => (
-      prev.includes(method)
-        ? prev.filter(value => value !== method)
-        : [...prev, method]
+      prev.includes(method) ? prev.filter(value => value !== method) : [...prev, method]
     ))
   }
 
   const toggleFramework = (framework: RepoApiFramework) => {
     setSelectedFrameworks(prev => (
-      prev.includes(framework)
-        ? prev.filter(value => value !== framework)
-        : [...prev, framework]
+      prev.includes(framework) ? prev.filter(value => value !== framework) : [...prev, framework]
     ))
   }
 
@@ -547,10 +562,7 @@ export default function Page() {
         }
       })
 
-      setRunnerCollections(prev => [
-        saved,
-        ...prev.filter(collection => collection.id !== saved.id)
-      ])
+      setRunnerCollections(prev => [saved, ...prev.filter(collection => collection.id !== saved.id)])
       setRunnerError(null)
     } catch (nextError) {
       setRunnerError(resolveErrorMessage(nextError))
@@ -563,9 +575,7 @@ export default function Page() {
       ?? null
 
     if (!endpoint) {
-      setRunnerError(
-        `Saved endpoint not found in current list: ${collection.config.endpointMethod ?? 'UNKNOWN'} ${collection.config.endpointPath ?? ''}`
-      )
+      setRunnerError(`Saved endpoint not found in current list: ${collection.config.endpointMethod ?? 'UNKNOWN'} ${collection.config.endpointPath ?? ''}`)
       return
     }
 
@@ -613,10 +623,7 @@ export default function Page() {
         name
       })
 
-      setRunnerAuthPresets(prev => [
-        saved,
-        ...prev.filter(preset => preset.id !== saved.id)
-      ])
+      setRunnerAuthPresets(prev => [saved, ...prev.filter(preset => preset.id !== saved.id)])
       setRunnerError(null)
     } catch (nextError) {
       setRunnerError(resolveErrorMessage(nextError))
@@ -661,11 +668,15 @@ export default function Page() {
       const blob = new Blob([json], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const downloadLink = document.createElement('a')
+
       downloadLink.href = url
       downloadLink.download = `repo-${repoId}-openapi.json`
+
       document.body.appendChild(downloadLink)
+
       downloadLink.click()
       downloadLink.remove()
+
       URL.revokeObjectURL(url)
     } catch (nextError) {
       setError(resolveErrorMessage(nextError))
@@ -682,6 +693,7 @@ export default function Page() {
 
     setExportingEndpoints(true)
     setError(null)
+
     try {
       const result = await getRepoInteractiveApiJson(repoId, {
         frameworks: selectedFrameworks.length > 0 ? selectedFrameworks : undefined,
@@ -692,11 +704,14 @@ export default function Page() {
       const blob = new Blob([json], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const downloadLink = document.createElement('a')
+
       downloadLink.href = url
       downloadLink.download = `repo-${repoId}-endpoints.json`
+
       document.body.appendChild(downloadLink)
       downloadLink.click()
       downloadLink.remove()
+
       URL.revokeObjectURL(url)
     } catch (nextError) {
       setError(resolveErrorMessage(nextError))
@@ -732,11 +747,14 @@ export default function Page() {
       })
 
       const headers: Record<string, string> = {}
+
       for (const [key, value] of Object.entries(parsedHeaders)) {
         const normalizedKey = key.trim()
+
         if (!normalizedKey) {
           continue
         }
+
         headers[normalizedKey] = typeof value === 'string' ? value : JSON.stringify(value)
       }
 
@@ -791,6 +809,7 @@ export default function Page() {
               <Search className="size-4 text-cyan-300" />
               Search
             </span>
+
             <Input
               id="api-search"
               onChange={event => setSearch(event.target.value)}
@@ -801,12 +820,14 @@ export default function Page() {
 
           <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="runtime-openapi-base-url">
             <span className="text-white">Runtime OpenAPI Base URL (optional)</span>
+
             <Input
               id="runtime-openapi-base-url"
               onChange={event => setRuntimeOpenApiBaseUrl(event.target.value)}
               placeholder="http://127.0.0.1:3001"
               value={runtimeOpenApiBaseUrl}
             />
+
             <span className="text-xs font-normal text-muted-foreground">
               OpenAPI export is runtime-first from this URL, with static fallback from code.
             </span>
@@ -816,6 +837,7 @@ export default function Page() {
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Methods</p>
+
             <div className="flex flex-wrap gap-2 text-sm">
               {METHOD_OPTIONS.map(method => (
                 <label
@@ -828,6 +850,7 @@ export default function Page() {
                     onChange={() => toggleMethod(method)}
                     type="checkbox"
                   />
+
                   <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${methodClasses[method]}`}>{method}</span>
                 </label>
               ))}
@@ -836,9 +859,11 @@ export default function Page() {
 
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Frameworks</p>
+
             <div className="flex flex-wrap gap-2 text-sm">
               {FRAMEWORK_OPTIONS.map(framework => {
                 const enabled = availableFrameworks.length === 0 || availableFrameworks.includes(framework)
+
                 return (
                   <label
                     className={`flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 transition ${selectedFrameworks.includes(framework) ? 'border-cyan-300/40 bg-cyan-300/10 text-cyan-100' : 'border-white/10 bg-white/[0.03] text-muted-foreground hover:border-cyan-300/30 hover:text-white'} ${enabled ? '' : 'opacity-40'}`}
@@ -850,6 +875,7 @@ export default function Page() {
                       onChange={() => toggleFramework(framework)}
                       type="checkbox"
                     />
+
                     <span>{framework}</span>
                   </label>
                 )
@@ -863,22 +889,27 @@ export default function Page() {
             <Filter className="size-4" />
             Apply filters
           </Button>
+
           <Button onClick={resetFilters} type="button" variant="glass">
             <RotateCcw className="size-4" />
             Reset
           </Button>
+
           <Button onClick={loadExplorer} type="button" variant="glass">
             <RefreshCw className="size-4" />
             Refresh
           </Button>
+
           <Button disabled={exportingEndpoints} onClick={handleExportEndpointsJson} type="button" variant="glass">
             <Download className="size-4" />
             {exportingEndpoints ? 'Exporting...' : 'Export Endpoints JSON'}
           </Button>
+
           <Button disabled={exportingOpenApi} onClick={handleExportOpenApi} type="button" variant="glass">
             <Download className="size-4" />
             {exportingOpenApi ? 'Exporting...' : 'Export OpenAPI JSON'}
           </Button>
+
           <span className="ml-auto text-xs text-muted-foreground">
             Endpoints: {data?.metadata.endpointCount ?? 0} | Segments scanned: {data?.metadata.segmentCount ?? 0}
           </span>
@@ -888,6 +919,7 @@ export default function Page() {
       <section aria-label="API runner" className="glass-panel rounded-3xl p-4 space-y-3 md:p-5">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">API Runner (MVP)</h2>
+
           {selectedEndpoint && (
             <p className="text-xs text-muted-foreground">
               Selected: {selectedEndpoint.method} {selectedEndpoint.path}
@@ -900,6 +932,7 @@ export default function Page() {
             <summary className="cursor-pointer text-primary">
               Source fragment{selectedEndpoint.sourceLineStart ? ` (L${selectedEndpoint.sourceLineStart})` : ''}
             </summary>
+
             <pre className="mt-2 max-h-40 overflow-auto rounded-xl border border-white/10 bg-slate-950/80 p-3 font-mono text-[11px] leading-relaxed text-slate-100">
               {selectedEndpoint.sourceSnippet}
             </pre>
@@ -909,6 +942,7 @@ export default function Page() {
         <div className="grid gap-3 md:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm">
             <span>Base URL</span>
+
             <input
               className={fieldClassName}
               onChange={event => setBaseUrl(event.target.value)}
@@ -916,8 +950,10 @@ export default function Page() {
               value={baseUrl}
             />
           </label>
+
           <label className="flex flex-col gap-1 text-sm">
             <span>Timeout (ms)</span>
+
             <input
               className={fieldClassName}
               min={1000}
@@ -930,17 +966,22 @@ export default function Page() {
 
         <div className={runnerPanelClassName}>
           <p className="text-xs font-medium uppercase text-muted-foreground">Auth preset</p>
+
           <div className="grid gap-3 md:grid-cols-2">
             <label className="flex flex-col gap-1 text-sm">
               <span>Mode</span>
+
               <select
                 className={fieldClassName}
                 onChange={event => setAuth(prev => ({ ...prev, mode: event.target.value as RepoApiRunnerAuthMode }))}
                 value={auth.mode}
               >
                 <option value="none">None</option>
+
                 <option value="bearer">Bearer token</option>
+
                 <option value="basic">Basic auth</option>
+
                 <option value="apiKey">API key</option>
               </select>
             </label>
@@ -949,6 +990,7 @@ export default function Page() {
           {auth.mode === 'bearer' && (
             <label className="flex flex-col gap-1 text-sm">
               <span>Bearer token</span>
+
               <input
                 className={fieldClassName}
                 onChange={event => setAuth(prev => ({ ...prev, bearerToken: event.target.value }))}
@@ -962,14 +1004,17 @@ export default function Page() {
             <div className="grid gap-3 md:grid-cols-2">
               <label className="flex flex-col gap-1 text-sm">
                 <span>Username</span>
+
                 <input
                   className={fieldClassName}
                   onChange={event => setAuth(prev => ({ ...prev, basicUsername: event.target.value }))}
                   value={auth.basicUsername}
                 />
               </label>
+
               <label className="flex flex-col gap-1 text-sm">
                 <span>Password</span>
+
                 <input
                   className={fieldClassName}
                   onChange={event => setAuth(prev => ({ ...prev, basicPassword: event.target.value }))}
@@ -984,14 +1029,17 @@ export default function Page() {
             <div className="grid gap-3 md:grid-cols-3">
               <label className="flex flex-col gap-1 text-sm">
                 <span>Key name</span>
+
                 <input
                   className={fieldClassName}
                   onChange={event => setAuth(prev => ({ ...prev, apiKeyName: event.target.value }))}
                   value={auth.apiKeyName}
                 />
               </label>
+
               <label className="flex flex-col gap-1 text-sm">
                 <span>Key value</span>
+
                 <input
                   className={fieldClassName}
                   onChange={event => setAuth(prev => ({ ...prev, apiKeyValue: event.target.value }))}
@@ -999,14 +1047,17 @@ export default function Page() {
                   value={auth.apiKeyValue}
                 />
               </label>
+
               <label className="flex flex-col gap-1 text-sm">
                 <span>Placement</span>
+
                 <select
                   className={fieldClassName}
                   onChange={event => setAuth(prev => ({ ...prev, apiKeyPlacement: event.target.value as RepoApiRunnerApiKeyPlacement }))}
                   value={auth.apiKeyPlacement}
                 >
                   <option value="header">Header</option>
+
                   <option value="query">Query</option>
                 </select>
               </label>
@@ -1018,19 +1069,22 @@ export default function Page() {
           <p className="text-xs font-medium uppercase text-muted-foreground">Auth presets (workspace-shared)</p>
           <div className="flex flex-wrap gap-2">
             <input
-              className={`${fieldClassName} min-w-[220px] flex-1`}
+              className={`${fieldClassName} min-w-55 flex-1`}
               onChange={event => setAuthPresetNameInput(event.target.value)}
               placeholder="Auth preset name"
               value={authPresetNameInput}
             />
+
+            {/* FIXME create button component for that */}
             <button
-              className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-muted-foreground transition hover:border-primary/40 hover:text-white"
+              className="rounded-xl border border-white/10 bg-white/4 px-4 py-2 text-sm text-muted-foreground transition hover:border-primary/40 hover:text-white"
               onClick={handleSaveAuthPreset}
               type="button"
             >
               Save current auth
             </button>
           </div>
+
           {runnerAuthPresets.length === 0 ? (
             <p className="text-xs text-muted-foreground">No saved auth presets for this repo yet.</p>
           ) : (
@@ -1039,20 +1093,25 @@ export default function Page() {
                 <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2" key={preset.id}>
                   <div className="min-w-0">
                     <p className="truncate text-sm">{preset.name}</p>
+
                     <p className="truncate text-xs text-muted-foreground">
                       mode: {preset.config.mode}
                     </p>
                   </div>
+
                   <div className="flex gap-1">
+                    {/* FIXME create button component for that */}
                     <button
-                      className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-white"
+                      className="rounded-lg border border-white/10 bg-white/4 px-2.5 py-1.5 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-white"
                       onClick={() => handleLoadAuthPreset(preset)}
                       type="button"
                     >
                       Load
                     </button>
+
+                    {/* FIXME create button component for that */}
                     <button
-                      className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-white"
+                      className="rounded-lg border border-white/10 bg-white/4 px-2.5 py-1.5 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-white"
                       onClick={() => handleDeleteAuthPreset(preset.id)}
                       type="button"
                     >
@@ -1067,21 +1126,24 @@ export default function Page() {
 
         <div className={runnerPanelClassName}>
           <p className="text-xs font-medium uppercase text-muted-foreground">Request collections (workspace-shared)</p>
+
           <div className="flex flex-wrap gap-2">
             <input
-              className={`${fieldClassName} min-w-[220px] flex-1`}
+              className={`${fieldClassName} min-w-55 flex-1`}
               onChange={event => setCollectionNameInput(event.target.value)}
               placeholder="Collection name"
               value={collectionNameInput}
             />
+
             <button
-              className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-muted-foreground transition hover:border-primary/40 hover:text-white"
+              className="rounded-xl border border-white/10 bg-white/4 px-4 py-2 text-sm text-muted-foreground transition hover:border-primary/40 hover:text-white"
               onClick={handleSaveCollection}
               type="button"
             >
               Save current config
             </button>
           </div>
+
           {runnerCollections.length === 0 ? (
             <p className="text-xs text-muted-foreground">No saved collections for this repo yet.</p>
           ) : (
@@ -1090,20 +1152,24 @@ export default function Page() {
                 <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2" key={collection.id}>
                   <div className="min-w-0">
                     <p className="truncate text-sm">{collection.name}</p>
+
                     <p className="truncate text-xs text-muted-foreground">
                       {collection.config.endpointMethod ?? 'UNKNOWN'} {collection.config.endpointPath ?? ''}
                     </p>
                   </div>
+
                   <div className="flex gap-1">
+                    {/* FIXME create button component for that */}
                     <button
-                      className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-white"
+                      className="rounded-lg border border-white/10 bg-white/4 px-2.5 py-1.5 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-white"
                       onClick={() => handleLoadCollection(collection)}
                       type="button"
                     >
                       Load
                     </button>
+
                     <button
-                      className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-white"
+                      className="rounded-lg border border-white/10 bg-white/4 px-2.5 py-1.5 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-white"
                       onClick={() => handleDeleteCollection(collection.id)}
                       type="button"
                     >
@@ -1121,10 +1187,12 @@ export default function Page() {
             {Object.keys(pathValues).length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs font-medium uppercase text-muted-foreground">Path Params</p>
+
                 <div className="grid gap-2 md:grid-cols-2">
                   {Object.entries(pathValues).map(([name, value]) => (
                     <label className="flex flex-col gap-1 text-sm" key={name}>
                       <span>{name}</span>
+
                       <input
                         className={fieldClassName}
                         onChange={event => setPathValues(prev => ({ ...prev, [name]: event.target.value }))}
@@ -1139,22 +1207,27 @@ export default function Page() {
             <div className="grid gap-3 md:grid-cols-3">
               <label className="flex flex-col gap-1 text-sm">
                 <span>Query JSON</span>
+
                 <Textarea
                   className="h-40 font-mono text-xs"
                   onChange={event => setQueryJson(event.target.value)}
                   value={queryJson}
                 />
               </label>
+
               <label className="flex flex-col gap-1 text-sm">
                 <span>Body JSON</span>
+
                 <Textarea
                   className="h-40 font-mono text-xs"
                   onChange={event => setBodyJson(event.target.value)}
                   value={bodyJson}
                 />
               </label>
+
               <label className="flex flex-col gap-1 text-sm">
                 <span>Headers JSON</span>
+
                 <Textarea
                   className="h-40 font-mono text-xs"
                   onChange={event => setHeadersJson(event.target.value)}
@@ -1171,6 +1244,7 @@ export default function Page() {
               >
                 Regenerate test payload
               </Button>
+
               <Button
                 disabled={runningRequest}
                 onClick={handleRunRequest}
@@ -1191,13 +1265,17 @@ export default function Page() {
                   Status: <span className={runnerResult.ok ? 'text-green-600' : 'text-red-600'}>{runnerResult.status}</span>
                   {' '}| Duration: {runnerResult.durationMs}ms
                 </p>
+
                 <p className="text-xs text-muted-foreground font-mono break-all">{runnerResult.url}</p>
+
                 <details className="text-xs">
                   <summary className="cursor-pointer">Response headers</summary>
+
                   <pre className="mt-2 overflow-x-auto rounded-xl border border-white/10 bg-slate-950/80 p-3">
                     {JSON.stringify(runnerResult.headers, null, 2)}
                   </pre>
                 </details>
+
                 <pre className="max-h-80 overflow-auto rounded-xl border border-white/10 bg-slate-950/80 p-3 text-xs text-slate-100">
                   {runnerDataPreview}
                 </pre>
@@ -1223,15 +1301,22 @@ export default function Page() {
       {!loading && !error && endpoints.length > 0 && (
         <div className="glass-panel overflow-x-auto rounded-3xl border border-white/10">
           <table className="min-w-full">
-            <thead className="bg-white/[0.04]">
+            <thead className="bg-white/4">
               <tr className="text-left text-xs uppercase text-muted-foreground">
                 <th className="px-3 py-2">Method</th>
+
                 <th className="px-3 py-2">Path</th>
+
                 <th className="px-3 py-2">Framework</th>
+
                 <th className="px-3 py-2">Module</th>
+
                 <th className="px-3 py-2">File</th>
+
                 <th className="px-3 py-2">Params</th>
+
                 <th className="px-3 py-2">Code</th>
+
                 <th className="px-3 py-2">Runner</th>
               </tr>
             </thead>

@@ -1,5 +1,6 @@
 'use client'
 
+import type { Nullable } from '@workspace/codepath-common/globals'
 import type { RepoGraphEdgeType } from '@workspace/codepath-common/graph'
 import { Button } from '@workspace/ui/components/button'
 import { Input } from '@workspace/ui/components/input'
@@ -32,6 +33,7 @@ const normalizeFilePath = (value: string) => value
 export default function Page() {
   const params = useParams()
   const dispatch = useAppDispatch()
+
   const repoId = useMemo(() => Number(getFirstRouteParam(params.repoId)), [params.repoId])
 
   const interactiveGraph = useAppSelector(state => state.graphs.interactiveGraph)
@@ -39,10 +41,10 @@ export default function Page() {
   const loadingInteractive = useAppSelector(state => state.graphs.loadingInteractive)
 
   const [collapsedModuleIds, setCollapsedModuleIds] = useState<string[]>([])
-  const [depth, setDepth] = useState(2)
-  const [focusedNodeId, setFocusedNodeId] = useState<null | string>(null)
-  const [includeSymbols, setIncludeSymbols] = useState(false)
-  const [scopeToFocus, setScopeToFocus] = useState(false)
+  const [depth, setDepth] = useState<number>(2)
+  const [focusedNodeId, setFocusedNodeId] = useState<Nullable<string>>(null)
+  const [includeSymbols, setIncludeSymbols] = useState<boolean>(false)
+  const [scopeToFocus, setScopeToFocus] = useState<boolean>(false)
   const [selectedRelationTypes, setSelectedRelationTypes] = useState<RepoGraphEdgeType[]>(EDGE_TYPE_OPTIONS)
 
   useEffect(() => {
@@ -52,7 +54,7 @@ export default function Page() {
 
     void dispatch(getInteractiveGraph({ includeSymbols, repoId }))
     void dispatch(getGraphs(repoId))
-  }, [dispatch, includeSymbols, repoId])
+  }, [includeSymbols, repoId])
 
   useEffect(() => {
     if (!interactiveGraph) {
@@ -64,6 +66,7 @@ export default function Page() {
     }
 
     const exists = interactiveGraph.nodes.some(node => node.id === focusedNodeId)
+
     if (!exists) {
       setFocusedNodeId(null)
     }
@@ -99,6 +102,7 @@ export default function Page() {
     setCollapsedModuleIds([])
     setFocusedNodeId(null)
     setSelectedRelationTypes(EDGE_TYPE_OPTIONS)
+
     if (Number.isFinite(repoId)) {
       void dispatch(getInteractiveGraph({ includeSymbols, repoId }))
     }
@@ -106,17 +110,13 @@ export default function Page() {
 
   const toggleRelationType = (relationType: RepoGraphEdgeType) => {
     setSelectedRelationTypes(prev => (
-      prev.includes(relationType)
-        ? prev.filter(type => type !== relationType)
-        : [...prev, relationType]
+      prev.includes(relationType) ? prev.filter(type => type !== relationType) : [...prev, relationType]
     ))
   }
 
   const toggleModuleCollapse = (moduleId: string) => {
     setCollapsedModuleIds(prev => (
-      prev.includes(moduleId)
-        ? prev.filter(id => id !== moduleId)
-        : [...prev, moduleId]
+      prev.includes(moduleId) ? prev.filter(id => id !== moduleId) : [...prev, moduleId]
     ))
   }
 
@@ -184,9 +184,11 @@ export default function Page() {
 
   const legacyGraphByPath = useMemo(() => {
     const byPath = new Map<string, { id: number }>()
+
     for (const graph of legacyGraphs) {
       byPath.set(normalizeFilePath(graph.fileName), { id: graph.id })
     }
+
     return byPath
   }, [legacyGraphs])
 
@@ -204,6 +206,7 @@ export default function Page() {
     }
 
     setScopeToFocus(true)
+
     void dispatch(getInteractiveGraph({
       depth,
       focusNodeId: focusedNodeId,
@@ -222,6 +225,7 @@ export default function Page() {
               <SlidersHorizontal className="size-4" />
               Apply filters
             </Button>
+
             <Button onClick={resetFilters} type="button" variant="glass">
               <RotateCcw className="size-4" />
               Reset
@@ -235,7 +239,7 @@ export default function Page() {
 
       <section aria-label="Graph controls" className="rounded-3xl border border-primary/25 bg-slate-950/30 p-4 shadow-[inset_0_1px_0_oklch(1_0_0/0.06)] backdrop-blur-xl">
         <div className="flex flex-wrap items-center gap-3">
-          <label className="flex min-h-12 items-center gap-3 rounded-2xl border border-primary/20 bg-white/[0.04] px-4 text-sm text-muted-foreground transition hover:border-primary/45 hover:text-white">
+          <label className="flex min-h-12 items-center gap-3 rounded-2xl border border-primary/20 bg-white/4 px-4 text-sm text-muted-foreground transition hover:border-primary/45 hover:text-white">
             <input
               checked={scopeToFocus}
               className="size-4 accent-primary"
@@ -246,7 +250,7 @@ export default function Page() {
             Focus mode
           </label>
 
-          <label className="flex min-h-12 items-center gap-3 rounded-2xl border border-primary/20 bg-white/[0.04] px-4 text-sm text-muted-foreground">
+          <label className="flex min-h-12 items-center gap-3 rounded-2xl border border-primary/20 bg-white/4 px-4 text-sm text-muted-foreground">
             Depth:
             <Input
               aria-label="Graph traversal depth"
@@ -259,7 +263,7 @@ export default function Page() {
             />
           </label>
 
-          <label className="flex min-h-12 items-center gap-3 rounded-2xl border border-primary/20 bg-white/[0.04] px-4 text-sm text-muted-foreground transition hover:border-primary/45 hover:text-white">
+          <label className="flex min-h-12 items-center gap-3 rounded-2xl border border-primary/20 bg-white/4 px-4 text-sm text-muted-foreground transition hover:border-primary/45 hover:text-white">
             <input
               checked={includeSymbols}
               className="size-4 accent-primary"
@@ -271,16 +275,19 @@ export default function Page() {
           </label>
 
           <details className="group relative">
-            <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 rounded-2xl border border-primary/20 bg-white/[0.04] px-4 text-sm text-muted-foreground transition hover:border-primary/45 hover:text-white">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 rounded-2xl border border-primary/20 bg-white/4 px-4 text-sm text-muted-foreground transition hover:border-primary/45 hover:text-white">
               <SlidersHorizontal className="size-4" />
               Filters
             </summary>
+
             <div className="absolute left-0 top-14 z-20 w-[min(38rem,calc(100vw-3rem))] rounded-3xl border border-primary/25 bg-slate-950/95 p-4 shadow-2xl backdrop-blur-xl">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Relation filters</p>
+
               <div className="mt-3 flex flex-wrap gap-2 text-sm">
                 {EDGE_TYPE_OPTIONS.map(relationType => {
                   const isAvailable = availableRelationTypes.includes(relationType)
                   const isSelected = selectedRelationTypes.includes(relationType)
+
                   return (
                     <label
                       className={`flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 transition ${isSelected ? 'border-primary/50 bg-primary/15 text-white' : 'border-white/10 bg-white/[0.03] text-muted-foreground'} ${isAvailable ? '' : 'opacity-40'}`}
@@ -301,9 +308,11 @@ export default function Page() {
               {moduleNodes.length > 0 && (
                 <div className="mt-4 space-y-2 border-t border-white/10 pt-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Expand / collapse modules</p>
+
                   <div className="flex max-h-44 flex-wrap gap-2 overflow-auto pr-1">
                     {moduleNodes.map(moduleNode => {
                       const collapsed = collapsedModuleIds.includes(moduleNode.id)
+
                       return (
                         <button
                           className={`rounded-full border px-3 py-1.5 text-xs transition ${collapsed ? 'border-amber-300/50 bg-amber-300/10 text-amber-200' : 'border-white/10 bg-white/[0.03] text-muted-foreground hover:border-primary/40 hover:text-white'}`}
@@ -352,7 +361,7 @@ export default function Page() {
       )}
 
       {interactiveGraph && (
-        <section aria-label="Interactive repository graph" className="glass-panel-strong rounded-[2rem] p-4">
+        <section aria-label="Interactive repository graph" className="glass-panel-strong rounded-4xl p-4">
           <InteractiveRepoGraph
             collapsedModuleIds={collapsedModuleIds}
             focusedNodeId={focusedNodeId}
@@ -375,6 +384,7 @@ export default function Page() {
             {interactiveGraph.metadata.topologyMode && (
               <span>Topology mode: {interactiveGraph.metadata.topologyMode}</span>
             )}
+
             {interactiveGraph.metadata.importResolution && (
               <span>
                 Import resolution: {interactiveGraph.metadata.importResolution.resolved ?? 0}/
@@ -393,15 +403,18 @@ export default function Page() {
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Focused node</p>
+
               <h2 className="mt-2 text-xl font-semibold tracking-[-0.04em] text-white">
                 {focusedNode.label}{' '}
                 <span className="text-sm font-normal text-muted-foreground">({focusedNode.type})</span>
               </h2>
+
               {focusedPath.length > 0 && (
                 <p className="mt-3 break-all text-xs text-muted-foreground">
                   Focus path: {focusedPath.join(' -> ')}
                 </p>
               )}
+
               {focusedFilePath && !focusedLegacyGraphId && (
                 <p className="mt-3 break-all text-xs text-muted-foreground">
                   File path: {focusedFilePath}. Legacy per-file graph is not available for this file.

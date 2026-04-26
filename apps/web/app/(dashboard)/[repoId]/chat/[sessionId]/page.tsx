@@ -1,12 +1,13 @@
 'use client'
 import 'highlight.js/styles/github-dark-dimmed.css'
 
+import type { Nullable } from '@workspace/codepath-common/globals'
 import { Button } from '@workspace/ui/components/button'
 import { Card, CardContent } from '@workspace/ui/components/card'
 import { Input } from '@workspace/ui/components/input'
 import { Bot, Check, Copy, Send, Sparkles, User } from 'lucide-react'
 import { useParams } from 'next/navigation'
-import type React from 'react'
+import type { FormEvent } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import Markdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
@@ -20,29 +21,38 @@ import { getSessionDetails, sendMessage } from '@/redux/slices/chatSlice'
 export default function ChatPage() {
   const params = useParams()
   const dispatch = useAppDispatch()
+
   const sessionDetails = useAppSelector(state => state.chat.sessionDetails)
+
   const repoId = useMemo(() => Number(getFirstRouteParam(params.repoId)), [params.repoId])
   const sessionId = useMemo(() => getFirstRouteParam(params.sessionId) ?? '', [params.sessionId])
   const hasValidRouteParams = Number.isFinite(repoId) && sessionId.length > 0
-  const [copiedId, setCopiedId] = useState<null | string>(null)
-  const [inputValue, setInputValue] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const [copiedId, setCopiedId] = useState<Nullable<string>>(null)
+  const [inputValue, setInputValue] = useState<string>('')
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    if (!inputValue.trim() || !hasValidRouteParams) return
+
+    if (!inputValue.trim() || !hasValidRouteParams) {
+      return
+    }
 
     setIsLoading(true)
+
     try {
       await dispatch(sendMessage({
         question: inputValue,
         repoId,
         sessionId
       })).unwrap()
+
       await dispatch(getSessionDetails({
         repoId,
         sessionId
       })).unwrap()
+
       setInputValue('')
     } catch (error) {
       console.error('Error sending message:', error)
@@ -70,7 +80,7 @@ export default function ChatPage() {
       repoId,
       sessionId
     }))
-  }, [dispatch, hasValidRouteParams, repoId, sessionId])
+  }, [hasValidRouteParams, repoId, sessionId])
 
   return (
     <div className="flex min-h-[calc(100svh-4rem)] flex-col gap-6">
@@ -82,7 +92,7 @@ export default function ChatPage() {
 
       <section
         aria-label="Chat conversation"
-        className="glass-panel-strong flex min-h-[620px] flex-1 flex-col overflow-hidden rounded-[2rem]"
+        className="glass-panel-strong flex min-h-155 flex-1 flex-col overflow-hidden rounded-4xl"
       >
         <div className="flex-1 space-y-6 overflow-y-auto p-4 md:p-6">
           {sessionDetails.length === 0 && !isLoading && (
@@ -91,7 +101,9 @@ export default function ChatPage() {
                 <div className="mx-auto grid size-14 place-items-center rounded-2xl border border-primary/30 bg-primary/15 text-primary shadow-[0_0_28px_oklch(0.62_0.24_270/0.3)]">
                   <Sparkles className="size-6" />
                 </div>
+
                 <h2 className="mt-5 text-2xl font-semibold tracking-[-0.04em] text-white">Ask about this repository</h2>
+
                 <p className="mt-2 text-sm text-muted-foreground">
                   Start with a concrete question, for example about DTO shape, endpoint behaviour or module responsibilities.
                 </p>
@@ -111,6 +123,7 @@ export default function ChatPage() {
                         </span>
                         Ty
                       </div>
+
                       <p className="text-sm leading-relaxed text-foreground/90 md:text-base">{detail.content}</p>
                     </CardContent>
                   </Card>
@@ -126,6 +139,7 @@ export default function ChatPage() {
                           </span>
                           Asystent AI
                         </div>
+
                         <Button
                           aria-label="Skopiuj odpowiedź"
                           className="size-9"
@@ -140,6 +154,7 @@ export default function ChatPage() {
                           )}
                         </Button>
                       </div>
+
                       <article className="prose prose-sm max-w-none prose-pre:border prose-pre:border-white/10 prose-pre:bg-slate-950/80 prose-pre:text-gray-100 dark:prose-invert">
                         <Markdown
                           components={{
@@ -150,11 +165,13 @@ export default function ChatPage() {
                             ),
                             code: ({ children, className, ...props }) => {
                               const match = /language-(\w+)/.exec(className || '')
+
                               return match ? (
                                 <div className="relative">
                                   <div className="absolute right-2 top-2 rounded bg-slate-950/90 px-2 py-1 text-xs text-cyan-200">
                                     {match[1]}
                                   </div>
+
                                   <code className={className} {...props}>
                                     {children}
                                   </code>
@@ -210,9 +227,12 @@ export default function ChatPage() {
                   <div className="flex items-center gap-3">
                     <div aria-hidden="true" className="flex gap-1">
                       <span className="size-2 animate-bounce rounded-full bg-primary" />
+
                       <span className="size-2 animate-bounce rounded-full bg-primary [animation-delay:120ms]" />
+
                       <span className="size-2 animate-bounce rounded-full bg-primary [animation-delay:240ms]" />
                     </div>
+
                     <span className="text-sm text-muted-foreground">Pisze odpowiedź...</span>
                   </div>
                 </CardContent>
@@ -239,6 +259,7 @@ export default function ChatPage() {
                 value={inputValue}
               />
             </div>
+
             <Button
               aria-label="Wyślij wiadomość"
               className="size-12"
@@ -250,6 +271,7 @@ export default function ChatPage() {
               <Send className="size-5" />
             </Button>
           </form>
+
           <p className="mt-3 text-center text-xs text-muted-foreground">
             {hasValidRouteParams
               ? 'Enter wysyła wiadomość, Shift+Enter dodaje nową linię.'
