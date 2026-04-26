@@ -10,22 +10,138 @@ interface GsapAuroraProps {
   density?: 'default' | 'hero'
 }
 
-const heroOpacity = {
-  base: 'opacity-100',
-  ribbon: 'opacity-95',
-  texture: 'opacity-55'
+type Ribbon = {
+  bottom: (t: number) => number
+  dotEveryX: number
+  dotEveryY: number
+  endX: number
+  id: string
+  startX: number
+  top: (t: number) => number
 }
 
-const appOpacity = {
-  base: 'opacity-70',
-  ribbon: 'opacity-70',
-  texture: 'opacity-32'
+type MeshDot = {
+  id: string
+  opacity: number
+  radius: number
+  x: number
+  y: number
 }
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
+const noise = (x: number, y: number) => {
+  const raw = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453
+  return raw - Math.floor(raw)
+}
+
+const buildRibbonPath = (ribbon: Ribbon) => {
+  const samples = 68
+  const topPoints: string[] = []
+  const bottomPoints: string[] = []
+
+  for (let index = 0; index <= samples; index += 1) {
+    const t = index / samples
+    const x = ribbon.startX + (ribbon.endX - ribbon.startX) * t
+    topPoints.push(`${x.toFixed(1)} ${ribbon.top(t).toFixed(1)}`)
+    bottomPoints.unshift(`${x.toFixed(1)} ${ribbon.bottom(t).toFixed(1)}`)
+  }
+
+  return `M ${topPoints.join(' L ')} L ${bottomPoints.join(' L ')} Z`
+}
+
+const buildCrestPath = (ribbon: Ribbon) => {
+  const samples = 72
+  const points: string[] = []
+
+  for (let index = 0; index <= samples; index += 1) {
+    const t = index / samples
+    const x = ribbon.startX + (ribbon.endX - ribbon.startX) * t
+    points.push(`${x.toFixed(1)} ${ribbon.top(t).toFixed(1)}`)
+  }
+
+  return `M ${points.join(' L ')}`
+}
+
+const buildMeshDots = (ribbon: Ribbon, bias: 'left' | 'lower' | 'right') => {
+  const dots: MeshDot[] = []
+  let column = 0
+
+  for (let x = ribbon.startX; x <= ribbon.endX; x += ribbon.dotEveryX) {
+    const t = (x - ribbon.startX) / (ribbon.endX - ribbon.startX)
+    const top = ribbon.top(t)
+    const bottom = ribbon.bottom(t)
+    let row = 0
+
+    for (let y = top + 18; y <= bottom - 16; y += ribbon.dotEveryY) {
+      const vertical = (y - top) / Math.max(bottom - top, 1)
+      const fadeEdge = Math.sin(clamp(vertical, 0, 1) * Math.PI)
+      const horizontalFade = Math.sin(clamp(t, 0, 1) * Math.PI)
+      const n = noise(x * 0.011, y * 0.013)
+      const crestBoost = Math.max(0, 1 - vertical * 2.2)
+      const sideWeight = bias === 'left'
+        ? 1 - t * 0.22
+        : bias === 'right'
+          ? 0.75 + t * 0.25
+          : 0.82
+
+      dots.push({
+        id: `${ribbon.id}-${column}-${row}`,
+        opacity: clamp((0.08 + fadeEdge * 0.18 + crestBoost * 0.2 + n * 0.1) * horizontalFade * sideWeight, 0.03, 0.5),
+        radius: 0.72 + n * 0.55,
+        x,
+        y: y + Math.sin(column * 0.55 + row * 0.38) * 1.8
+      })
+      row += 1
+    }
+    column += 1
+  }
+
+  return dots
+}
+
+const leftRibbon: Ribbon = {
+  dotEveryX: 15,
+  dotEveryY: 15,
+  endX: 845,
+  id: 'left',
+  startX: -130,
+  bottom: t => 760 + Math.sin(t * Math.PI * 1.2 + 0.4) * 34 - t * 52,
+  top: t => 472 - Math.sin(t * Math.PI * 0.95) * 132 + Math.sin(t * Math.PI * 2.1 + 0.2) * 14
+}
+
+const rightRibbon: Ribbon = {
+  dotEveryX: 15,
+  dotEveryY: 15,
+  endX: 1720,
+  id: 'right',
+  startX: 735,
+  bottom: t => 672 + Math.sin(t * Math.PI * 1.45 + 0.3) * 32 + t * 20,
+  top: t => 520 - Math.sin(t * Math.PI * 0.98) * 92 + Math.sin(t * Math.PI * 2.3 + 1.1) * 12
+}
+
+const lowerRibbon: Ribbon = {
+  dotEveryX: 18,
+  dotEveryY: 18,
+  endX: 1680,
+  id: 'lower',
+  startX: 520,
+  bottom: t => 846 + Math.sin(t * Math.PI * 1.1 + 0.6) * 30,
+  top: t => 668 + Math.sin(t * Math.PI * 1.35 + 0.8) * 42
+}
+
+const leftPath = buildRibbonPath(leftRibbon)
+const rightPath = buildRibbonPath(rightRibbon)
+const lowerPath = buildRibbonPath(lowerRibbon)
+const leftCrest = buildCrestPath(leftRibbon)
+const rightCrest = buildCrestPath(rightRibbon)
+const lowerCrest = buildCrestPath(lowerRibbon)
+const leftDots = buildMeshDots(leftRibbon, 'left')
+const rightDots = buildMeshDots(rightRibbon, 'right')
+const lowerDots = buildMeshDots(lowerRibbon, 'lower')
 
 export function GsapAurora({ className, density = 'default' }: GsapAuroraProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const isHero = density === 'hero'
-  const opacity = isHero ? heroOpacity : appOpacity
 
   useGSAP(() => {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -34,202 +150,181 @@ export function GsapAurora({ className, density = 'default' }: GsapAuroraProps) 
     }
 
     const ribbons = gsap.utils.toArray<SVGGElement>('[data-aurora-ribbon]')
+    const meshes = gsap.utils.toArray<SVGGElement>('[data-aurora-mesh]')
     const crests = gsap.utils.toArray<SVGPathElement>('[data-aurora-crest]')
-    const textures = gsap.utils.toArray<SVGGElement>('[data-aurora-texture]')
+    const meshDots = gsap.utils.toArray<SVGCircleElement>('[data-aurora-dot]')
     const glows = gsap.utils.toArray<HTMLElement>('[data-aurora-glow]')
     const particles = gsap.utils.toArray<HTMLElement>('[data-aurora-particle]')
 
-    gsap.set([...ribbons, ...textures], { transformOrigin: '50% 50%' })
-    gsap.set(crests, { strokeDasharray: '14 28', strokeDashoffset: 0, transformOrigin: '50% 50%' })
+    gsap.set([...ribbons, ...meshes], { transformOrigin: '50% 50%' })
+    gsap.set(crests, { transformOrigin: '50% 50%' })
     gsap.set([...glows, ...particles], { transformOrigin: '50% 50%' })
 
     ribbons.forEach((ribbon, index) => {
       gsap.to(ribbon, {
-        duration: isHero ? 10 + index * 1.8 : 15 + index * 2.5,
+        duration: isHero ? 13 + index * 2 : 18 + index * 2.5,
         ease: 'sine.inOut',
         repeat: -1,
-        rotate: index % 2 === 0 ? 1.8 : -1.5,
-        scaleX: 1.03 + index * 0.012,
-        scaleY: 1.035,
-        x: index % 2 === 0 ? 28 : -34,
-        y: index % 2 === 0 ? -18 : 22,
+        rotate: index % 2 === 0 ? 0.8 : -0.9,
+        scaleX: 1.02,
+        scaleY: 1.025,
+        x: index % 2 === 0 ? 22 : -26,
+        y: index % 2 === 0 ? -12 : 14,
+        yoyo: true
+      })
+    })
+
+    meshes.forEach((mesh, index) => {
+      gsap.to(mesh, {
+        duration: isHero ? 8 + index * 1.2 : 12 + index * 1.6,
+        ease: 'sine.inOut',
+        repeat: -1,
+        x: index % 2 === 0 ? 12 : -14,
+        y: index % 2 === 0 ? -7 : 8,
         yoyo: true
       })
     })
 
     crests.forEach((crest, index) => {
       gsap.to(crest, {
-        duration: isHero ? 5.8 + index * 0.7 : 8.8 + index,
-        ease: 'none',
-        repeat: -1,
-        strokeDashoffset: index % 2 === 0 ? -90 : 90
-      })
-    })
-
-    textures.forEach((texture, index) => {
-      gsap.to(texture, {
-        duration: isHero ? 7.5 + index : 11 + index * 1.4,
+        duration: isHero ? 9 + index : 13 + index * 1.4,
         ease: 'sine.inOut',
-        opacity: index === 1 ? 0.72 : 0.58,
+        opacity: index === 1 ? 0.82 : 0.7,
         repeat: -1,
-        x: index % 2 === 0 ? 22 : -24,
-        y: index % 2 === 0 ? -10 : 12,
+        x: index % 2 === 0 ? 10 : -12,
+        y: index % 2 === 0 ? -5 : 6,
         yoyo: true
       })
     })
 
+    gsap.to(meshDots, {
+      duration: 3.8,
+      ease: 'sine.inOut',
+      opacity: '+=0.12',
+      repeat: -1,
+      scale: 1.22,
+      yoyo: true,
+      stagger: {
+        amount: 4.2,
+        from: 'random'
+      }
+    })
+
     glows.forEach((glow, index) => {
       gsap.to(glow, {
-        duration: isHero ? 8 + index * 1.4 : 13 + index * 1.8,
+        duration: isHero ? 10 + index * 1.4 : 16 + index * 1.8,
         ease: 'sine.inOut',
-        opacity: index % 2 === 0 ? 0.72 : 0.54,
+        opacity: index % 2 === 0 ? 0.62 : 0.48,
         repeat: -1,
-        scale: 1.14,
-        x: index % 2 === 0 ? 34 : -38,
-        y: index % 2 === 0 ? 22 : -26,
+        scale: 1.12,
+        x: index % 2 === 0 ? 26 : -28,
+        y: index % 2 === 0 ? 18 : -20,
         yoyo: true
       })
     })
 
     particles.forEach((particle, index) => {
       gsap.to(particle, {
-        duration: 4.5 + index * 0.8,
+        duration: 5 + index * 0.8,
         ease: 'sine.inOut',
-        opacity: 0.88,
+        opacity: 0.82,
         repeat: -1,
-        scale: 1.35,
-        x: index % 2 === 0 ? 24 : -26,
-        y: index % 3 === 0 ? -30 : 24,
+        scale: 1.28,
+        x: index % 2 === 0 ? 20 : -20,
+        y: index % 3 === 0 ? -24 : 20,
         yoyo: true
       })
     })
   }, { dependencies: [isHero], scope: rootRef })
 
+  const ribbonOpacity = isHero ? 'opacity-90' : 'opacity-55'
+  const meshOpacity = isHero ? 'opacity-100' : 'opacity-70'
+
   return (
     <div aria-hidden="true" className={cn('pointer-events-none absolute inset-0 overflow-hidden', className)} ref={rootRef}>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_52%_42%,oklch(0.18_0.075_252/0.2),transparent_31rem),linear-gradient(180deg,#030819_0%,#05132b_48%,#020617_100%)]" />
-      <div className="absolute left-[-8%] top-[24%] h-[24rem] w-[46rem] rounded-full bg-violet-500/12 blur-[76px]" data-aurora-glow="" />
-      <div className="absolute right-[-4%] top-[32%] h-[28rem] w-[52rem] rounded-full bg-cyan-400/13 blur-[84px]" data-aurora-glow="" />
-      <div className="absolute bottom-[-16%] left-[18%] h-[24rem] w-[44rem] rounded-full bg-blue-500/9 blur-[90px]" data-aurora-glow="" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_52%_42%,oklch(0.18_0.075_252/0.18),transparent_31rem),linear-gradient(180deg,#030819_0%,#05132b_48%,#020617_100%)]" />
+      <div className="absolute left-[-10%] top-[28%] h-[22rem] w-[46rem] rounded-full bg-violet-500/10 blur-[92px]" data-aurora-glow="" />
+      <div className="absolute right-[-8%] top-[34%] h-[25rem] w-[56rem] rounded-full bg-cyan-400/11 blur-[96px]" data-aurora-glow="" />
+      <div className="absolute bottom-[-14%] left-[20%] h-[20rem] w-[48rem] rounded-full bg-blue-500/8 blur-[104px]" data-aurora-glow="" />
 
-      <svg className={cn('absolute inset-0 h-full w-full', opacity.base)} preserveAspectRatio="none" viewBox="0 0 1600 900">
+      <svg className="absolute inset-0 h-full w-full" preserveAspectRatio="none" viewBox="0 0 1600 900">
         <defs>
-          <linearGradient id="leftRibbonFill" x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0" stopColor="#b06cff" stopOpacity="0.52" />
-            <stop offset="0.42" stopColor="#4b6dff" stopOpacity="0.26" />
-            <stop offset="1" stopColor="#0b2a65" stopOpacity="0" />
+          <linearGradient id="leftMeshFill" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stopColor="#a46cff" stopOpacity="0.4" />
+            <stop offset="0.4" stopColor="#455fff" stopOpacity="0.2" />
+            <stop offset="1" stopColor="#0d2a65" stopOpacity="0" />
           </linearGradient>
-          <linearGradient id="rightRibbonFill" x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0" stopColor="#0c2f7a" stopOpacity="0" />
-            <stop offset="0.42" stopColor="#0aa7e5" stopOpacity="0.36" />
-            <stop offset="0.72" stopColor="#6267ff" stopOpacity="0.28" />
-            <stop offset="1" stopColor="#8a4fff" stopOpacity="0.22" />
+          <linearGradient id="rightMeshFill" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stopColor="#0f52ba" stopOpacity="0" />
+            <stop offset="0.36" stopColor="#09b8d8" stopOpacity="0.22" />
+            <stop offset="0.68" stopColor="#4168ff" stopOpacity="0.22" />
+            <stop offset="1" stopColor="#8f5cff" stopOpacity="0.24" />
           </linearGradient>
-          <linearGradient id="lowerRibbonFill" x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0" stopColor="#113a91" stopOpacity="0" />
-            <stop offset="0.38" stopColor="#1457ce" stopOpacity="0.18" />
-            <stop offset="0.86" stopColor="#0aa7e5" stopOpacity="0.13" />
+          <linearGradient id="lowerMeshFill" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stopColor="#0a2c72" stopOpacity="0" />
+            <stop offset="0.48" stopColor="#1261c8" stopOpacity="0.12" />
+            <stop offset="1" stopColor="#09a6d8" stopOpacity="0.08" />
           </linearGradient>
-          <linearGradient id="leftCrest" x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0" stopColor="#b987ff" stopOpacity="0.08" />
-            <stop offset="0.28" stopColor="#bf8cff" stopOpacity="0.72" />
-            <stop offset="0.62" stopColor="#6d7cff" stopOpacity="0.28" />
+          <linearGradient id="leftMeshCrest" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stopColor="#b984ff" stopOpacity="0" />
+            <stop offset="0.32" stopColor="#c296ff" stopOpacity="0.7" />
+            <stop offset="0.68" stopColor="#6178ff" stopOpacity="0.28" />
             <stop offset="1" stopColor="#3ba4ff" stopOpacity="0" />
           </linearGradient>
-          <linearGradient id="rightCrest" x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0" stopColor="#21d9ff" stopOpacity="0" />
-            <stop offset="0.28" stopColor="#36ddff" stopOpacity="0.72" />
-            <stop offset="0.62" stopColor="#7d73ff" stopOpacity="0.4" />
-            <stop offset="1" stopColor="#a177ff" stopOpacity="0.05" />
+          <linearGradient id="rightMeshCrest" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stopColor="#27dcff" stopOpacity="0" />
+            <stop offset="0.36" stopColor="#42eaff" stopOpacity="0.68" />
+            <stop offset="0.7" stopColor="#7c73ff" stopOpacity="0.38" />
+            <stop offset="1" stopColor="#9c6dff" stopOpacity="0.02" />
           </linearGradient>
-          <filter height="220%" id="softRibbonGlow" width="220%" x="-60%" y="-60%">
+          <filter height="220%" id="meshGlow" width="220%" x="-60%" y="-60%">
             <feGaussianBlur result="blur" stdDeviation="18" />
-            <feColorMatrix in="blur" result="tint" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1.3 0 0  0 0 0 0.62 0" />
-            <feMerge>
-              <feMergeNode in="tint" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-          <filter height="180%" id="crestGlow" width="180%" x="-40%" y="-40%">
-            <feGaussianBlur result="blur" stdDeviation="6" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-          <pattern height="16" id="violetDotMesh" patternUnits="userSpaceOnUse" width="16">
-            <circle cx="4" cy="4" fill="#d8c2ff" opacity="0.35" r="1.15" />
-          </pattern>
-          <pattern height="15" id="cyanDotMesh" patternUnits="userSpaceOnUse" width="15">
-            <circle cx="5" cy="5" fill="#92efff" opacity="0.36" r="1.05" />
-          </pattern>
-          <pattern height="18" id="blueDotMesh" patternUnits="userSpaceOnUse" width="18">
-            <circle cx="6" cy="6" fill="#8ab7ff" opacity="0.24" r="0.95" />
-          </pattern>
+          <filter height="190%" id="crestSoftGlow" width="190%" x="-45%" y="-45%">
+            <feGaussianBlur result="blur" stdDeviation="5" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
         </defs>
 
-        <g className={opacity.ribbon} data-aurora-ribbon="">
-          <path
-            d="M-140 565 C70 430 230 354 430 382 C594 405 658 492 824 500 C650 552 496 631 304 702 C128 768 -24 812 -170 838 Z"
-            fill="url(#leftRibbonFill)"
-            filter="url(#softRibbonGlow)"
-          />
-          <g className={opacity.texture} data-aurora-texture="">
-            <path
-              d="M-132 540 C82 420 240 370 430 393 C555 410 642 466 782 488 C620 526 458 584 286 648 C120 710 -36 760 -160 790 Z"
-              fill="url(#violetDotMesh)"
-            />
+        <g data-aurora-ribbon="">
+          <path className={ribbonOpacity} d={leftPath} fill="url(#leftMeshFill)" filter="url(#meshGlow)" />
+          <g className={meshOpacity} data-aurora-mesh="">
+            {leftDots.map(dot => (
+              <circle cx={dot.x} cy={dot.y} data-aurora-dot="" fill="#bfa3ff" key={dot.id} opacity={dot.opacity} r={dot.radius} />
+            ))}
           </g>
-          <path
-            d="M-118 535 C86 418 246 365 432 388 C560 404 650 468 810 492"
-            data-aurora-crest=""
-            fill="none"
-            filter="url(#crestGlow)"
-            stroke="url(#leftCrest)"
-            strokeLinecap="round"
-            strokeWidth="7"
-          />
+          <path d={leftCrest} data-aurora-crest="" fill="none" filter="url(#crestSoftGlow)" opacity="0.68" stroke="url(#leftMeshCrest)" strokeLinecap="round" strokeWidth="5" />
         </g>
 
-        <g className={opacity.ribbon} data-aurora-ribbon="">
-          <path
-            d="M682 610 C852 506 958 385 1140 368 C1305 352 1436 407 1644 490 L1644 666 C1415 590 1280 552 1116 590 C934 632 824 744 658 734 Z"
-            fill="url(#rightRibbonFill)"
-            filter="url(#softRibbonGlow)"
-          />
-          <g className={opacity.texture} data-aurora-texture="">
-            <path
-              d="M734 594 C888 512 982 418 1148 396 C1308 375 1428 424 1624 502 L1624 625 C1398 556 1270 524 1128 560 C962 602 842 704 704 710 Z"
-              fill="url(#cyanDotMesh)"
-            />
+        <g data-aurora-ribbon="">
+          <path className={ribbonOpacity} d={rightPath} fill="url(#rightMeshFill)" filter="url(#meshGlow)" />
+          <g className={meshOpacity} data-aurora-mesh="">
+            {rightDots.map(dot => (
+              <circle cx={dot.x} cy={dot.y} data-aurora-dot="" fill="#75e7ff" key={dot.id} opacity={dot.opacity} r={dot.radius} />
+            ))}
           </g>
-          <path
-            d="M712 602 C866 512 978 404 1148 386 C1308 370 1436 424 1628 500"
-            data-aurora-crest=""
-            fill="none"
-            filter="url(#crestGlow)"
-            stroke="url(#rightCrest)"
-            strokeLinecap="round"
-            strokeWidth="8"
-          />
+          <path d={rightCrest} data-aurora-crest="" fill="none" filter="url(#crestSoftGlow)" opacity="0.72" stroke="url(#rightMeshCrest)" strokeLinecap="round" strokeWidth="5" />
         </g>
 
-        <g className={isHero ? 'opacity-70' : 'opacity-45'} data-aurora-ribbon="">
-          <path
-            d="M180 704 C348 616 504 604 660 642 C806 678 928 760 1100 748 C1266 736 1402 646 1608 674 L1608 812 C1364 780 1244 856 1068 862 C874 868 744 772 574 742 C430 716 304 744 168 832 Z"
-            fill="url(#lowerRibbonFill)"
-            filter="url(#softRibbonGlow)"
-          />
-          <g className={opacity.texture} data-aurora-texture="">
-            <path
-              d="M220 706 C372 636 506 626 654 660 C808 696 928 774 1090 768 C1254 760 1378 700 1588 710 L1588 790 C1366 770 1246 836 1070 840 C874 844 752 754 582 728 C444 706 320 740 198 802 Z"
-              fill="url(#blueDotMesh)"
-            />
+        <g data-aurora-ribbon="">
+          <path className={isHero ? 'opacity-55' : 'opacity-35'} d={lowerPath} fill="url(#lowerMeshFill)" filter="url(#meshGlow)" />
+          <g className={isHero ? 'opacity-45' : 'opacity-28'} data-aurora-mesh="">
+            {lowerDots.map(dot => (
+              <circle cx={dot.x} cy={dot.y} data-aurora-dot="" fill="#7fb7ff" key={dot.id} opacity={dot.opacity} r={dot.radius} />
+            ))}
           </g>
+          <path d={lowerCrest} data-aurora-crest="" fill="none" opacity="0.18" stroke="#5a8cff" strokeLinecap="round" strokeWidth="3" />
         </g>
       </svg>
 
-      <span className="absolute left-[30%] top-[22%] size-1.5 rounded-full bg-cyan-200/80 shadow-[0_0_24px_oklch(0.82_0.15_220/0.9)]" data-aurora-particle="" />
+      <span className="absolute left-[34%] top-[22%] size-1.5 rounded-full bg-cyan-200/80 shadow-[0_0_24px_oklch(0.82_0.15_220/0.9)]" data-aurora-particle="" />
       <span className="absolute right-[18%] top-[35%] size-1 rounded-full bg-violet-100/75 shadow-[0_0_22px_oklch(0.78_0.22_292/0.9)]" data-aurora-particle="" />
     </div>
   )
