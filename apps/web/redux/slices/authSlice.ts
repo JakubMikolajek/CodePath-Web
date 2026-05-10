@@ -21,7 +21,9 @@ export const login = createAsyncThunk('auth/login',
   async ({ identifier, password }: { identifier: string; password: string }, { rejectWithValue }) => {
     try {
       await loginApi(identifier, password)
+
       window.location.href = '/dashboard'
+
       return
     } catch (error: unknown) {
       return rejectWithValue(getApiErrorMessage(error, 'Login failed'))
@@ -33,9 +35,11 @@ export const logout = createAsyncThunk('auth/logout',
   async (_, { rejectWithValue }) => {
     try {
       await logoutApi()
+
       window.location.href = '/'
     } catch (error: unknown) {
       console.error('Logout error:', error)
+
       return rejectWithValue(getApiErrorMessage(error, 'Logout failed'))
     }
   })
@@ -44,6 +48,7 @@ export const register = createAsyncThunk('auth/register',
   async ({ email, login, password }: { email: string; login: string; password: string }, { rejectWithValue }) => {
     try {
       await registerApi(email, login, password)
+
       return
     } catch (error: unknown) {
       return rejectWithValue(getApiErrorMessage(error, 'Registration failed'))

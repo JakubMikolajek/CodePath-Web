@@ -7,9 +7,11 @@ interface ApiErrorResponse {
 export function getApiErrorMessage(error: unknown, fallbackMessage: string): string {
   if (axios.isAxiosError<ApiErrorResponse>(error)) {
     const apiMessage = error.response?.data?.message
+
     if (Array.isArray(apiMessage)) {
       return apiMessage.join(', ')
     }
+
     if (typeof apiMessage === 'string' && apiMessage.trim().length > 0) {
       return apiMessage
     }

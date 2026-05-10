@@ -26,6 +26,7 @@ export default function MermaidGraph({ graph }: MermaidGraphProps) {
       mermaid.contentLoaded()
     }
   }, [graph])
+
   return (
     <div className="p-4 w-full h-full">
       <div className="mermaid">{graph}</div>

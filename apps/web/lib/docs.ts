@@ -1,3 +1,4 @@
+import type { Nullable } from '@workspace/codepath-common/globals'
 import type { RepoCloneStatus, RepoDocsStatus, RepoEmbeddingStatus } from '@workspace/codepath-common/repository'
 
 import { apiClient } from '@/lib/api/api'
@@ -15,7 +16,7 @@ interface GenerateRepoDocsResponse {
 }
 
 export async function getRepoDocs(repoId: number) {
-  return apiClient.get<null | string>(`/docs/${repoId}`)
+  return apiClient.get<Nullable<string>>(`/docs/${repoId}`)
 }
 
 export async function getRepoDocsStatus(repoId: number) {
