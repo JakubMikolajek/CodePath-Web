@@ -1,3 +1,5 @@
+'use client'
+
 import { Button } from '@workspace/ui/components/button'
 import { Card, CardContent } from '@workspace/ui/components/card'
 import { ArrowLeft, ShieldCheck, UserRoundPlus } from 'lucide-react'
@@ -11,7 +13,7 @@ interface RegisterFormProps {
 
 export default function RegisterForm({ handleShowRegisterForm }: RegisterFormProps) {
   const startOidcRegistration = () => {
-    void signIn('keycloak', { callbackUrl: '/dashboard' })
+    void signIn('keycloak', { callbackUrl: `${window.location.origin}/dashboard` })
   }
 
   return (
