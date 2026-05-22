@@ -1,7 +1,6 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit'
 import type { Nullable } from '@workspace/codepath-common/globals'
 import type { IUser } from '@workspace/codepath-common/user'
-import { signOut } from 'next-auth/react'
 
 interface AuthState {
   error: Nullable<string>
@@ -17,7 +16,7 @@ const initialState: AuthState = {
 
 export const logout = createAsyncThunk('auth/logout',
   async () => {
-    await signOut({ callbackUrl: '/' })
+    window.location.assign('/api/auth/logout')
   })
 
 const authSlice = createSlice({

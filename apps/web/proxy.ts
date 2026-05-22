@@ -10,6 +10,10 @@ export async function proxy(req: NextRequest) {
   const isAuthenticated = Boolean(token)
   const isProtectedRoute = pathname.startsWith('/dashboard')
 
+  if (pathname === '/' && isAuthenticated) {
+    return NextResponse.redirect(new URL('/dashboard', req.url))
+  }
+
   if (isProtectedRoute && !isAuthenticated) {
     return NextResponse.redirect(new URL('/', req.url))
   }
