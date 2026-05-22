@@ -14,10 +14,6 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL('/', req.url))
   }
 
-  if (isAuthenticated && pathname === '/') {
-    return NextResponse.redirect(new URL('/dashboard', req.url))
-  }
-
   return NextResponse.next()
 }
 
