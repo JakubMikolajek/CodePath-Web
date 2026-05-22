@@ -15,7 +15,6 @@ const secureCookie = (process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? '').st
 type GetTokenRequest = Parameters<typeof getToken>[0]['req']
 
 export const authOptions: NextAuthOptions = {
-  debug: true,
   secret: authSecret,
   callbacks: {
     async jwt({ account, token }) {
@@ -68,17 +67,6 @@ export const authOptions: NextAuthOptions = {
     },
     signOut() {
       console.info('[next-auth] event=signOut')
-    }
-  },
-  logger: {
-    debug(code, metadata) {
-      console.info(`[next-auth][debug][${code}]`, sanitizeAuthLogMetadata(metadata))
-    },
-    error(code, metadata) {
-      console.error(`[next-auth][error][${code}]`, sanitizeAuthLogMetadata(metadata))
-    },
-    warn(code) {
-      console.warn(`[next-auth][warn][${code}]`)
     }
   },
   providers: [
@@ -161,18 +149,4 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
     console.warn(`[next-auth] refreshAccessToken threw error=${error instanceof Error ? error.message : 'unknown'}`)
     return { ...token, error: 'RefreshAccessTokenError' }
   }
-}
-
-function sanitizeAuthLogMetadata(value: unknown): unknown {
-  if (!value || typeof value !== 'object') {
-    return value
-  }
-
-  return JSON.parse(JSON.stringify(value, (key, nestedValue) => {
-    if (['access_token', 'client_secret', 'id_token', 'refresh_token', 'token'].includes(key.toLowerCase())) {
-      return '[redacted]'
-    }
-
-    return nestedValue
-  })) as unknown
 }
