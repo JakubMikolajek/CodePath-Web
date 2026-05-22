@@ -93,7 +93,10 @@ export async function getKeycloakAccessToken(request: NextRequest): Promise<null
 }
 
 export async function getKeycloakAccessTokenFromCookieHeader(cookieHeader: string): Promise<null | string> {
-  return await readKeycloakAccessToken({ headers: { cookie: cookieHeader } } as GetTokenRequest)
+  return await readKeycloakAccessToken({
+    cookies: parseCookieHeader(cookieHeader),
+    headers: { cookie: cookieHeader }
+  } as GetTokenRequest)
 }
 
 async function readKeycloakAccessToken(request: GetTokenRequest): Promise<null | string> {
@@ -104,6 +107,35 @@ async function readKeycloakAccessToken(request: GetTokenRequest): Promise<null |
   const token = await getToken({ req: request, secret: authSecret, secureCookie })
 
   return typeof token?.accessToken === 'string' ? token.accessToken : null
+}
+
+function parseCookieHeader(cookieHeader: string): Record<string, string> {
+  return cookieHeader
+    .split(';')
+    .map(part => part.trim())
+    .filter(Boolean)
+    .reduce<Record<string, string>>((cookies, part) => {
+      const separatorIndex = part.indexOf('=')
+
+      if (separatorIndex <= 0) {
+        return cookies
+      }
+
+      const name = part.slice(0, separatorIndex).trim()
+      const rawValue = part.slice(separatorIndex + 1).trim()
+
+      if (!name) {
+        return cookies
+      }
+
+      try {
+        cookies[name] = decodeURIComponent(rawValue)
+      } catch {
+        cookies[name] = rawValue
+      }
+
+      return cookies
+    }, {})
 }
 
 async function refreshAccessToken(token: JWT): Promise<JWT> {
