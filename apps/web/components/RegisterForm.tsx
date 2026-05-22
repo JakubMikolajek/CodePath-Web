@@ -13,7 +13,7 @@ interface RegisterFormProps {
 
 export default function RegisterForm({ handleShowRegisterForm }: RegisterFormProps) {
   const startOidcRegistration = () => {
-    void signIn('keycloak', { callbackUrl: `${window.location.origin}/dashboard` })
+    void signIn('keycloak', { callbackUrl: '/dashboard' })
   }
 
   return (

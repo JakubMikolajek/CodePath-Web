@@ -15,10 +15,12 @@ const secureCookie = (process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? '').st
 type GetTokenRequest = Parameters<typeof getToken>[0]['req']
 
 export const authOptions: NextAuthOptions = {
+  debug: true,
   secret: authSecret,
   callbacks: {
     async jwt({ account, token }) {
       if (account) {
+        console.info(`[next-auth] jwt account provider=${account.provider} type=${account.type} expires_at=${account.expires_at ?? 'none'} has_access_token=${Boolean(account.access_token)}`)
         token.accessToken = account.access_token
         token.expiresAt = account.expires_at
         token.idToken = account.id_token
@@ -32,6 +34,19 @@ export const authOptions: NextAuthOptions = {
 
       return await refreshAccessToken(token)
     },
+    redirect({ baseUrl, url }) {
+      console.info(`[next-auth] redirect url=${url} baseUrl=${baseUrl}`)
+
+      if (url.startsWith('/')) {
+        return `${baseUrl}${url}`
+      }
+
+      if (new URL(url).origin === baseUrl) {
+        return url
+      }
+
+      return baseUrl
+    },
     session({ session, token }) {
       session.error = typeof token.error === 'string' ? token.error : undefined
 
@@ -40,6 +55,30 @@ export const authOptions: NextAuthOptions = {
       }
 
       return session
+    },
+    signIn({ account, profile }) {
+      console.info(`[next-auth] signIn provider=${account?.provider ?? 'unknown'} subject=${profile?.sub ?? 'unknown'} email=${profile?.email ?? 'unknown'}`)
+
+      return true
+    }
+  },
+  events: {
+    signIn({ account, isNewUser, user }) {
+      console.info(`[next-auth] event=signIn provider=${account?.provider ?? 'unknown'} user=${user.email ?? user.id ?? 'unknown'} isNewUser=${Boolean(isNewUser)}`)
+    },
+    signOut() {
+      console.info('[next-auth] event=signOut')
+    }
+  },
+  logger: {
+    debug(code, metadata) {
+      console.info(`[next-auth][debug][${code}]`, sanitizeAuthLogMetadata(metadata))
+    },
+    error(code, metadata) {
+      console.error(`[next-auth][error][${code}]`, sanitizeAuthLogMetadata(metadata))
+    },
+    warn(code) {
+      console.warn(`[next-auth][warn][${code}]`)
     }
   },
   providers: [
@@ -106,6 +145,7 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
     }
 
     if (!response.ok || !refreshed.access_token) {
+      console.warn(`[next-auth] refreshAccessToken failed status=${response.status}`)
       return { ...token, error: 'RefreshAccessTokenError' }
     }
 
@@ -117,7 +157,22 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
       idToken: refreshed.id_token ?? token.idToken,
       refreshToken: refreshed.refresh_token ?? refreshToken
     }
-  } catch {
+  } catch (error) {
+    console.warn(`[next-auth] refreshAccessToken threw error=${error instanceof Error ? error.message : 'unknown'}`)
     return { ...token, error: 'RefreshAccessTokenError' }
   }
+}
+
+function sanitizeAuthLogMetadata(value: unknown): unknown {
+  if (!value || typeof value !== 'object') {
+    return value
+  }
+
+  return JSON.parse(JSON.stringify(value, (key, nestedValue) => {
+    if (['access_token', 'client_secret', 'id_token', 'refresh_token', 'token'].includes(key.toLowerCase())) {
+      return '[redacted]'
+    }
+
+    return nestedValue
+  })) as unknown
 }

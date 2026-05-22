@@ -6,7 +6,7 @@ import {
   randomUUID
 } from 'node:crypto'
 
-import { Injectable, UnauthorizedException } from '@nestjs/common'
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common'
 import { Nullable } from '@workspace/codepath-common/globals'
 import axios from 'axios'
 import * as bcrypt from 'bcrypt'
@@ -47,6 +47,7 @@ interface KeycloakClaims {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name)
   private jwksCache: Nullable<{ expiresAt: number, keys: KeycloakJwk[] }> = null
 
   constructor(
@@ -66,7 +67,8 @@ export class AuthService {
         login: claims.preferred_username,
         subject: claims.sub
       })
-    } catch {
+    } catch (error) {
+      this.logger.warn(`Keycloak token validation failed: ${error instanceof Error ? error.message : 'unknown error'}`)
       return null
     }
   }
