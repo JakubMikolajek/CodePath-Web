@@ -22,7 +22,7 @@ function buildLogoutUrl(origin: string, idToken: null | string): string {
   }
 
   const logoutUrl = new URL(`${keycloakIssuer}/protocol/openid-connect/logout`)
-  logoutUrl.searchParams.set('post_logout_redirect_uri', origin)
+  logoutUrl.searchParams.set('post_logout_redirect_uri', `${origin}/`)
 
   if (idToken) {
     logoutUrl.searchParams.set('id_token_hint', idToken)
