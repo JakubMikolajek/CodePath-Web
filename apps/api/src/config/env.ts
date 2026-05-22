@@ -30,7 +30,7 @@ const DEFAULTS = {
   repoStorageProvider: 'minio'
 } as const
 
-function parseInteger(value: | undefined, fallback: number): number {
+function parseInteger(value: string | undefined, fallback: number): number {
   if (!value) {
     return fallback
   }
