@@ -48,6 +48,7 @@ export class DbService implements OnModuleDestroy, OnModuleInit {
     const baselinedLegacySchema = await this.bootstrapLegacyMigrationBaselineIfNeeded(migrationsFolder)
     if (baselinedLegacySchema) {
       await this.applyRepoAuthSchemaCompatPatch()
+      await this.applyUserIdentitySchemaCompatPatch()
     }
 
     this.logger.log(`Running Drizzle migrations from ${migrationsFolder}`)
@@ -83,6 +84,21 @@ export class DbService implements OnModuleDestroy, OnModuleInit {
     `)
 
     this.logger.log('Applied legacy repo auth schema compatibility patch')
+  }
+
+  private async applyUserIdentitySchemaCompatPatch(): Promise<void> {
+    await this.pool.query(`
+      ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "auth_provider" text DEFAULT 'local' NOT NULL;
+      ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "auth_subject" text;
+    `)
+
+    await this.pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "users_auth_provider_subject_key"
+      ON "users" ("auth_provider","auth_subject")
+      WHERE "auth_subject" IS NOT NULL;
+    `)
+
+    this.logger.log('Applied legacy user identity schema compatibility patch')
   }
 
   private async bootstrapLegacyMigrationBaselineIfNeeded(migrationsFolder: string): Promise<boolean> {

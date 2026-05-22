@@ -22,7 +22,7 @@ function createClient(client: AxiosInstance) {
 
 export const apiClient = createClient(axiosClient)
 
-export const apiServer = (cookie: string) => {
-  const client = createAxiosServer(cookie)
+export const apiServer = async () => {
+  const client = await createAxiosServer()
   return createClient(client)
 }

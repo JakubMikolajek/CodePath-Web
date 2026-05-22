@@ -5,6 +5,8 @@ import { pgTable, serial, text, timestamp, unique } from 'drizzle-orm/pg-core'
 import { apiRunnerAuthPresets, apiRunnerCollections, chatHistory, chatSessions, repos } from './index'
 
 export const users = pgTable('users', {
+  authProvider: text('auth_provider').default('local').notNull(),
+  authSubject: text('auth_subject'),
   createdAt: timestamp('created_at', { mode: 'string' }).defaultNow(),
   email: text().notNull(),
   id: serial().primaryKey().notNull(),
@@ -12,6 +14,7 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash').notNull(),
   updatedAt: timestamp('updated_at', { mode: 'string' }).defaultNow()
 }, table => [
+  unique('users_auth_provider_subject_key').on(table.authProvider, table.authSubject),
   unique('users_email_key').on(table.email)
 ])
 
