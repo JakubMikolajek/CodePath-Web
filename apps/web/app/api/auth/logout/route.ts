@@ -2,12 +2,13 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
 const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET
+const appUrl = (process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? '').replace(/\/+$/, '')
 const keycloakClientId = process.env.AUTH_KEYCLOAK_ID ?? process.env.KEYCLOAK_CLIENT_ID ?? 'codepath-web'
 const keycloakIssuer = (process.env.AUTH_KEYCLOAK_ISSUER ?? process.env.KEYCLOAK_ISSUER ?? '').replace(/\/+$/, '')
 const secureCookie = (process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? '').startsWith('https://')
 
 export async function GET(request: NextRequest) {
-  const origin = request.nextUrl.origin
+  const origin = resolvePublicOrigin(request)
   const token = authSecret ? await getToken({ req: request, secret: authSecret, secureCookie }) : null
   const idToken = typeof token?.idToken === 'string' ? token.idToken : null
   const response = NextResponse.redirect(buildLogoutUrl(origin, idToken))
@@ -15,6 +16,21 @@ export async function GET(request: NextRequest) {
   clearNextAuthCookies(request, response)
 
   return response
+}
+
+function resolvePublicOrigin(request: NextRequest): string {
+  if (appUrl) {
+    return appUrl
+  }
+
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const forwardedProto = request.headers.get('x-forwarded-proto') ?? 'http'
+
+  if (forwardedHost) {
+    return `${forwardedProto}://${forwardedHost}`.replace(/\/+$/, '')
+  }
+
+  return request.nextUrl.origin.replace(/\/+$/, '')
 }
 
 function buildLogoutUrl(origin: string, idToken: null | string): string {
