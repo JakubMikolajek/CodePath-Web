@@ -2,7 +2,6 @@ import compress from '@fastify/compress'
 import fastifyCookie from '@fastify/cookie'
 import cors from '@fastify/cors'
 import helmet from '@fastify/helmet'
-import { ValidationPipe } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { FastifyAdapter } from '@nestjs/platform-fastify'
@@ -10,6 +9,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 
 import { AppModule } from './app.module'
 import { env, resolveCorsOrigin } from './config/env'
+import { createApiValidationPipe } from './config/validation'
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -30,11 +30,7 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api')
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      transform: true
-    }),
-  )
+  app.useGlobalPipes(createApiValidationPipe())
 
   await app.register(fastifyCookie)
 
