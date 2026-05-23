@@ -13,22 +13,15 @@ const LEGACY_REQUIRED_TABLES = ['users', 'repos', 'files', 'dependencies'] as co
 
 type LegacyTableName = (typeof LEGACY_REQUIRED_TABLES)[number]
 
-export function shouldBootstrapLegacyMigrationBaseline(
-  hasMigrationHistory: boolean,
-  tablePresenceByName: Record<LegacyTableName, boolean>
-): boolean {
-  if (hasMigrationHistory) {
-    return false
-  }
+export function shouldBootstrapLegacyMigrationBaseline(hasMigrationHistory: boolean, tablePresenceByName: Record<LegacyTableName, boolean>): boolean {
+  if (hasMigrationHistory) return false
 
   return LEGACY_REQUIRED_TABLES.every(tableName => tablePresenceByName[tableName] === true)
 }
 
 @Injectable()
 export class DbService implements OnModuleDestroy, OnModuleInit {
-  get dbClient() {
-    return this.db
-  }
+  get dbClient() { return this.db }
   private readonly pool = new Pool({ connectionString: env.databaseUrl })
   private readonly db: NodePgDatabase = drizzle(this.pool)
 
@@ -46,8 +39,10 @@ export class DbService implements OnModuleDestroy, OnModuleInit {
 
     const migrationsFolder = this.resolveMigrationsFolder()
     const baselinedLegacySchema = await this.bootstrapLegacyMigrationBaselineIfNeeded(migrationsFolder)
+
     if (baselinedLegacySchema) {
       await this.applyRepoAuthSchemaCompatPatch()
+      await this.applyUserIdentitySchemaCompatPatch()
     }
 
     this.logger.log(`Running Drizzle migrations from ${migrationsFolder}`)
@@ -85,6 +80,21 @@ export class DbService implements OnModuleDestroy, OnModuleInit {
     this.logger.log('Applied legacy repo auth schema compatibility patch')
   }
 
+  private async applyUserIdentitySchemaCompatPatch(): Promise<void> {
+    await this.pool.query(`
+      ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "auth_provider" text DEFAULT 'local' NOT NULL;
+      ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "auth_subject" text;
+    `)
+
+    await this.pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "users_auth_provider_subject_key"
+      ON "users" ("auth_provider","auth_subject")
+      WHERE "auth_subject" IS NOT NULL;
+    `)
+
+    this.logger.log('Applied legacy user identity schema compatibility patch')
+  }
+
   private async bootstrapLegacyMigrationBaselineIfNeeded(migrationsFolder: string): Promise<boolean> {
     await this.pool.query('CREATE SCHEMA IF NOT EXISTS drizzle')
     await this.pool.query(`
@@ -95,19 +105,16 @@ export class DbService implements OnModuleDestroy, OnModuleInit {
       )
     `)
 
-    const migrationCountResult = await this.pool.query<{ count: string }>(
-      'select count(*)::int as count from drizzle.__drizzle_migrations'
-    )
+    const migrationCountResult = await this.pool.query<{ count: string }>('select count(*)::int as count from drizzle.__drizzle_migrations')
     const hasMigrationHistory = Number(migrationCountResult.rows[0]?.count ?? 0) > 0
     const tablePresenceByName = await this.getLegacyTablePresence()
     const shouldBootstrap = shouldBootstrapLegacyMigrationBaseline(hasMigrationHistory, tablePresenceByName)
 
-    if (!shouldBootstrap) {
-      return false
-    }
+    if (!shouldBootstrap) return false
 
     const migrations = readMigrationFiles({ migrationsFolder })
     const latestMigration = migrations.at(-1)
+
     if (!latestMigration) {
       this.logger.warn(`No migrations found in ${migrationsFolder}; skipping legacy baseline`)
       return false
@@ -117,6 +124,7 @@ export class DbService implements OnModuleDestroy, OnModuleInit {
       'insert into drizzle.__drizzle_migrations ("hash", "created_at") values ($1, $2)',
       [latestMigration.hash, latestMigration.folderMillis]
     )
+
     this.logger.warn('Legacy DB schema detected without drizzle history; migration baseline inserted')
     return true
   }

@@ -1,7 +1,6 @@
 'use server'
 
 import { SidebarInset, SidebarProvider } from '@workspace/ui/components/sidebar'
-import { cookies } from 'next/headers'
 import type { ReactNode } from 'react'
 
 import AppSidebar from '@/components/AppSideBar'
@@ -14,11 +13,8 @@ interface DashboardLayoutProps {
 }
 
 export default async function DashboardLayout({ children }: Readonly<DashboardLayoutProps>) {
-  const cookieStore = await cookies()
-  const cookie = cookieStore.toString()
-
-  const me = await getCurrentUser(cookie)
-  const repos = await getRepos(cookie)
+  const me = await getCurrentUser()
+  const repos = await getRepos()
 
   return (
     <SidebarProvider defaultOpen>
