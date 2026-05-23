@@ -40,8 +40,6 @@ function buildLogoutUrl(origin: string, idToken: null | string): string {
 
   if (idToken) logoutUrl.searchParams.set('id_token_hint', idToken)
 
-  console.info(`[next-auth] keycloak logout post_logout_redirect_uri=${postLogoutRedirectUri} client_id=${keycloakClientId} has_id_token_hint=${Boolean(idToken)}`)
-
   return logoutUrl.toString()
 }
 
