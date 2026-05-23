@@ -1,7 +1,7 @@
 'use client'
 
-import { ThemeProvider as NextThemesProvider } from 'next-themes'
 import { SessionProvider } from 'next-auth/react'
+import { ThemeProvider as NextThemesProvider } from 'next-themes'
 import type { ReactNode } from 'react'
 import { Provider } from 'react-redux'
 

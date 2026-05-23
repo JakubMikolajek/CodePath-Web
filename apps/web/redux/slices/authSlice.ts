@@ -14,10 +14,7 @@ const initialState: AuthState = {
   user: null
 }
 
-export const logout = createAsyncThunk('auth/logout',
-  async () => {
-    window.location.assign('/api/auth/logout')
-  })
+export const logout = createAsyncThunk('auth/logout', () => window.location.assign('/api/auth/logout'))
 
 const authSlice = createSlice({
   initialState,

@@ -23,8 +23,6 @@ export default function LoginForm({ handleShowRegisterForm }: LoginFormProps) {
           <BrandMark className="justify-center text-2xl md:text-3xl" />
 
           <h1 className="mt-12 text-4xl font-bold text-white md:text-[2.65rem]">Welcome back</h1>
-
-          <p className="mt-3 text-lg text-muted-foreground">Sign in with your CodePath identity provider</p>
         </div>
 
         <div className="space-y-7">
@@ -33,7 +31,7 @@ export default function LoginForm({ handleShowRegisterForm }: LoginFormProps) {
               <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" />
 
               <p className="leading-6 text-white/86">
-                Authentication is handled by Keycloak through OpenID Connect. CodePath does not collect your password here.
+                Authentication is handled through OpenID Connect. CodePath does not collect your password here.
               </p>
             </div>
           </div>
@@ -45,7 +43,7 @@ export default function LoginForm({ handleShowRegisterForm }: LoginFormProps) {
             variant="glow"
           >
             <LogIn className="size-5" />
-            Continue with Keycloak
+            Sign in
           </Button>
 
           <p className="text-center text-base text-muted-foreground">
@@ -57,7 +55,7 @@ export default function LoginForm({ handleShowRegisterForm }: LoginFormProps) {
               type="button"
             >
               <UserRoundPlus className="size-4" />
-              Create one
+              Sign up
             </button>
           </p>
         </div>

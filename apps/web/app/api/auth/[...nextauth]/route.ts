@@ -1,15 +1,11 @@
 import { authHandler } from '@/auth'
 
 interface NextRouteContext {
-  params: Promise<{
-    nextauth: string[]
-  }>
+  params: Promise<{ nextauth: string[] }>
 }
 
 interface NextAuthRouteContext {
-  params: {
-    nextauth: string[]
-  }
+  params: { nextauth: string[] }
 }
 
 const handler = authHandler as (request: Request, context: NextAuthRouteContext) => Promise<Response>

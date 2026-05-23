@@ -19,33 +19,26 @@ export async function GET(request: NextRequest) {
 }
 
 function resolvePublicOrigin(request: NextRequest): string {
-  if (appUrl) {
-    return appUrl
-  }
+  if (appUrl) return appUrl
 
   const forwardedHost = request.headers.get('x-forwarded-host')
   const forwardedProto = request.headers.get('x-forwarded-proto') ?? 'http'
 
-  if (forwardedHost) {
-    return `${forwardedProto}://${forwardedHost}`.replace(/\/+$/, '')
-  }
+  if (forwardedHost) return `${forwardedProto}://${forwardedHost}`.replace(/\/+$/, '')
 
   return request.nextUrl.origin.replace(/\/+$/, '')
 }
 
 function buildLogoutUrl(origin: string, idToken: null | string): string {
-  if (!keycloakIssuer) {
-    return origin
-  }
+  if (!keycloakIssuer) return origin
 
   const postLogoutRedirectUri = `${origin}/`
   const logoutUrl = new URL(`${keycloakIssuer}/protocol/openid-connect/logout`)
+
   logoutUrl.searchParams.set('client_id', keycloakClientId)
   logoutUrl.searchParams.set('post_logout_redirect_uri', postLogoutRedirectUri)
 
-  if (idToken) {
-    logoutUrl.searchParams.set('id_token_hint', idToken)
-  }
+  if (idToken) logoutUrl.searchParams.set('id_token_hint', idToken)
 
   console.info(`[next-auth] keycloak logout post_logout_redirect_uri=${postLogoutRedirectUri} client_id=${keycloakClientId} has_id_token_hint=${Boolean(idToken)}`)
 
@@ -54,11 +47,7 @@ function buildLogoutUrl(origin: string, idToken: null | string): string {
 
 function clearNextAuthCookies(request: NextRequest, response: NextResponse): void {
   for (const cookie of request.cookies.getAll()) {
-    if (
-      cookie.name.startsWith('next-auth.') ||
-      cookie.name.startsWith('__Secure-next-auth.') ||
-      cookie.name.startsWith('__Host-next-auth.')
-    ) {
+    if (cookie.name.startsWith('next-auth.') || cookie.name.startsWith('__Secure-next-auth.') || cookie.name.startsWith('__Host-next-auth.')) {
       response.cookies.set(cookie.name, '', {
         expires: new Date(0),
         httpOnly: true,

@@ -27,20 +27,21 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ pat
 async function forwardToApi(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const accessToken = await getKeycloakAccessToken(request)
 
-  if (!accessToken) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
-  }
+  if (!accessToken) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 
   const { path } = await context.params
   const targetUrl = new URL(`${internalApiBaseUrl}/${path.join('/')}`)
+
   targetUrl.search = request.nextUrl.search
 
   const headers = new Headers(request.headers)
+
   headers.delete('authorization')
   headers.delete('connection')
   headers.delete('content-length')
   headers.delete('cookie')
   headers.delete('host')
+
   headers.set('authorization', `Bearer ${accessToken}`)
 
   const response = await fetch(targetUrl, {

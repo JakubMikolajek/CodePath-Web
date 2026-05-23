@@ -21,9 +21,7 @@ export class SessionAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>()
     const token = extractAccessToken(request)
 
-    if (!token) {
-      throw new UnauthorizedException('Missing access token')
-    }
+    if (!token) throw new UnauthorizedException('Missing access token')
 
     return await this.attachKeycloakUser(request, token)
   }
@@ -31,9 +29,7 @@ export class SessionAuthGuard implements CanActivate {
   private async attachKeycloakUser(request: AuthenticatedRequest, token: string): Promise<boolean> {
     const user = await this.authService.validateKeycloakAccessToken(token)
 
-    if (!user) {
-      throw new UnauthorizedException('Invalid Keycloak access token')
-    }
+    if (!user) throw new UnauthorizedException('Invalid Keycloak access token')
 
     request.user = user
     return true
@@ -43,9 +39,7 @@ export class SessionAuthGuard implements CanActivate {
 function extractAccessToken(request: AuthenticatedRequest): null | string {
   const authHeader = request.headers.authorization
 
-  if (typeof authHeader === 'string' && authHeader.toLowerCase().startsWith('bearer ')) {
-    return authHeader.slice('bearer '.length).trim()
-  }
+  if (typeof authHeader === 'string' && authHeader.toLowerCase().startsWith('bearer ')) return authHeader.slice('bearer '.length).trim()
 
   return null
 }

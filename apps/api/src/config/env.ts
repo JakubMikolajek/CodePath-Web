@@ -31,33 +31,22 @@ const DEFAULTS = {
 } as const
 
 function parseInteger(value: string | undefined, fallback: number): number {
-  if (!value) {
-    return fallback
-  }
+  if (!value) return fallback
 
   const parsed = Number.parseInt(value, 10)
 
-  if (Number.isNaN(parsed)) {
-    return fallback
-  }
+  if (Number.isNaN(parsed)) return fallback
 
   return parsed
 }
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
-  if (!value) {
-    return fallback
-  }
+  if (!value) return fallback
 
   const normalized = value.trim().toLowerCase()
 
-  if (['1', 'true', 'yes', 'on'].includes(normalized)) {
-    return true
-  }
-
-  if (['0', 'false', 'no', 'off'].includes(normalized)) {
-    return false
-  }
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false
 
   return fallback
 }
@@ -70,9 +59,7 @@ function parseList(value: string | undefined, fallback: string): string[] {
 function parseStorageProvider(value: string | undefined): 'local' | 'minio' {
   const normalized = (value ?? DEFAULTS.repoStorageProvider).trim().toLowerCase()
 
-  if (normalized === 'minio') {
-    return 'minio'
-  }
+  if (normalized === 'minio') return 'minio'
 
   return 'local'
 }

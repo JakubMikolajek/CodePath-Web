@@ -19,7 +19,6 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ account, token }) {
       if (account) {
-        console.info(`[next-auth] jwt account provider=${account.provider} type=${account.type} expires_at=${account.expires_at ?? 'none'} has_access_token=${Boolean(account.access_token)}`)
         token.accessToken = account.access_token
         token.expiresAt = account.expires_at
         token.idToken = account.id_token
@@ -27,58 +26,30 @@ export const authOptions: NextAuthOptions = {
         return token
       }
 
-      if (typeof token.expiresAt === 'number' && Date.now() < token.expiresAt * 1000 - 30_000) {
-        return token
-      }
+      if (typeof token.expiresAt === 'number' && Date.now() < token.expiresAt * 1000 - 30_000) return token
 
       return await refreshAccessToken(token)
     },
     redirect({ baseUrl, url }) {
-      console.info(`[next-auth] redirect url=${url} baseUrl=${baseUrl}`)
-
-      if (url.startsWith('/')) {
-        return `${baseUrl}${url}`
-      }
-
-      if (new URL(url).origin === baseUrl) {
-        return url
-      }
+      if (url.startsWith('/')) return `${baseUrl}${url}`
+      if (new URL(url).origin === baseUrl) return url
 
       return baseUrl
     },
     session({ session, token }) {
       session.error = typeof token.error === 'string' ? token.error : undefined
 
-      if (session.user) {
-        session.user.subject = typeof token.sub === 'string' ? token.sub : undefined
-      }
+      if (session.user) session.user.subject = typeof token.sub === 'string' ? token.sub : undefined
 
       return session
-    },
-    signIn({ account, profile }) {
-      console.info(`[next-auth] signIn provider=${account?.provider ?? 'unknown'} subject=${profile?.sub ?? 'unknown'} email=${profile?.email ?? 'unknown'}`)
-
-      return true
-    }
-  },
-  events: {
-    signIn({ account, isNewUser, user }) {
-      console.info(`[next-auth] event=signIn provider=${account?.provider ?? 'unknown'} user=${user.email ?? user.id ?? 'unknown'} isNewUser=${Boolean(isNewUser)}`)
-    },
-    signOut() {
-      console.info('[next-auth] event=signOut')
     }
   },
   providers: [
     Keycloak({
+      authorization: { params: { scope: 'openid profile email' } },
       clientId: keycloakClientId,
       clientSecret: keycloakClientSecret,
-      issuer: normalizedKeycloakIssuer,
-      authorization: {
-        params: {
-          scope: 'openid profile email'
-        }
-      }
+      issuer: normalizedKeycloakIssuer
     })
   ],
   session: {
@@ -100,9 +71,7 @@ export async function getKeycloakAccessTokenFromCookieHeader(cookieHeader: strin
 }
 
 async function readKeycloakAccessToken(request: GetTokenRequest): Promise<null | string> {
-  if (!authSecret) {
-    return null
-  }
+  if (!authSecret) return null
 
   const token = await getToken({ req: request, secret: authSecret, secureCookie })
 
@@ -110,40 +79,30 @@ async function readKeycloakAccessToken(request: GetTokenRequest): Promise<null |
 }
 
 function parseCookieHeader(cookieHeader: string): Record<string, string> {
-  return cookieHeader
-    .split(';')
-    .map(part => part.trim())
-    .filter(Boolean)
-    .reduce<Record<string, string>>((cookies, part) => {
-      const separatorIndex = part.indexOf('=')
+  return cookieHeader.split(';').map(part => part.trim()).filter(Boolean).reduce<Record<string, string>>((cookies, part) => {
+    const separatorIndex = part.indexOf('=')
 
-      if (separatorIndex <= 0) {
-        return cookies
-      }
+    if (separatorIndex <= 0) return cookies
 
-      const name = part.slice(0, separatorIndex).trim()
-      const rawValue = part.slice(separatorIndex + 1).trim()
+    const name = part.slice(0, separatorIndex).trim()
+    const rawValue = part.slice(separatorIndex + 1).trim()
 
-      if (!name) {
-        return cookies
-      }
+    if (!name) return cookies
 
-      try {
-        cookies[name] = decodeURIComponent(rawValue)
-      } catch {
-        cookies[name] = rawValue
-      }
+    try {
+      cookies[name] = decodeURIComponent(rawValue)
+    } catch {
+      cookies[name] = rawValue
+    }
 
-      return cookies
-    }, {})
+    return cookies
+  }, {})
 }
 
 async function refreshAccessToken(token: JWT): Promise<JWT> {
   const refreshToken = typeof token.refreshToken === 'string' ? token.refreshToken : null
 
-  if (!refreshToken) {
-    return { ...token, error: 'RefreshAccessTokenError' }
-  }
+  if (!refreshToken) return { ...token, error: 'RefreshAccessTokenError' }
 
   try {
     const response = await fetch(`${normalizedKeycloakIssuer}/protocol/openid-connect/token`, {
@@ -165,7 +124,6 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
     }
 
     if (!response.ok || !refreshed.access_token) {
-      console.warn(`[next-auth] refreshAccessToken failed status=${response.status}`)
       return { ...token, error: 'RefreshAccessTokenError' }
     }
 
@@ -178,7 +136,6 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
       refreshToken: refreshed.refresh_token ?? refreshToken
     }
   } catch (error) {
-    console.warn(`[next-auth] refreshAccessToken threw error=${error instanceof Error ? error.message : 'unknown'}`)
     return { ...token, error: 'RefreshAccessTokenError' }
   }
 }

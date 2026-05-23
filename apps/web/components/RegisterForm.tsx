@@ -23,8 +23,6 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
           <BrandMark className="justify-center text-2xl md:text-3xl" />
 
           <h1 className="mt-10 text-4xl font-bold text-white md:text-[2.4rem]">Create account</h1>
-
-          <p className="mt-3 text-lg text-muted-foreground">Create your account in Keycloak</p>
         </div>
 
         <div className="space-y-6">
@@ -44,7 +42,7 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
             variant="glow"
           >
             <UserRoundPlus className="size-5" />
-            Continue to registration
+            Sign up
           </Button>
 
           <Button
