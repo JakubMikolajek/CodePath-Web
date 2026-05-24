@@ -11,7 +11,7 @@ interface RootLayoutProps {
 
 export const metadata: Metadata = {
   description: 'Code intelligence cockpit for repositories, APIs, docs and dependency graphs.',
-  title: 'CodePath'
+  title: 'Nurt Cloud'
 }
 
 export default function RootLayout({ children }: Readonly<RootLayoutProps>) {

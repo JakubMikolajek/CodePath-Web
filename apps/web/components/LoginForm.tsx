@@ -31,7 +31,7 @@ export default function LoginForm({ handleShowRegisterForm }: LoginFormProps) {
               <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" />
 
               <p className="leading-6 text-white/86">
-                Authentication is handled through OpenID Connect. CodePath does not collect your password here.
+                Authentication is handled through OpenID Connect. Nurt Cloud does not collect your password here.
               </p>
             </div>
           </div>

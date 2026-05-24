@@ -1,4 +1,4 @@
-# CodePath
+# Nurt Cloud
 
 AI-powered code intelligence platform for:
 
@@ -7,7 +7,7 @@ AI-powered code intelligence platform for:
 - automatic documentation generation,
 - dependency-aware code retrieval.
 
-CodePath is a thesis-driven engineering project focused on automatic code
+Nurt Cloud is a thesis-driven engineering project focused on automatic code
 documentation generation using language models and dependency analysis. The
 system turns source repositories into a structured knowledge base that can be
 searched, documented, visualized and queried through natural language.
@@ -18,7 +18,7 @@ This repository contains the user-facing Web/API layer:
 - `apps/api` - NestJS application API and control plane,
 - `packages/*` - shared UI, TypeScript configuration and Web-owned contracts.
 
-The wider CodePath platform also uses separate orchestration, ingestion, AI and
+The wider Nurt Cloud platform also uses separate orchestration, ingestion, AI and
 infrastructure runtimes. Their boundaries are described here, but their internal
 implementation details are intentionally kept out of this repository.
 
@@ -26,7 +26,7 @@ implementation details are intentionally kept out of this repository.
 
 Modern codebases change faster than their documentation. New developers often
 need days or weeks to understand project structure, business logic and hidden
-dependencies. CodePath explores whether language models, embeddings and
+dependencies. Nurt Cloud explores whether language models, embeddings and
 structure-aware repository analysis can reduce that onboarding cost.
 
 The thesis topic behind the project is:
@@ -97,7 +97,7 @@ For the full architecture, see [architecture.md](./architecture.md).
 ## Why Structure-Aware Analysis Matters
 
 Many AI code tools treat repositories as plain text and split files into generic
-chunks. CodePath is designed around a stronger pipeline:
+chunks. Nurt Cloud is designed around a stronger pipeline:
 
 ```text
 Raw source code
@@ -119,7 +119,7 @@ dependency relationships.
 
 ## Engineering Challenges
 
-CodePath is not just an LLM wrapper. The hard parts are mostly systems and
+Nurt Cloud is not just an LLM wrapper. The hard parts are mostly systems and
 retrieval problems:
 
 - repository-scale context windows,

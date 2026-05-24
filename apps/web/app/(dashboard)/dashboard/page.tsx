@@ -5,10 +5,10 @@ import { MetricCard } from '@/components/MetricCard'
 import { PageHeader } from '@/components/PageHeader'
 
 const recentActivity = [
-  { icon: GitPullRequestArrow, meta: 'in CodePath-Web', time: '2m ago', title: 'Updated authentication flow', tone: 'from-pink-500 to-amber-400' },
+  { icon: GitPullRequestArrow, meta: 'in Nurt Cloud', time: '2m ago', title: 'Updated authentication flow', tone: 'from-pink-500 to-amber-400' },
   { icon: Braces, meta: '/api/v1/users/me', time: '10m ago', title: 'Added new API endpoint', tone: 'from-blue-500 to-cyan-300' },
-  { icon: FolderGit2, meta: 'in CodePath-AI', time: '1h ago', title: 'Updated documentation', tone: 'from-amber-500 to-yellow-300' },
-  { icon: Sparkles, meta: 'in CodePath-Desktop', time: '3h ago', title: 'Fixed issue with session', tone: 'from-emerald-500 to-lime-300' }
+  { icon: FolderGit2, meta: 'in Nurt Cloud AI', time: '1h ago', title: 'Updated documentation', tone: 'from-amber-500 to-yellow-300' },
+  { icon: Sparkles, meta: 'in Nurt Studio', time: '3h ago', title: 'Fixed issue with session', tone: 'from-emerald-500 to-lime-300' }
 ]
 
 const sessions = [
