@@ -27,9 +27,7 @@ export default function Page() {
   const loading = useAppSelector(state => state.graphs.loading)
 
   useEffect(() => {
-    if (!Number.isFinite(repoId)) {
-      return
-    }
+    if (!Number.isFinite(repoId)) return
 
     void dispatch(getGraphs(repoId))
   }, [repoId])

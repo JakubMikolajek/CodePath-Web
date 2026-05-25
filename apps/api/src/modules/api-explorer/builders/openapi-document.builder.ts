@@ -31,10 +31,7 @@ const SUPPORTED_OPENAPI_METHODS: RepoOpenApiOperationMethod[] = [
 ]
 
 export class OpenApiDocumentBuilder {
-  buildStaticSpec(
-    interactiveApi: RepoInteractiveApi,
-    schemaRegistry: Record<string, RepoOpenApiSchema>
-  ): RepoOpenApiDocument {
+  buildStaticSpec(interactiveApi: RepoInteractiveApi,schemaRegistry: Record<string, RepoOpenApiSchema>): RepoOpenApiDocument {
     const paths: RepoOpenApiDocument['paths'] = {}
 
     for (const endpoint of interactiveApi.endpoints) {
@@ -42,11 +39,10 @@ export class OpenApiDocumentBuilder {
       const openApiMethod = METHOD_TO_OPENAPI[endpoint.method]
       const nextOperation = this.toOpenApiOperation(endpoint, openApiPath, schemaRegistry)
 
-      if (!paths[openApiPath]) {
-        paths[openApiPath] = {}
-      }
+      if (!paths[openApiPath]) paths[openApiPath] = {}
 
       const existing = paths[openApiPath][openApiMethod]
+      
       if (!existing) {
         paths[openApiPath][openApiMethod] = nextOperation
         continue
@@ -59,13 +55,7 @@ export class OpenApiDocumentBuilder {
       }
     }
 
-    const tags = Array.from(
-      new Set(
-        interactiveApi.endpoints.map(endpoint => endpoint.moduleName || endpoint.framework)
-      )
-    )
-      .sort((a, b) => a.localeCompare(b))
-      .map(name => ({ name }))
+    const tags = Array.from(new Set(interactiveApi.endpoints.map(endpoint => endpoint.moduleName || endpoint.framework))).sort((a, b) => a.localeCompare(b)).map(name => ({ name }))
 
     const staticOperationCount = this.countOpenApiOperations(paths)
     const staticOperationsWithCodeSource = this.countOperationsWithCodeSource(paths)
@@ -73,11 +63,7 @@ export class OpenApiDocumentBuilder {
     const staticModuleTagCount = tags.length
 
     return {
-      components: Object.keys(schemaRegistry).length > 0
-        ? {
-          schemas: schemaRegistry
-        }
-        : undefined,
+      components: Object.keys(schemaRegistry).length > 0 ? { schemas: schemaRegistry } : undefined,
       info: {
         description: `Generated from repository segments for repo ${interactiveApi.metadata.repoId}`,
         title: `${interactiveApi.metadata.repoName} Interactive API`,
@@ -100,11 +86,7 @@ export class OpenApiDocumentBuilder {
     }
   }
 
-  mergeRuntimeOpenApiWithStatic(
-    runtimeSpec: RepoOpenApiDocument,
-    staticSpec: RepoOpenApiDocument,
-    runtimeResolvedUrl?: string
-  ): RepoOpenApiDocument {
+  mergeRuntimeOpenApiWithStatic(runtimeSpec: RepoOpenApiDocument, staticSpec: RepoOpenApiDocument, runtimeResolvedUrl?: string): RepoOpenApiDocument {
     const mergedPaths: RepoOpenApiDocument['paths'] = {}
     const runtimePaths = runtimeSpec.paths ?? {}
     const staticPaths = staticSpec.paths ?? {}
@@ -114,11 +96,10 @@ export class OpenApiDocumentBuilder {
 
       for (const [rawMethod, runtimeOperation] of Object.entries(runtimeOperations ?? {})) {
         const method = rawMethod as RepoOpenApiOperationMethod
-        if (!runtimeOperation) {
-          continue
-        }
+        if (!runtimeOperation) continue
 
         const staticOperation = this.findStaticOperationForRuntimePath(staticPaths, runtimePath, method)
+        
         if (!staticOperation) {
           mergedOperations[method] = runtimeOperation
           continue
@@ -142,33 +123,23 @@ export class OpenApiDocumentBuilder {
     for (const [staticPath, staticOperations] of Object.entries(staticPaths)) {
       for (const [rawMethod, staticOperation] of Object.entries(staticOperations ?? {})) {
         const method = rawMethod as RepoOpenApiOperationMethod
-        if (!staticOperation) {
-          continue
-        }
+        
+        if (!staticOperation) continue
 
         const runtimeMatch = this.findRuntimePathForStatic(staticPath, method, runtimePaths)
-        if (runtimeMatch) {
-          continue
-        }
+        
+        if (runtimeMatch) continue
+        if (!mergedPaths[staticPath]) mergedPaths[staticPath] = {}
 
-        if (!mergedPaths[staticPath]) {
-          mergedPaths[staticPath] = {}
-        }
         mergedPaths[staticPath][method] = staticOperation
       }
     }
 
     const runtimeSchemas = runtimeSpec.components?.schemas ?? {}
     const staticSchemas = staticSpec.components?.schemas ?? {}
-    const mergedSchemas = {
-      ...staticSchemas,
-      ...runtimeSchemas
-    }
+    const mergedSchemas = { ...staticSchemas, ...runtimeSchemas }
 
-    const mergedTags = this.mergeTagValues(
-      runtimeSpec.tags?.map(tag => tag.name),
-      staticSpec.tags?.map(tag => tag.name)
-    ).map(name => ({ name }))
+    const mergedTags = this.mergeTagValues(runtimeSpec.tags?.map(tag => tag.name), staticSpec.tags?.map(tag => tag.name)).map(name => ({ name }))
 
     const staticOperationCount = this.countOpenApiOperations(staticPaths)
     const runtimeOperationCount = this.countOpenApiOperations(runtimePaths)
@@ -176,16 +147,10 @@ export class OpenApiDocumentBuilder {
     const operationsWithCodeSource = this.countOperationsWithCodeSource(mergedPaths)
     const moduleTagCount = mergedTags.length > 0 ? mergedTags.length : runtimeSpec.tags?.length ?? 0
     const schemaComponentCount = Object.keys(mergedSchemas).length
-    const sourceMode = runtimeOperationCount > 0
-      ? (staticOperationCount > 0 ? 'hybrid' : 'runtime')
-      : 'static'
+    const sourceMode = runtimeOperationCount > 0 ? (staticOperationCount > 0 ? 'hybrid' : 'runtime') : 'static'
 
     return {
-      components: Object.keys(mergedSchemas).length > 0
-        ? {
-          schemas: mergedSchemas
-        }
-        : undefined,
+      components: Object.keys(mergedSchemas).length > 0 ? { schemas: mergedSchemas } : undefined,
       info: runtimeSpec.info?.title ? runtimeSpec.info : staticSpec.info,
       openapi: '3.1.0',
       paths: mergedPaths,
@@ -206,51 +171,35 @@ export class OpenApiDocumentBuilder {
   }
 
   normalizeRuntimeOpenApiDocument(input: unknown): null | RepoOpenApiDocument {
-    if (!input || typeof input !== 'object') {
-      return null
-    }
+    if (!input || typeof input !== 'object') return null
 
     const raw = input as Record<string, unknown>
     const rawPaths = raw.paths
-    const infoRaw = raw.info && typeof raw.info === 'object'
-      ? raw.info as Record<string, unknown>
-      : {}
+    const infoRaw = raw.info && typeof raw.info === 'object' ? raw.info as Record<string, unknown> : {}
 
-    if (!rawPaths || typeof rawPaths !== 'object' || Array.isArray(rawPaths)) {
-      return null
-    }
+    if (!rawPaths || typeof rawPaths !== 'object' || Array.isArray(rawPaths)) return null
 
     const rawOpenApi = typeof raw.openapi === 'string' ? raw.openapi : ''
     const rawSwagger = typeof raw.swagger === 'string' ? raw.swagger : ''
-    if (!rawOpenApi.startsWith('3.') && !rawSwagger.startsWith('2.')) {
-      return null
-    }
+    
+    if (!rawOpenApi.startsWith('3.') && !rawSwagger.startsWith('2.')) return null
 
     const runtimeTags = Array.isArray(raw.tags)
       ? raw.tags
         .map(item => {
-          if (!item || typeof item !== 'object') {
-            return null
-          }
+          if (!item || typeof item !== 'object') return null
+          
           const name = (item as Record<string, unknown>).name
           return typeof name === 'string' && name.trim() ? { name: name.trim() } : null
         })
         .filter((value): value is { name: string } => value !== null)
       : undefined
 
-    const componentsRaw = raw.components && typeof raw.components === 'object'
-      ? raw.components as Record<string, unknown>
-      : undefined
-    const schemasRaw = componentsRaw?.schemas && typeof componentsRaw.schemas === 'object' && !Array.isArray(componentsRaw.schemas)
-      ? componentsRaw.schemas as Record<string, RepoOpenApiSchema>
-      : undefined
+    const componentsRaw = raw.components && typeof raw.components === 'object' ? raw.components as Record<string, unknown> : undefined
+    const schemasRaw = componentsRaw?.schemas && typeof componentsRaw.schemas === 'object' && !Array.isArray(componentsRaw.schemas) ? componentsRaw.schemas as Record<string, RepoOpenApiSchema> : undefined
 
     return {
-      components: schemasRaw
-        ? {
-          schemas: schemasRaw
-        }
-        : undefined,
+      components: schemasRaw ? { schemas: schemasRaw } : undefined,
       info: {
         description: typeof infoRaw.description === 'string' ? infoRaw.description : '',
         title: typeof infoRaw.title === 'string' ? infoRaw.title : 'Runtime OpenAPI',

@@ -35,9 +35,7 @@ export default function ChatPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
 
-    if (!inputValue.trim() || !hasValidRouteParams) {
-      return
-    }
+    if (!inputValue.trim() || !hasValidRouteParams) return
 
     setIsLoading(true)
 
@@ -72,9 +70,7 @@ export default function ChatPage() {
   }
 
   useEffect(() => {
-    if (!hasValidRouteParams) {
-      return
-    }
+    if (!hasValidRouteParams) return
 
     void dispatch(getSessionDetails({
       repoId,

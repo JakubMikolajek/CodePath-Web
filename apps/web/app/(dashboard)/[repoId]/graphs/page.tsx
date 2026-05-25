@@ -48,42 +48,29 @@ export default function Page() {
   const [selectedRelationTypes, setSelectedRelationTypes] = useState<RepoGraphEdgeType[]>(EDGE_TYPE_OPTIONS)
 
   useEffect(() => {
-    if (!Number.isFinite(repoId)) {
-      return
-    }
+    if (!Number.isFinite(repoId)) return
 
     void dispatch(getInteractiveGraph({ includeSymbols, repoId }))
     void dispatch(getGraphs(repoId))
   }, [includeSymbols, repoId])
 
   useEffect(() => {
-    if (!interactiveGraph) {
-      return
-    }
-
-    if (!focusedNodeId) {
-      return
-    }
+    if (!interactiveGraph) return
+    if (!focusedNodeId) return
 
     const exists = interactiveGraph.nodes.some(node => node.id === focusedNodeId)
 
-    if (!exists) {
-      setFocusedNodeId(null)
-    }
+    if (!exists) setFocusedNodeId(null)
   }, [focusedNodeId, interactiveGraph])
 
   const moduleNodes = useMemo(() => {
-    if (!interactiveGraph) {
-      return []
-    }
+    if (!interactiveGraph) return []
 
     return interactiveGraph.nodes.filter(node => node.type === 'module')
   }, [interactiveGraph])
 
   const applyFilters = () => {
-    if (!Number.isFinite(repoId)) {
-      return
-    }
+    if (!Number.isFinite(repoId)) return
 
     const useAllRelationTypes = selectedRelationTypes.length === EDGE_TYPE_OPTIONS.length
 
@@ -103,75 +90,52 @@ export default function Page() {
     setFocusedNodeId(null)
     setSelectedRelationTypes(EDGE_TYPE_OPTIONS)
 
-    if (Number.isFinite(repoId)) {
-      void dispatch(getInteractiveGraph({ includeSymbols, repoId }))
-    }
+    if (Number.isFinite(repoId)) void dispatch(getInteractiveGraph({ includeSymbols, repoId }))
   }
 
   const toggleRelationType = (relationType: RepoGraphEdgeType) => {
-    setSelectedRelationTypes(prev => (
-      prev.includes(relationType) ? prev.filter(type => type !== relationType) : [...prev, relationType]
-    ))
+    setSelectedRelationTypes(prev => prev.includes(relationType) ? prev.filter(type => type !== relationType) : [...prev, relationType])
   }
 
   const toggleModuleCollapse = (moduleId: string) => {
-    setCollapsedModuleIds(prev => (
-      prev.includes(moduleId) ? prev.filter(id => id !== moduleId) : [...prev, moduleId]
-    ))
+    setCollapsedModuleIds(prev => prev.includes(moduleId) ? prev.filter(id => id !== moduleId) : [...prev, moduleId])
   }
 
   const availableRelationTypes = interactiveGraph?.metadata.availableEdgeTypes ?? EDGE_TYPE_OPTIONS
 
   const nodeById = useMemo(() => {
-    if (!interactiveGraph) {
-      return new Map<string, NonNullable<typeof interactiveGraph>['nodes'][number]>()
-    }
+    if (!interactiveGraph) return new Map<string, NonNullable<typeof interactiveGraph>['nodes'][number]>()
 
     return new Map(interactiveGraph.nodes.map(node => [node.id, node]))
   }, [interactiveGraph])
 
   const focusedNode = useMemo(() => {
-    if (!interactiveGraph || !focusedNodeId) {
-      return null
-    }
+    if (!interactiveGraph || !focusedNodeId) return null
 
     return interactiveGraph.nodes.find(node => node.id === focusedNodeId) ?? null
   }, [focusedNodeId, interactiveGraph])
 
   const focusedFilePath = useMemo(() => {
-    if (!focusedNode) {
-      return null
-    }
-
-    if (focusedNode.type === 'file') {
-      return normalizeFilePath(focusedNode.metadata?.filePath ?? focusedNode.label)
-    }
-
-    if (focusedNode.type === 'symbol' && focusedNode.metadata?.filePath) {
-      return normalizeFilePath(focusedNode.metadata.filePath)
-    }
+    if (!focusedNode) return null
+    if (focusedNode.type === 'file') return normalizeFilePath(focusedNode.metadata?.filePath ?? focusedNode.label)
+    if (focusedNode.type === 'symbol' && focusedNode.metadata?.filePath) return normalizeFilePath(focusedNode.metadata.filePath)
 
     return null
   }, [focusedNode])
 
   const focusedPath = useMemo(() => {
-    if (!interactiveGraph || !focusedNode) {
-      return [] as string[]
-    }
+    if (!interactiveGraph || !focusedNode) return [] as string[]
 
     const path: string[] = [interactiveGraph.metadata.repoName]
     const moduleNode = focusedNode.metadata?.moduleId ? nodeById.get(focusedNode.metadata.moduleId) : null
 
-    if (moduleNode?.label) {
-      path.push(moduleNode.label)
-    }
+    if (moduleNode?.label) path.push(moduleNode.label)
 
     if (focusedNode.type === 'file') {
       path.push(focusedNode.label)
     } else if (focusedNode.type === 'symbol') {
-      if (focusedFilePath) {
-        path.push(focusedFilePath)
-      }
+      if (focusedFilePath) path.push(focusedFilePath)
+
       path.push(focusedNode.label)
     } else if (focusedNode.type === 'external_package') {
       path.push(focusedNode.label)
@@ -193,17 +157,13 @@ export default function Page() {
   }, [legacyGraphs])
 
   const focusedLegacyGraphId = useMemo(() => {
-    if (!focusedFilePath) {
-      return null
-    }
+    if (!focusedFilePath) return null
 
     return legacyGraphByPath.get(focusedFilePath)?.id ?? null
   }, [focusedFilePath, legacyGraphByPath])
 
   const scopeToFocusedNodeNow = () => {
-    if (!Number.isFinite(repoId) || !focusedNodeId) {
-      return
-    }
+    if (!Number.isFinite(repoId) || !focusedNodeId) return
 
     setScopeToFocus(true)
 

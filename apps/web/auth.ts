@@ -123,9 +123,7 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
       refresh_token?: string
     }
 
-    if (!response.ok || !refreshed.access_token) {
-      return { ...token, error: 'RefreshAccessTokenError' }
-    }
+    if (!response.ok || !refreshed.access_token) return { ...token, error: 'RefreshAccessTokenError' }
 
     return {
       ...token,
