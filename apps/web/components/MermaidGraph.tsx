@@ -17,14 +17,10 @@ mermaid.initialize({
 })
 
 export default function MermaidGraph({ graph }: MermaidGraphProps) {
-  if (graph === '') {
-    return <p>Loading</p>
-  }
+  if (graph === '') return <p>Loading</p>
 
   useEffect(() => {
-    if (graph !== '') {
-      mermaid.contentLoaded()
-    }
+    if (graph !== '') mermaid.contentLoaded()
   }, [graph])
 
   return (

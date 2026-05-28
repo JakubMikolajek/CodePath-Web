@@ -8,18 +8,11 @@ export function getApiErrorMessage(error: unknown, fallbackMessage: string): str
   if (axios.isAxiosError<ApiErrorResponse>(error)) {
     const apiMessage = error.response?.data?.message
 
-    if (Array.isArray(apiMessage)) {
-      return apiMessage.join(', ')
-    }
-
-    if (typeof apiMessage === 'string' && apiMessage.trim().length > 0) {
-      return apiMessage
-    }
+    if (Array.isArray(apiMessage)) return apiMessage.join(', ')
+    if (typeof apiMessage === 'string' && apiMessage.trim().length > 0) return apiMessage
   }
 
-  if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message
-  }
+  if (error instanceof Error && error.message.trim().length > 0) return error.message
 
   return fallbackMessage
 }
@@ -29,9 +22,7 @@ export function isUnauthorizedError(error: unknown): boolean {
 }
 
 export function toError(error: unknown, fallbackMessage: string): Error {
-  if (error instanceof Error) {
-    return error
-  }
+  if (error instanceof Error) return error
 
   return new Error(getApiErrorMessage(error, fallbackMessage))
 }

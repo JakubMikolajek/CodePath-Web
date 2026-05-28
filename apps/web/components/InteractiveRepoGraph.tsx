@@ -61,9 +61,7 @@ function getDegreeByNode(edges: RepoGraphEdge[]) {
 }
 
 function getOverviewNodes(nodes: RepoGraphNode[], edges: RepoGraphEdge[], focusedNodeId: Nullable<string>) {
-  if (nodes.length <= OVERVIEW_NODE_LIMIT || focusedNodeId) {
-    return nodes
-  }
+  if (nodes.length <= OVERVIEW_NODE_LIMIT || focusedNodeId) return nodes
 
   const degreeByNode = getDegreeByNode(edges)
 
@@ -80,9 +78,7 @@ function getOverviewNodes(nodes: RepoGraphNode[], edges: RepoGraphEdge[], focuse
       const scoreA = (degreeByNode.get(a.id) ?? 0) * 9 + typeWeight[a.type]
       const scoreB = (degreeByNode.get(b.id) ?? 0) * 9 + typeWeight[b.type]
 
-      if (scoreA !== scoreB) {
-        return scoreB - scoreA
-      }
+      if (scoreA !== scoreB) return scoreB - scoreA
 
       return a.label.localeCompare(b.label)
     }).slice(0, OVERVIEW_NODE_LIMIT).map(node => node.id)
@@ -146,9 +142,7 @@ function buildLayeredLayout(visibleNodes: RepoGraphNode[]): PositionedGraph {
 }
 
 function buildCoreRingsLayout(visibleNodes: RepoGraphNode[], visibleEdges: RepoGraphEdge[]): PositionedGraph {
-  if (visibleNodes.length === 0) {
-    return { height: 860, positions: new Map(), width: 1480 }
-  }
+  if (visibleNodes.length === 0) return { height: 860, positions: new Map(), width: 1480 }
 
   const nodeById = new Map(visibleNodes.map(node => [node.id, node]))
   const adjacency = new Map<string, Set<string>>()
@@ -156,9 +150,7 @@ function buildCoreRingsLayout(visibleNodes: RepoGraphNode[], visibleEdges: RepoG
   visibleNodes.forEach(node => adjacency.set(node.id, new Set()))
 
   for (const edge of visibleEdges) {
-    if (!adjacency.has(edge.source) || !adjacency.has(edge.target)) {
-      continue
-    }
+    if (!adjacency.has(edge.source) || !adjacency.has(edge.target)) continue
 
     adjacency.get(edge.source)?.add(edge.target)
     adjacency.get(edge.target)?.add(edge.source)
@@ -181,9 +173,7 @@ function buildCoreRingsLayout(visibleNodes: RepoGraphNode[], visibleEdges: RepoG
   const sortedByScore = [...visibleNodes].sort((a, b) => {
     const scoreDelta = nodeScore(b) - nodeScore(a)
 
-    if (scoreDelta !== 0) {
-      return scoreDelta
-    }
+    if (scoreDelta !== 0) return scoreDelta
 
     return a.label.localeCompare(b.label)
   })
@@ -191,9 +181,7 @@ function buildCoreRingsLayout(visibleNodes: RepoGraphNode[], visibleEdges: RepoG
   const coreIds = new Set(sortedByScore.slice(0, coreCount).map(node => node.id))
   const repoNode = visibleNodes.find(node => node.type === 'repo')
 
-  if (repoNode) {
-    coreIds.add(repoNode.id)
-  }
+  if (repoNode) coreIds.add(repoNode.id)
 
   while (coreIds.size > coreCount) {
     const removable = [...coreIds]
@@ -202,16 +190,12 @@ function buildCoreRingsLayout(visibleNodes: RepoGraphNode[], visibleEdges: RepoG
       .sort((a, b) => {
         const scoreDelta = nodeScore(a) - nodeScore(b)
 
-        if (scoreDelta !== 0) {
-          return scoreDelta
-        }
+        if (scoreDelta !== 0) return scoreDelta
 
         return a.label.localeCompare(b.label)
       })[0]
 
-    if (!removable) {
-      break
-    }
+    if (!removable) break
 
     coreIds.delete(removable.id)
   }
@@ -226,21 +210,15 @@ function buildCoreRingsLayout(visibleNodes: RepoGraphNode[], visibleEdges: RepoG
   while (bfsQueue.length > 0) {
     const currentId = bfsQueue.shift()
 
-    if (!currentId) {
-      break
-    }
+    if (!currentId) break
 
     const currentDepth = depthByNode.get(currentId) ?? 0
     const neighbors = adjacency.get(currentId)
 
-    if (!neighbors) {
-      continue
-    }
+    if (!neighbors) continue
 
     for (const neighborId of neighbors) {
-      if (depthByNode.has(neighborId)) {
-        continue
-      }
+      if (depthByNode.has(neighborId)) continue
 
       depthByNode.set(neighborId, currentDepth + 1)
       bfsQueue.push(neighborId)
@@ -259,9 +237,7 @@ function buildCoreRingsLayout(visibleNodes: RepoGraphNode[], visibleEdges: RepoG
   for (const node of visibleNodes) {
     const depth = depthByNode.get(node.id) ?? fallbackDepth
 
-    if (!rings.has(depth)) {
-      rings.set(depth, [])
-    }
+    if (!rings.has(depth)) rings.set(depth, [])
 
     rings.get(depth)?.push(node)
   }
@@ -273,9 +249,7 @@ function buildCoreRingsLayout(visibleNodes: RepoGraphNode[], visibleEdges: RepoG
     rings.set(depth, [...nodes].sort((a, b) => {
       const typeDelta = (typeOrder.get(a.type) ?? 99) - (typeOrder.get(b.type) ?? 99)
 
-      if (typeDelta !== 0) {
-        return typeDelta
-      }
+      if (typeDelta !== 0) return typeDelta
 
       return a.label.localeCompare(b.label)
     }))
@@ -306,9 +280,7 @@ function buildCoreRingsLayout(visibleNodes: RepoGraphNode[], visibleEdges: RepoG
   sortedRingDepths.filter(depth => depth > 0).forEach(depth => {
     const nodes = rings.get(depth) ?? []
 
-    if (nodes.length === 0) {
-      return
-    }
+    if (nodes.length === 0) return
 
     const radius = firstRingRadius + (depth - 1) * ringGap
 
@@ -362,63 +334,37 @@ export default function InteractiveRepoGraph({ collapsedModuleIds, focusedNodeId
     for (const node of graph.nodes) {
       const moduleId = node.metadata?.moduleId
 
-      if (!moduleId || !collapsed.has(moduleId)) {
-        continue
-      }
-
-      if ((node.type === 'file' || node.type === 'symbol') && node.id !== focusedNodeId) {
-        ids.add(node.id)
-      }
+      if (!moduleId || !collapsed.has(moduleId)) continue
+      if ((node.type === 'file' || node.type === 'symbol') && node.id !== focusedNodeId) ids.add(node.id)
     }
 
     return ids
   }, [collapsedModuleIds, focusedNodeId, graph.nodes])
 
-  const rawVisibleNodes = useMemo(() => {
-    return graph.nodes.filter(node => !hiddenNodeIds.has(node.id))
-  }, [graph.nodes, hiddenNodeIds])
-
+  const rawVisibleNodes = useMemo(() => graph.nodes.filter(node => !hiddenNodeIds.has(node.id)), [graph.nodes, hiddenNodeIds])
   const rawVisibleNodeIdSet = useMemo(() => new Set(rawVisibleNodes.map(node => node.id)), [rawVisibleNodes])
-
-  const rawVisibleEdges = useMemo(() => {
-    return graph.edges.filter(edge => rawVisibleNodeIdSet.has(edge.source) && rawVisibleNodeIdSet.has(edge.target))
-  }, [graph.edges, rawVisibleNodeIdSet])
-
-  const visibleNodes = useMemo(() => {
-    return getOverviewNodes(rawVisibleNodes, rawVisibleEdges, focusedNodeId)
-  }, [focusedNodeId, rawVisibleEdges, rawVisibleNodes])
+  const rawVisibleEdges = useMemo(() => graph.edges.filter(edge => rawVisibleNodeIdSet.has(edge.source) && rawVisibleNodeIdSet.has(edge.target)), [graph.edges, rawVisibleNodeIdSet])
+  const visibleNodes = useMemo(() => getOverviewNodes(rawVisibleNodes, rawVisibleEdges, focusedNodeId), [focusedNodeId, rawVisibleEdges, rawVisibleNodes])
 
   const overviewHiddenCount = rawVisibleNodes.length - visibleNodes.length
 
   const visibleNodeIdSet = useMemo(() => new Set(visibleNodes.map(node => node.id)), [visibleNodes])
-
-  const visibleEdges = useMemo(() => {
-    return rawVisibleEdges.filter(edge => visibleNodeIdSet.has(edge.source) && visibleNodeIdSet.has(edge.target))
-  }, [rawVisibleEdges, visibleNodeIdSet])
+  const visibleEdges = useMemo(() => rawVisibleEdges.filter(edge => visibleNodeIdSet.has(edge.source) && visibleNodeIdSet.has(edge.target)), [rawVisibleEdges, visibleNodeIdSet])
 
   const positioned = useMemo(() => {
-    if (layoutMode === LayoutMode.CORE_RINGS) {
-      return buildCoreRingsLayout(visibleNodes, visibleEdges)
-    }
+    if (layoutMode === LayoutMode.CORE_RINGS) return buildCoreRingsLayout(visibleNodes, visibleEdges)
 
     return buildLayeredLayout(visibleNodes)
   }, [layoutMode, visibleEdges, visibleNodes])
 
   const focusedNeighborIds = useMemo(() => {
-    if (!focusedNodeId) {
-      return new Set<string>()
-    }
+    if (!focusedNodeId) return new Set<string>()
 
     const neighbors = new Set<string>()
 
     for (const edge of visibleEdges) {
-      if (edge.source === focusedNodeId) {
-        neighbors.add(edge.target)
-      }
-
-      if (edge.target === focusedNodeId) {
-        neighbors.add(edge.source)
-      }
+      if (edge.source === focusedNodeId) neighbors.add(edge.target)
+      if (edge.target === focusedNodeId) neighbors.add(edge.source)
     }
 
     return neighbors
@@ -447,9 +393,7 @@ export default function InteractiveRepoGraph({ collapsedModuleIds, focusedNodeId
   }
 
   const handlePointerMove: PointerEventHandler<HTMLDivElement> = event => {
-    if (!dragStart) {
-      return
-    }
+    if (!dragStart) return
 
     setViewport(prev => ({
       ...prev,
@@ -458,9 +402,7 @@ export default function InteractiveRepoGraph({ collapsedModuleIds, focusedNodeId
     }))
   }
 
-  const handlePointerUp: PointerEventHandler<HTMLDivElement> = () => {
-    setDragStart(null)
-  }
+  const handlePointerUp: PointerEventHandler<HTMLDivElement> = () => setDragStart(null)
 
   const getNodeEmphasis = (nodeId: string) => {
     if (!focusedNodeId) {

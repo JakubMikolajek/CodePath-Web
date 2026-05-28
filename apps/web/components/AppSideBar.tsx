@@ -71,9 +71,7 @@ export default function AppSidebar({ fetchedRepos, me }: AppSideBarProps) {
 
     setShowSyncErrorToast(true)
 
-    const timeout = setTimeout(() => {
-      setShowSyncErrorToast(false)
-    }, 6000)
+    const timeout = setTimeout(() => setShowSyncErrorToast(false), 6000)
 
     return () => clearTimeout(timeout)
   }, [syncError, syncErrorNonce])

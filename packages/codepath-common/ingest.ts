@@ -1,4 +1,5 @@
 export const INGEST_CONTRACT_VERSION_V1 = 'ingest.v1' as const
+export const INGEST_CONTRACT_VERSION_V2 = 'ingest.v2' as const
 
 export enum IngestMessageType {
   JobRequest = 'ingest.job.request',
@@ -39,6 +40,13 @@ export const INGEST_JOB_FAILED_STAGES = [
   'unknown'
 ] as const
 export type IngestJobFailedStageV1 = (typeof INGEST_JOB_FAILED_STAGES)[number]
+export type IngestJobFailedStageV2 = (typeof INGEST_JOB_FAILED_STAGES)[number]
+
+export const INGEST_SEGMENT_CATEGORIES_V2 = ['code', 'config', 'documentation'] as const
+export type IngestSegmentCategoryV2 = (typeof INGEST_SEGMENT_CATEGORIES_V2)[number]
+
+export const INGEST_PARSE_STRATEGIES_V2 = ['tree_sitter', 'text_fallback'] as const
+export type IngestParseStrategyV2 = (typeof INGEST_PARSE_STRATEGIES_V2)[number]
 
 export interface IngestErrorEnvelopeV1 {
   code: IngestErrorCode
@@ -105,8 +113,77 @@ export interface IngestJobFailedPayloadV1 {
   snapshot: IngestSnapshotRefV1
 }
 
+export interface IngestSnapshotRefV2 extends IngestSnapshotRefV1 {}
+
+export interface IngestParseOptionsV2 extends IngestParseOptionsV1 {}
+
+export interface IngestJobRequestPayloadV2 {
+  parseOptions: IngestParseOptionsV2
+  snapshot: IngestSnapshotRefV2
+}
+
+export interface IngestSegmentV2 {
+  astPath?: string[]
+  category: IngestSegmentCategoryV2
+  chunkCount: number
+  chunkIndex: number
+  comment?: string
+  content: string
+  contentSha256: string
+  decorators?: string[]
+  endByte?: number
+  endLine?: number
+  fallbackReason?: string
+  fileExt?: string
+  filePath: string
+  httpMethod?: string
+  jsDoc?: string
+  language?: string
+  nodeType?: string
+  parentSymbolName?: string
+  params?: string[]
+  parseStrategy: IngestParseStrategyV2
+  returnType?: string
+  routePath?: string
+  segmentId: string
+  startByte?: number
+  startLine?: number
+  symbolKind: string
+  symbolName?: string
+}
+
+export interface IngestBatchStatsV2 extends IngestBatchStatsV1 {}
+
+export interface IngestBatchReadyPayloadV2 {
+  batchCount: number
+  batchId: string
+  batchIndex: number
+  isLastBatch: boolean
+  segments: IngestSegmentV2[]
+  snapshot: IngestSnapshotRefV2
+  stats: IngestBatchStatsV2
+}
+
+export interface IngestErrorEnvelopeV2 extends IngestErrorEnvelopeV1 {}
+
+export interface IngestJobFailedPayloadV2 {
+  error: IngestErrorEnvelopeV2
+  stage: IngestJobFailedStageV2
+  snapshot: IngestSnapshotRefV2
+}
+
 interface IngestEnvelopeBaseV1<TType extends IngestMessageType, TPayload> {
   contractVersion: typeof INGEST_CONTRACT_VERSION_V1
+  correlationId: string
+  messageType: TType
+  payload: TPayload
+  producedAt: string
+  producer: IngestProducer
+  repoId: number
+}
+
+interface IngestEnvelopeBaseV2<TType extends IngestMessageType, TPayload> {
+  contractVersion: typeof INGEST_CONTRACT_VERSION_V2
   correlationId: string
   messageType: TType
   payload: TPayload
@@ -121,9 +198,16 @@ export type IngestJobFailedV1 = IngestEnvelopeBaseV1<IngestMessageType.JobFailed
 
 export type IngestMessageV1 = IngestBatchReadyV1 | IngestJobFailedV1 | IngestJobRequestV1
 
+export type IngestJobRequestV2 = IngestEnvelopeBaseV2<IngestMessageType.JobRequest, IngestJobRequestPayloadV2>
+export type IngestBatchReadyV2 = IngestEnvelopeBaseV2<IngestMessageType.BatchReady, IngestBatchReadyPayloadV2>
+export type IngestJobFailedV2 = IngestEnvelopeBaseV2<IngestMessageType.JobFailed, IngestJobFailedPayloadV2>
+
+export type IngestMessageV2 = IngestBatchReadyV2 | IngestJobFailedV2 | IngestJobRequestV2
+
 type JsonSchemaObject = Record<string, unknown>
 
 export const INGEST_MESSAGE_JSON_SCHEMA_ID_V1 = 'codepath.ingest.v1.message' as const
+export const INGEST_MESSAGE_JSON_SCHEMA_ID_V2 = 'codepath.ingest.v2.message' as const
 
 const INGEST_SNAPSHOT_REF_SCHEMA_V1: JsonSchemaObject = {
   additionalProperties: false,
@@ -185,6 +269,7 @@ const INGEST_SEGMENT_SCHEMA_V1: JsonSchemaObject = {
       minLength: 1,
       type: 'string'
     },
+    httpMethod: { type: 'string' },
     jsDoc: { type: 'string' },
     language: { type: 'string' },
     params: {
@@ -200,6 +285,84 @@ const INGEST_SEGMENT_SCHEMA_V1: JsonSchemaObject = {
     symbolName: { type: 'string' }
   },
   required: ['filePath', 'symbolKind', 'content'],
+  type: 'object'
+}
+
+const INGEST_SEGMENT_SCHEMA_V2: JsonSchemaObject = {
+  additionalProperties: false,
+  properties: {
+    astPath: {
+      items: { type: 'string' },
+      type: 'array'
+    },
+    category: {
+      enum: INGEST_SEGMENT_CATEGORIES_V2
+    },
+    chunkCount: {
+      minimum: 1,
+      type: 'integer'
+    },
+    chunkIndex: {
+      minimum: 0,
+      type: 'integer'
+    },
+    content: {
+      minLength: 1,
+      type: 'string'
+    },
+    contentSha256: {
+      minLength: 64,
+      type: 'string'
+    },
+    comment: { type: 'string' },
+    decorators: {
+      items: { type: 'string' },
+      type: 'array'
+    },
+    endByte: { minimum: 0, type: 'integer' },
+    endLine: { minimum: 1, type: 'integer' },
+    fallbackReason: { type: 'string' },
+    fileExt: { type: 'string' },
+    filePath: {
+      minLength: 1,
+      type: 'string'
+    },
+    jsDoc: { type: 'string' },
+    language: { type: 'string' },
+    nodeType: { type: 'string' },
+    parentSymbolName: { type: 'string' },
+    params: {
+      items: { type: 'string' },
+      type: 'array'
+    },
+    parseStrategy: {
+      enum: INGEST_PARSE_STRATEGIES_V2
+    },
+    returnType: { type: 'string' },
+    routePath: { type: 'string' },
+    segmentId: {
+      minLength: 1,
+      type: 'string'
+    },
+    startByte: { minimum: 0, type: 'integer' },
+    startLine: { minimum: 1, type: 'integer' },
+    symbolKind: {
+      minLength: 1,
+      type: 'string'
+    },
+    symbolName: { type: 'string' }
+  },
+  required: [
+    'segmentId',
+    'filePath',
+    'category',
+    'parseStrategy',
+    'symbolKind',
+    'content',
+    'contentSha256',
+    'chunkIndex',
+    'chunkCount'
+  ],
   type: 'object'
 }
 
@@ -256,9 +419,57 @@ const INGEST_MESSAGE_ENVELOPE_BASE_SCHEMA_V1: JsonSchemaObject = {
   type: 'object'
 }
 
+const INGEST_MESSAGE_ENVELOPE_BASE_SCHEMA_V2: JsonSchemaObject = {
+  additionalProperties: false,
+  properties: {
+    contractVersion: {
+      const: INGEST_CONTRACT_VERSION_V2
+    },
+    correlationId: {
+      minLength: 1,
+      type: 'string'
+    },
+    producedAt: {
+      format: 'date-time',
+      type: 'string'
+    },
+    producer: {
+      enum: INGEST_PRODUCERS
+    },
+    repoId: {
+      minimum: 1,
+      type: 'integer'
+    }
+  },
+  required: ['contractVersion', 'repoId', 'correlationId', 'producer', 'producedAt', 'payload', 'messageType'],
+  type: 'object'
+}
+
 const INGEST_JOB_REQUEST_SCHEMA_V1: JsonSchemaObject = {
   allOf: [
     INGEST_MESSAGE_ENVELOPE_BASE_SCHEMA_V1,
+    {
+      properties: {
+        messageType: {
+          const: IngestMessageType.JobRequest
+        },
+        payload: {
+          additionalProperties: false,
+          properties: {
+            parseOptions: INGEST_PARSE_OPTIONS_SCHEMA_V1,
+            snapshot: INGEST_SNAPSHOT_REF_SCHEMA_V1
+          },
+          required: ['snapshot', 'parseOptions'],
+          type: 'object'
+        }
+      }
+    }
+  ]
+}
+
+const INGEST_JOB_REQUEST_SCHEMA_V2: JsonSchemaObject = {
+  allOf: [
+    INGEST_MESSAGE_ENVELOPE_BASE_SCHEMA_V2,
     {
       properties: {
         messageType: {
@@ -326,9 +537,82 @@ const INGEST_BATCH_READY_SCHEMA_V1: JsonSchemaObject = {
   ]
 }
 
+const INGEST_BATCH_READY_SCHEMA_V2: JsonSchemaObject = {
+  allOf: [
+    INGEST_MESSAGE_ENVELOPE_BASE_SCHEMA_V2,
+    {
+      properties: {
+        messageType: {
+          const: IngestMessageType.BatchReady
+        },
+        payload: {
+          additionalProperties: false,
+          properties: {
+            batchCount: {
+              minimum: 1,
+              type: 'integer'
+            },
+            batchId: {
+              minLength: 1,
+              type: 'string'
+            },
+            batchIndex: {
+              minimum: 0,
+              type: 'integer'
+            },
+            isLastBatch: { type: 'boolean' },
+            segments: {
+              items: INGEST_SEGMENT_SCHEMA_V2,
+              type: 'array'
+            },
+            snapshot: INGEST_SNAPSHOT_REF_SCHEMA_V1,
+            stats: {
+              additionalProperties: false,
+              properties: {
+                filesDiscovered: { minimum: 0, type: 'number' },
+                filesParsed: { minimum: 0, type: 'number' },
+                segmentsInBatch: { minimum: 0, type: 'number' }
+              },
+              required: ['filesDiscovered', 'filesParsed', 'segmentsInBatch'],
+              type: 'object'
+            }
+          },
+          required: ['batchId', 'batchIndex', 'batchCount', 'isLastBatch', 'snapshot', 'stats', 'segments'],
+          type: 'object'
+        }
+      }
+    }
+  ]
+}
+
 const INGEST_JOB_FAILED_SCHEMA_V1: JsonSchemaObject = {
   allOf: [
     INGEST_MESSAGE_ENVELOPE_BASE_SCHEMA_V1,
+    {
+      properties: {
+        messageType: {
+          const: IngestMessageType.JobFailed
+        },
+        payload: {
+          additionalProperties: false,
+          properties: {
+            error: INGEST_ERROR_ENVELOPE_SCHEMA_V1,
+            snapshot: INGEST_SNAPSHOT_REF_SCHEMA_V1,
+            stage: {
+              enum: INGEST_JOB_FAILED_STAGES
+            }
+          },
+          required: ['stage', 'snapshot', 'error'],
+          type: 'object'
+        }
+      }
+    }
+  ]
+}
+
+const INGEST_JOB_FAILED_SCHEMA_V2: JsonSchemaObject = {
+  allOf: [
+    INGEST_MESSAGE_ENVELOPE_BASE_SCHEMA_V2,
     {
       properties: {
         messageType: {
@@ -361,8 +645,22 @@ export const INGEST_MESSAGE_JSON_SCHEMA_V1: JsonSchemaObject = {
   ]
 }
 
+export const INGEST_MESSAGE_JSON_SCHEMA_V2: JsonSchemaObject = {
+  $id: INGEST_MESSAGE_JSON_SCHEMA_ID_V2,
+  $schema: 'https://json-schema.org/draft/2020-12/schema',
+  oneOf: [
+    INGEST_JOB_REQUEST_SCHEMA_V2,
+    INGEST_BATCH_READY_SCHEMA_V2,
+    INGEST_JOB_FAILED_SCHEMA_V2
+  ]
+}
+
 export type IngestMessageValidationV1 =
   | { message: IngestMessageV1, ok: true }
+  | { errors: string[], ok: false }
+
+export type IngestMessageValidationV2 =
+  | { message: IngestMessageV2, ok: true }
   | { errors: string[], ok: false }
 
 export interface IngestProducerValidationOptionsV1 {
@@ -370,7 +668,17 @@ export interface IngestProducerValidationOptionsV1 {
   expectedProducer: IngestProducer
 }
 
+export interface IngestProducerValidationOptionsV2 {
+  allowedMessageTypes?: IngestMessageType[]
+  expectedProducer: IngestProducer
+}
+
 export interface IngestConsumerValidationOptionsV1 {
+  allowedMessageTypes?: IngestMessageType[]
+  allowedProducers?: IngestProducer[]
+}
+
+export interface IngestConsumerValidationOptionsV2 {
   allowedMessageTypes?: IngestMessageType[]
   allowedProducers?: IngestProducer[]
 }
@@ -425,10 +733,65 @@ function isIngestSegmentV1(value: unknown): value is IngestSegmentV1 {
     && value.content.trim().length > 0
 }
 
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string')
+}
+
+function isOptionalInteger(value: unknown, minimum: number): boolean {
+  return value === undefined || (typeof value === 'number' && Number.isInteger(value) && value >= minimum)
+}
+
+function isOptionalString(value: unknown): boolean {
+  return value === undefined || typeof value === 'string'
+}
+
+function isIngestSegmentV2(value: unknown): value is IngestSegmentV2 {
+  if (!isRecord(value)) return false
+
+  // FIXME im confusing :)
+  return typeof value.segmentId === 'string'
+    && value.segmentId.trim().length > 0
+    && typeof value.filePath === 'string'
+    && value.filePath.trim().length > 0
+    && typeof value.category === 'string'
+    && INGEST_SEGMENT_CATEGORIES_V2.includes(value.category as IngestSegmentCategoryV2)
+    && typeof value.parseStrategy === 'string'
+    && INGEST_PARSE_STRATEGIES_V2.includes(value.parseStrategy as IngestParseStrategyV2)
+    && typeof value.symbolKind === 'string'
+    && value.symbolKind.trim().length > 0
+    && typeof value.content === 'string'
+    && value.content.trim().length > 0
+    && typeof value.contentSha256 === 'string'
+    && value.contentSha256.trim().length >= 64
+    && typeof value.chunkIndex === 'number'
+    && Number.isInteger(value.chunkIndex)
+    && value.chunkIndex >= 0
+    && typeof value.chunkCount === 'number'
+    && Number.isInteger(value.chunkCount)
+    && value.chunkCount > 0
+    && value.chunkIndex < value.chunkCount
+    && isOptionalInteger(value.startLine, 1)
+    && isOptionalInteger(value.endLine, 1)
+    && isOptionalInteger(value.startByte, 0)
+    && isOptionalInteger(value.endByte, 0)
+    && isOptionalString(value.fileExt)
+    && isOptionalString(value.language)
+    && isOptionalString(value.fallbackReason)
+    && isOptionalString(value.httpMethod)
+    && isOptionalString(value.nodeType)
+    && isOptionalString(value.parentSymbolName)
+    && isOptionalString(value.symbolName)
+    && isOptionalString(value.comment)
+    && isOptionalString(value.jsDoc)
+    && isOptionalString(value.returnType)
+    && isOptionalString(value.routePath)
+    && (value.decorators === undefined || isStringArray(value.decorators))
+    && (value.params === undefined || isStringArray(value.params))
+    && (value.astPath === undefined || isStringArray(value.astPath))
+}
+
 function isIngestErrorEnvelopeV1(value: unknown): value is IngestErrorEnvelopeV1 {
-  if (!isRecord(value)) {
-    return false
-  }
+  if (!isRecord(value)) return false
 
   return typeof value.code === 'string'
     && INGEST_ERROR_CODES.includes(value.code as IngestErrorCode)
@@ -438,9 +801,7 @@ function isIngestErrorEnvelopeV1(value: unknown): value is IngestErrorEnvelopeV1
 }
 
 function isMessageBaseV1(value: unknown): value is Omit<IngestEnvelopeBaseV1<IngestMessageType, unknown>, 'payload'> & { payload: unknown } {
-  if (!isRecord(value)) {
-    return false
-  }
+  if (!isRecord(value)) return false
 
   return value.contractVersion === INGEST_CONTRACT_VERSION_V1
     && typeof value.repoId === 'number'
@@ -456,24 +817,34 @@ function isMessageBaseV1(value: unknown): value is Omit<IngestEnvelopeBaseV1<Ing
     && 'payload' in value
 }
 
+function isMessageBaseV2(value: unknown): value is Omit<IngestEnvelopeBaseV2<IngestMessageType, unknown>, 'payload'> & { payload: unknown } {
+  if (!isRecord(value)) return false
+
+  return value.contractVersion === INGEST_CONTRACT_VERSION_V2
+    && typeof value.repoId === 'number'
+    && Number.isInteger(value.repoId)
+    && value.repoId > 0
+    && typeof value.correlationId === 'string'
+    && value.correlationId.trim().length > 0
+    && typeof value.messageType === 'string'
+    && INGEST_MESSAGE_TYPES.includes(value.messageType as IngestMessageType)
+    && typeof value.producer === 'string'
+    && INGEST_PRODUCERS.includes(value.producer as IngestProducer)
+    && isIsoDateString(value.producedAt)
+    && 'payload' in value
+}
+
 export function isIngestMessageV1(value: unknown): value is IngestMessageV1 {
-  if (!isMessageBaseV1(value)) {
-    return false
-  }
+  if (!isMessageBaseV1(value)) return false
 
   if (value.messageType === IngestMessageType.JobRequest) {
-    if (!isRecord(value.payload)) {
-      return false
-    }
+    if (!isRecord(value.payload)) return false
 
-    return isParseOptionsV1(value.payload.parseOptions)
-      && isSnapshotRefV1(value.payload.snapshot)
+    return isParseOptionsV1(value.payload.parseOptions) && isSnapshotRefV1(value.payload.snapshot)
   }
 
   if (value.messageType === IngestMessageType.BatchReady) {
-    if (!isRecord(value.payload)) {
-      return false
-    }
+    if (!isRecord(value.payload)) return false
 
     return typeof value.payload.batchId === 'string'
       && value.payload.batchId.trim().length > 0
@@ -503,78 +874,96 @@ export function isIngestMessageV1(value: unknown): value is IngestMessageV1 {
     && isIngestErrorEnvelopeV1(value.payload.error)
 }
 
+export function isIngestMessageV2(value: unknown): value is IngestMessageV2 {
+  if (!isMessageBaseV2(value)) return false
+
+  if (value.messageType === IngestMessageType.JobRequest) {
+    if (!isRecord(value.payload)) return false
+
+    return isParseOptionsV1(value.payload.parseOptions) && isSnapshotRefV1(value.payload.snapshot)
+  }
+
+  if (value.messageType === IngestMessageType.BatchReady) {
+    if (!isRecord(value.payload)) return false
+
+    return typeof value.payload.batchId === 'string'
+      && value.payload.batchId.trim().length > 0
+      && typeof value.payload.batchIndex === 'number'
+      && Number.isInteger(value.payload.batchIndex)
+      && value.payload.batchIndex >= 0
+      && typeof value.payload.batchCount === 'number'
+      && Number.isInteger(value.payload.batchCount)
+      && value.payload.batchCount > 0
+      && typeof value.payload.isLastBatch === 'boolean'
+      && isSnapshotRefV1(value.payload.snapshot)
+      && isRecord(value.payload.stats)
+      && typeof value.payload.stats.filesDiscovered === 'number'
+      && typeof value.payload.stats.filesParsed === 'number'
+      && typeof value.payload.stats.segmentsInBatch === 'number'
+      && Array.isArray(value.payload.segments)
+      && value.payload.segments.every(isIngestSegmentV2)
+  }
+
+  if (!isRecord(value.payload)) return false
+
+  return isSnapshotRefV1(value.payload.snapshot) && typeof value.payload.stage === 'string' && INGEST_JOB_FAILED_STAGES.includes(value.payload.stage as IngestJobFailedStageV2) && isIngestErrorEnvelopeV1(value.payload.error)
+}
+
 function normalizeValidationList<T extends string>(values: T[] | undefined, defaults: T[]): T[] {
   const effectiveValues = values ?? defaults
   return [...new Set(effectiveValues)]
 }
 
-export function validateIngestProducerMessageV1(
-  value: unknown,
-  options: IngestProducerValidationOptionsV1
-): IngestMessageValidationV1 {
-  if (!isIngestMessageV1(value)) {
-    return {
-      errors: ['Message does not match ingest.v1 contract schema'],
-      ok: false
-    }
-  }
+export function validateIngestProducerMessageV1(value: unknown, options: IngestProducerValidationOptionsV1): IngestMessageValidationV1 {
+  if (!isIngestMessageV1(value)) return { errors: ['Message does not match ingest.v1 contract schema'], ok: false }
 
   const allowedMessageTypes = normalizeValidationList(options.allowedMessageTypes, INGEST_MESSAGE_TYPES)
   const errors: string[] = []
 
-  if (value.producer !== options.expectedProducer) {
-    errors.push(`Unexpected producer '${value.producer}', expected '${options.expectedProducer}'`)
-  }
+  if (value.producer !== options.expectedProducer) errors.push(`Unexpected producer '${value.producer}', expected '${options.expectedProducer}'`)
+  if (!allowedMessageTypes.includes(value.messageType)) errors.push(`Message type '${value.messageType}' is not allowed for this producer`)
+  if (errors.length > 0) return { errors, ok: false }
 
-  if (!allowedMessageTypes.includes(value.messageType)) {
-    errors.push(`Message type '${value.messageType}' is not allowed for this producer`)
-  }
-
-  if (errors.length > 0) {
-    return {
-      errors,
-      ok: false
-    }
-  }
-
-  return {
-    message: value,
-    ok: true
-  }
+  return { message: value, ok: true }
 }
 
-export function validateIngestConsumerMessageV1(
-  value: unknown,
-  options: IngestConsumerValidationOptionsV1 = {}
-): IngestMessageValidationV1 {
-  if (!isIngestMessageV1(value)) {
-    return {
-      errors: ['Message does not match ingest.v1 contract schema'],
-      ok: false
-    }
-  }
+export function validateIngestProducerMessageV2(value: unknown, options: IngestProducerValidationOptionsV2): IngestMessageValidationV2 {
+  if (!isIngestMessageV2(value)) return { errors: ['Message does not match ingest.v2 contract schema'], ok: false }
+
+  const allowedMessageTypes = normalizeValidationList(options.allowedMessageTypes, INGEST_MESSAGE_TYPES)
+  const errors: string[] = []
+
+  if (value.producer !== options.expectedProducer) errors.push(`Unexpected producer '${value.producer}', expected '${options.expectedProducer}'`)
+  if (!allowedMessageTypes.includes(value.messageType)) errors.push(`Message type '${value.messageType}' is not allowed for this producer`)
+  if (errors.length > 0) return { errors, ok: false }
+
+  return { message: value, ok: true }
+}
+
+export function validateIngestConsumerMessageV1(value: unknown, options: IngestConsumerValidationOptionsV1 = {}): IngestMessageValidationV1 {
+  if (!isIngestMessageV1(value)) return { errors: ['Message does not match ingest.v1 contract schema'], ok: false }
 
   const allowedMessageTypes = normalizeValidationList(options.allowedMessageTypes, INGEST_MESSAGE_TYPES)
   const allowedProducers = normalizeValidationList(options.allowedProducers, INGEST_PRODUCERS)
   const errors: string[] = []
 
-  if (!allowedMessageTypes.includes(value.messageType)) {
-    errors.push(`Message type '${value.messageType}' is not allowed for this consumer`)
-  }
+  if (!allowedMessageTypes.includes(value.messageType)) errors.push(`Message type '${value.messageType}' is not allowed for this consumer`)
+  if (!allowedProducers.includes(value.producer)) errors.push(`Producer '${value.producer}' is not allowed for this consumer`)
+  if (errors.length > 0) return { errors, ok: false }
 
-  if (!allowedProducers.includes(value.producer)) {
-    errors.push(`Producer '${value.producer}' is not allowed for this consumer`)
-  }
+  return { message: value, ok: true }
+}
 
-  if (errors.length > 0) {
-    return {
-      errors,
-      ok: false
-    }
-  }
+export function validateIngestConsumerMessageV2(value: unknown, options: IngestConsumerValidationOptionsV2 = {}): IngestMessageValidationV2 {
+  if (!isIngestMessageV2(value)) return { errors: ['Message does not match ingest.v2 contract schema'], ok: false }
 
-  return {
-    message: value,
-    ok: true
-  }
+  const allowedMessageTypes = normalizeValidationList(options.allowedMessageTypes, INGEST_MESSAGE_TYPES)
+  const allowedProducers = normalizeValidationList(options.allowedProducers, INGEST_PRODUCERS)
+  const errors: string[] = []
+
+  if (!allowedMessageTypes.includes(value.messageType)) errors.push(`Message type '${value.messageType}' is not allowed for this consumer`)
+  if (!allowedProducers.includes(value.producer)) errors.push(`Producer '${value.producer}' is not allowed for this consumer`)
+  if (errors.length > 0) return { errors, ok: false }
+
+  return { message: value, ok: true }
 }

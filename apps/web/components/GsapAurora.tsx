@@ -42,6 +42,7 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 
 const noise = (x: number, y: number): number => {
   const raw = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453
+  
   return raw - Math.floor(raw)
 }
 
@@ -50,17 +51,18 @@ const createRng = (seed: number) => {
 
   return () => {
     state += 0x6D2B79F5
+    
     let t = state
+    
     t = Math.imul(t ^ (t >>> 15), t | 1)
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
 }
 
 const waveBaseY = (xFraction: number, waveIndex: number): number => {
-  if (waveIndex === 0) {
-    return 0.4 + Math.sin(xFraction * Math.PI * 1.05) * -0.14 + Math.sin(xFraction * Math.PI * 2.2 + 0.3) * 0.02
-  }
+  if (waveIndex === 0) return 0.4 + Math.sin(xFraction * Math.PI * 1.05) * -0.14 + Math.sin(xFraction * Math.PI * 2.2 + 0.3) * 0.02
 
   return 0.64 + Math.sin(xFraction * Math.PI * 0.95 + 0.5) * -0.11 + Math.sin(xFraction * Math.PI * 2 + 1.4) * 0.018
 }
@@ -70,9 +72,7 @@ const waveSpread = (xFraction: number): number => 0.13 + Math.sin(clamp(xFractio
 const particleColor = (xFraction: number, waveIndex: number): [number, number, number] => {
   const t = clamp(xFraction, 0, 1)
 
-  if (waveIndex === 0) {
-    return [Math.round(178 + (45 - 178) * t), Math.round(80 + (210 - 80) * t), 255]
-  }
+  if (waveIndex === 0) return [Math.round(178 + (45 - 178) * t), Math.round(80 + (210 - 80) * t), 255]
 
   return [Math.round(35 + (150 - 35) * t), Math.round(90 + (65 - 90) * t), 255]
 }
@@ -134,9 +134,7 @@ export function GsapAurora({ className, density = GsapAuroraDensity.DEFAULT }: G
   useGSAP(() => {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-    if (reduceMotion) {
-      return
-    }
+    if (reduceMotion) return
 
     const particleTargets = particlesRef.current
 
@@ -175,15 +173,11 @@ export function GsapAurora({ className, density = GsapAuroraDensity.DEFAULT }: G
     const root = rootRef.current
     const canvas = canvasRef.current
 
-    if (!root || !canvas) {
-      return
-    }
+    if (!root || !canvas) return
 
     const context = canvas.getContext('2d')
 
-    if (!context) {
-      return
-    }
+    if (!context) return
 
     let width = 0
     let height = 0
@@ -205,9 +199,7 @@ export function GsapAurora({ className, density = GsapAuroraDensity.DEFAULT }: G
     }
 
     const draw = (timestamp: number) => {
-      if (startTimeRef.current === null) {
-        startTimeRef.current = timestamp
-      }
+      if (startTimeRef.current === null) startTimeRef.current = timestamp
 
       const elapsed = (timestamp - startTimeRef.current) * 0.001
       const wavePhase = wavePhaseRef.current

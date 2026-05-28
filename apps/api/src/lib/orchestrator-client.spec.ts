@@ -67,7 +67,7 @@ describe('orchestrator client', () => {
     global.fetch = fetchMock as typeof fetch
 
     await expect(enqueueIngestJob({
-      contractVersion: 'ingest.v1',
+      contractVersion: 'ingest.v2',
       correlationId: '',
       messageType: 'ingest.job.request',
       payload: {
@@ -104,7 +104,7 @@ describe('orchestrator client', () => {
     global.fetch = fetchMock as typeof fetch
 
     await expect(enqueueIngestJob({
-      contractVersion: 'ingest.v1',
+      contractVersion: 'ingest.v2',
       correlationId: 'corr-1',
       messageType: 'ingest.job.request',
       payload: {

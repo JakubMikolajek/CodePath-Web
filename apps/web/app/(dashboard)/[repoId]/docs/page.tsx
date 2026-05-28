@@ -20,18 +20,11 @@ const resolveErrorMessage = (error: unknown) => {
   if (typeof error === 'object' && error !== null && 'response' in error) {
     const responseData = (error as { response?: { data?: { message?: string | string[] } } }).response?.data?.message
 
-    if (Array.isArray(responseData)) {
-      return responseData.join(', ')
-    }
-
-    if (typeof responseData === 'string') {
-      return responseData
-    }
+    if (Array.isArray(responseData)) return responseData.join(', ')
+    if (typeof responseData === 'string') return responseData
   }
 
-  if (error instanceof Error) {
-    return error.message
-  }
+  if (error instanceof Error) return error.message
 
   return 'Unexpected error'
 }
@@ -39,17 +32,9 @@ const resolveErrorMessage = (error: unknown) => {
 const formatStatus = (status: string) => status.replaceAll('_', ' ')
 
 const getStatusTone = (status?: string) => {
-  if (status === 'ready' || status === 'embedded' || status === 'cloned') {
-    return 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
-  }
-
-  if (status === 'processing') {
-    return 'border-cyan-300/30 bg-cyan-300/10 text-cyan-200'
-  }
-
-  if (status === 'failed') {
-    return 'border-red-400/30 bg-red-400/10 text-red-200'
-  }
+  if (status === 'ready' || status === 'embedded' || status === 'cloned') return 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
+  if (status === 'processing') return 'border-cyan-300/30 bg-cyan-300/10 text-cyan-200'
+  if (status === 'failed') return 'border-red-400/30 bg-red-400/10 text-red-200'
 
   return 'border-white/10 bg-white/5 text-muted-foreground'
 }
@@ -66,9 +51,7 @@ export default function Page() {
   const [text, setText] = useState<string>('')
 
   const fetchDocs = useCallback(async () => {
-    if (!Number.isFinite(repoId)) {
-      return
-    }
+    if (!Number.isFinite(repoId)) return
 
     const data = await getRepoDocs(repoId)
 
@@ -76,9 +59,7 @@ export default function Page() {
   }, [repoId])
 
   const fetchStatus = useCallback(async () => {
-    if (!Number.isFinite(repoId)) {
-      return null
-    }
+    if (!Number.isFinite(repoId)) return null
 
     const nextStatus = await getRepoDocsStatus(repoId)
     setStatus(nextStatus)
@@ -97,11 +78,8 @@ export default function Page() {
     try {
       const nextStatus = await fetchStatus()
 
-      if (nextStatus?.docsStatus === 'ready') {
-        await fetchDocs()
-      } else {
-        setText('')
-      }
+      if (nextStatus?.docsStatus === 'ready') await fetchDocs()
+      else setText('')
     } catch (nextError) {
       setError(resolveErrorMessage(nextError))
     } finally {
@@ -110,9 +88,7 @@ export default function Page() {
   }, [fetchDocs, fetchStatus, repoId])
 
   const handleGenerate = async () => {
-    if (!Number.isFinite(repoId)) {
-      return
-    }
+    if (!Number.isFinite(repoId)) return
 
     setIsGenerating(true)
     setError(null)
@@ -122,11 +98,8 @@ export default function Page() {
 
       const nextStatus = await fetchStatus()
 
-      if (nextStatus?.docsStatus !== 'ready') {
-        setText('')
-      } else {
-        await fetchDocs()
-      }
+      if (nextStatus?.docsStatus !== 'ready') setText('')
+      else await fetchDocs()
     } catch (nextError) {
       setError(resolveErrorMessage(nextError))
     } finally {
@@ -139,18 +112,14 @@ export default function Page() {
   }, [loadPageState])
 
   useEffect(() => {
-    if (!Number.isFinite(repoId) || status?.docsStatus !== 'processing') {
-      return
-    }
+    if (!Number.isFinite(repoId) || status?.docsStatus !== 'processing') return
 
     const interval = setInterval(() => {
       void (async () => {
         try {
           const nextStatus = await fetchStatus()
 
-          if (nextStatus?.docsStatus === 'ready') {
-            await fetchDocs()
-          }
+          if (nextStatus?.docsStatus === 'ready') await fetchDocs()
         } catch (nextError) {
           setError(resolveErrorMessage(nextError))
         }

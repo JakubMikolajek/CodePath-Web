@@ -5,9 +5,7 @@ import { sanitizeString } from './helpers'
 import type { DepEdge } from './parser-types'
 
 export function buildMermaidGraph(deps: DepEdge[]): Nullable<string> {
-  if (isEmpty(deps)) {
-    return null
-  }
+  if (isEmpty(deps)) return null
 
   const lines = [
     'flowchart TD',
@@ -26,7 +24,9 @@ export function buildMermaidGraph(deps: DepEdge[]): Nullable<string> {
     const safeType = sanitizeString(type)
 
     const labelParts = [safeType]
+
     if (importedFrom) labelParts.push(`from ${sanitizeString(importedFrom)}`)
+    
     const label = join(labelParts, ' ')
 
     if (type === 'import') {

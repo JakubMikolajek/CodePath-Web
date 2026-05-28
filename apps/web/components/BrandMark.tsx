@@ -6,7 +6,7 @@ interface BrandMarkProps {
   label?: string
 }
 
-export function BrandMark({ className, compact = false, label = 'CodePath' }: BrandMarkProps) {
+export function BrandMark({ className, compact = false, label = 'Nurt Cloud' }: BrandMarkProps) {
   return (
     <div className={cn('flex items-center gap-[0.7em] text-lg', className)}>
       <div aria-hidden="true" className="brand-mark-icon">

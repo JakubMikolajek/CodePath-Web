@@ -12,9 +12,7 @@ export const createAxiosServer = async (): Promise<AxiosInstance> => {
   const cookieStore = await cookies()
   const accessToken = await getKeycloakAccessTokenFromCookieHeader(cookieStore.toString())
 
-  if (!accessToken) {
-    redirect('/')
-  }
+  if (!accessToken) redirect('/')
 
   const instance = axios.create({
     baseURL: internalApiBaseUrl,
@@ -26,9 +24,8 @@ export const createAxiosServer = async (): Promise<AxiosInstance> => {
   instance.interceptors.response.use(
     res => res,
     err => {
-      if (isUnauthorizedError(err)) {
-        redirect('/')
-      }
+      if (isUnauthorizedError(err)) redirect('/')
+      
       return Promise.reject(toError(err, 'Server request failed'))
     }
   )

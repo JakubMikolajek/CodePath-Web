@@ -74,18 +74,11 @@ const resolveErrorMessage = (error: unknown) => {
   if (typeof error === 'object' && error !== null && 'response' in error) {
     const responseData = (error as { response?: { data?: { message?: string | string[] } } }).response?.data?.message
 
-    if (Array.isArray(responseData)) {
-      return responseData.join(', ')
-    }
-
-    if (typeof responseData === 'string') {
-      return responseData
-    }
+    if (Array.isArray(responseData)) return responseData.join(', ')
+    if (typeof responseData === 'string') return responseData
   }
 
-  if (error instanceof Error) {
-    return error.message
-  }
+  if (error instanceof Error) return error.message
 
   return 'Unexpected error'
 }
@@ -105,21 +98,15 @@ const parsePathParamNames = (path: string) => {
   const names: string[] = []
 
   for (const match of path.matchAll(/:([A-Za-z0-9_]+)/g)) {
-    if (match[1]) {
-      names.push(match[1])
-    }
+    if (match[1]) names.push(match[1])
   }
 
   for (const match of path.matchAll(/\{([A-Za-z0-9_]+)(?::[^}]+)?}/g)) {
-    if (match[1]) {
-      names.push(match[1])
-    }
+    if (match[1]) names.push(match[1])
   }
 
   for (const match of path.matchAll(/<(?:[A-Za-z0-9_]+:)?([A-Za-z0-9_]+)>/g)) {
-    if (match[1]) {
-      names.push(match[1])
-    }
+    if (match[1]) names.push(match[1])
   }
 
   return Array.from(new Set(names))
@@ -129,39 +116,17 @@ const generateSampleValue = (name: string, seed: string) => {
   const lowered = name.trim().toLowerCase()
   const deterministic = hashString(`${seed}:${lowered}`)
 
-  if (lowered.includes('uuid')) {
-    return '550e8400-e29b-41d4-a716-446655440000'
-  }
-  if (lowered.includes('email')) {
-    return `user${deterministic % 100}@example.com`
-  }
-  if (lowered.includes('phone')) {
-    return `+4812345${String(deterministic % 10_000).padStart(4, '0')}`
-  }
-  if (lowered.includes('date')) {
-    return '2026-01-01'
-  }
-  if (lowered.includes('time')) {
-    return '2026-01-01T10:00:00.000Z'
-  }
-  if (lowered.includes('token')) {
-    return `token-${deterministic.toString(16)}`
-  }
-  if (lowered.includes('price') || lowered.includes('amount') || lowered.includes('total')) {
-    return Number(((deterministic % 20000) / 100).toFixed(2))
-  }
-  if (lowered.includes('count') || lowered.includes('limit') || lowered.includes('page') || lowered.includes('offset')) {
-    return (deterministic % 50) + 1
-  }
-  if (lowered.includes('active') || lowered.includes('enabled') || lowered.startsWith('is')) {
-    return deterministic % 2 === 0
-  }
-  if (lowered === 'id' || lowered.endsWith('_id') || lowered.endsWith('id')) {
-    return (deterministic % 9000) + 1000
-  }
-  if (lowered.includes('name')) {
-    return `sample-${lowered}-${deterministic % 100}`
-  }
+  if (lowered.includes('uuid')) return '550e8400-e29b-41d4-a716-446655440000'
+  if (lowered.includes('email')) return `user${deterministic % 100}@example.com`
+  if (lowered.includes('phone')) return `+4812345${String(deterministic % 10_000).padStart(4, '0')}`
+  if (lowered.includes('date')) return '2026-01-01'
+  if (lowered.includes('time')) return '2026-01-01T10:00:00.000Z'
+  if (lowered.includes('token')) return `token-${deterministic.toString(16)}`
+  if (lowered.includes('price') || lowered.includes('amount') || lowered.includes('total')) return Number(((deterministic % 20000) / 100).toFixed(2))
+  if (lowered.includes('count') || lowered.includes('limit') || lowered.includes('page') || lowered.includes('offset')) return (deterministic % 50) + 1
+  if (lowered.includes('active') || lowered.includes('enabled') || lowered.startsWith('is')) return deterministic % 2 === 0
+  if (lowered === 'id' || lowered.endsWith('_id') || lowered.endsWith('id')) return (deterministic % 9000) + 1000
+  if (lowered.includes('name')) return `sample-${lowered}-${deterministic % 100}`
 
   return `sample-${lowered || 'value'}-${deterministic % 1000}`
 }
@@ -170,15 +135,11 @@ const parseJsonObjectInput = (raw: string, label: string) => {
   try {
     const parsed = JSON.parse(raw)
 
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new Error(`${label} must be a JSON object`)
-    }
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error(`${label} must be a JSON object`)
 
     return parsed as Record<string, unknown>
   } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(`${label}: ${error.message}`)
-    }
+    if (error instanceof Error) throw new Error(`${label}: ${error.message}`)
 
     throw new Error(`${label}: invalid JSON`)
   }
@@ -188,9 +149,7 @@ const parseJsonInput = (raw: string, label: string) => {
   try {
     return JSON.parse(raw)
   } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(`${label}: ${error.message}`)
-    }
+    if (error instanceof Error) throw new Error(`${label}: ${error.message}`)
 
     throw new Error(`${label}: invalid JSON`)
   }
@@ -199,9 +158,7 @@ const parseJsonInput = (raw: string, label: string) => {
 const normalizeBaseUrl = (value: string) => {
   const trimmed = value.trim()
 
-  if (!trimmed) {
-    throw new Error('Base URL is required')
-  }
+  if (!trimmed) throw new Error('Base URL is required')
 
   try {
     const parsed = new URL(trimmed)
@@ -232,9 +189,7 @@ const buildRunnerUrl = (baseUrl: string, path: string, query: Record<string, unk
   const finalUrl = new URL(path.startsWith('/') ? path : `/${path}`, normalizedBaseUrl)
 
   for (const [key, value] of Object.entries(query)) {
-    if (value === undefined || value === null) {
-      continue
-    }
+    if (value === undefined || value === null) continue
 
     if (Array.isArray(value)) {
       for (const item of value) {
@@ -261,9 +216,7 @@ const buildAuthArtifacts = (auth: RepoApiRunnerCollectionConfig['auth']) => {
   const query: Record<string, string> = {}
 
   if (auth.mode === 'bearer') {
-    if (!auth.bearerToken.trim()) {
-      throw new Error('Bearer token is required')
-    }
+    if (!auth.bearerToken.trim()) throw new Error('Bearer token is required')
 
     headers.Authorization = `Bearer ${auth.bearerToken.trim()}`
   }
@@ -272,9 +225,7 @@ const buildAuthArtifacts = (auth: RepoApiRunnerCollectionConfig['auth']) => {
     const username = auth.basicUsername.trim()
     const password = auth.basicPassword
 
-    if (!username) {
-      throw new Error('Basic username is required')
-    }
+    if (!username) throw new Error('Basic username is required')
 
     const encoded = window.btoa(`${username}:${password}`)
 
@@ -285,19 +236,12 @@ const buildAuthArtifacts = (auth: RepoApiRunnerCollectionConfig['auth']) => {
     const keyName = auth.apiKeyName.trim()
     const keyValue = auth.apiKeyValue.trim()
 
-    if (!keyName) {
-      throw new Error('API key name is required')
-    }
+    if (!keyName) throw new Error('API key name is required')
 
-    if (!keyValue) {
-      throw new Error('API key value is required')
-    }
+    if (!keyValue) throw new Error('API key value is required')
 
-    if (auth.apiKeyPlacement === 'query') {
-      query[keyName] = keyValue
-    } else {
-      headers[keyName] = keyValue
-    }
+    if (auth.apiKeyPlacement === 'query') query[keyName] = keyValue
+    else headers[keyName] = keyValue
   }
 
   return { headers, query }
@@ -429,9 +373,7 @@ export default function Page() {
   }, [loadExplorer])
 
   const loadRunnerCollectionsFromServer = useCallback(async () => {
-    if (!Number.isFinite(repoId)) {
-      return
-    }
+    if (!Number.isFinite(repoId)) return
 
     try {
       const collections = await listRepoRunnerCollections(repoId)
@@ -446,9 +388,7 @@ export default function Page() {
   }, [loadRunnerCollectionsFromServer])
 
   const loadRunnerAuthPresetsFromServer = useCallback(async () => {
-    if (!Number.isFinite(repoId)) {
-      return
-    }
+    if (!Number.isFinite(repoId)) return
 
     try {
       const presets = await listRepoRunnerAuthPresets(repoId)
@@ -488,17 +428,13 @@ export default function Page() {
       nextBody[key] = generateSampleValue(key, seed)
     }
 
-    if (METHOD_WITH_BODY.has(endpoint.method) && Object.keys(nextBody).length === 0) {
-      nextBody.payload = `sample-${hashString(seed) % 1000}`
-    }
+    if (METHOD_WITH_BODY.has(endpoint.method) && Object.keys(nextBody).length === 0) nextBody.payload = `sample-${hashString(seed) % 1000}`
 
     const nextHeaders: Record<string, string> = {
       Accept: 'application/json'
     }
 
-    if (METHOD_WITH_BODY.has(endpoint.method)) {
-      nextHeaders['Content-Type'] = 'application/json'
-    }
+    if (METHOD_WITH_BODY.has(endpoint.method)) nextHeaders['Content-Type'] = 'application/json'
 
     setSelectedEndpoint(endpoint)
     setPathValues(nextPathValues)
@@ -511,15 +447,11 @@ export default function Page() {
   }, [])
 
   const toggleMethod = (method: RepoApiHttpMethod) => {
-    setSelectedMethods(prev => (
-      prev.includes(method) ? prev.filter(value => value !== method) : [...prev, method]
-    ))
+    setSelectedMethods(prev => prev.includes(method) ? prev.filter(value => value !== method) : [...prev, method])
   }
 
   const toggleFramework = (framework: RepoApiFramework) => {
-    setSelectedFrameworks(prev => (
-      prev.includes(framework) ? prev.filter(value => value !== framework) : [...prev, framework]
-    ))
+    setSelectedFrameworks(prev => prev.includes(framework) ? prev.filter(value => value !== framework) : [...prev, framework])
   }
 
   const resetFilters = () => {
@@ -540,6 +472,7 @@ export default function Page() {
     }
 
     const name = collectionNameInput.trim()
+    
     if (!name) {
       setRunnerError('Collection name is required')
       return
@@ -593,9 +526,7 @@ export default function Page() {
   }
 
   const handleDeleteCollection = async (collectionId: number) => {
-    if (!Number.isFinite(repoId)) {
-      return
-    }
+    if (!Number.isFinite(repoId)) return
 
     try {
       await deleteRepoRunnerCollection(repoId, collectionId)
@@ -612,6 +543,7 @@ export default function Page() {
     }
 
     const name = authPresetNameInput.trim()
+    
     if (!name) {
       setRunnerError('Auth preset name is required')
       return
@@ -637,9 +569,7 @@ export default function Page() {
   }
 
   const handleDeleteAuthPreset = async (presetId: number) => {
-    if (!Number.isFinite(repoId)) {
-      return
-    }
+    if (!Number.isFinite(repoId)) return
 
     try {
       await deleteRepoRunnerAuthPreset(repoId, presetId)
@@ -657,6 +587,7 @@ export default function Page() {
 
     setExportingOpenApi(true)
     setError(null)
+    
     try {
       const spec = await getRepoOpenApiSpec(repoId, {
         frameworks: selectedFrameworks.length > 0 ? selectedFrameworks : undefined,
@@ -664,6 +595,7 @@ export default function Page() {
         runtimeBaseUrl: runtimeOpenApiBaseUrl,
         search
       })
+
       const json = JSON.stringify(spec, null, 2)
       const blob = new Blob([json], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
@@ -700,6 +632,7 @@ export default function Page() {
         methods: selectedMethods.length > 0 ? selectedMethods : undefined,
         search
       })
+
       const json = JSON.stringify(result, null, 2)
       const blob = new Blob([json], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
@@ -751,9 +684,7 @@ export default function Page() {
       for (const [key, value] of Object.entries(parsedHeaders)) {
         const normalizedKey = key.trim()
 
-        if (!normalizedKey) {
-          continue
-        }
+        if (!normalizedKey) continue
 
         headers[normalizedKey] = typeof value === 'string' ? value : JSON.stringify(value)
       }
@@ -763,6 +694,7 @@ export default function Page() {
       }
 
       const shouldSendBody = METHOD_WITH_BODY.has(selectedEndpoint.method)
+      
       const response = await runRepoApiRequest(repoId, {
         body: shouldSendBody ? parsedBody : undefined,
         headers,
@@ -783,13 +715,8 @@ export default function Page() {
   const endpoints = data?.endpoints ?? []
 
   const runnerDataPreview = useMemo(() => {
-    if (!runnerResult) {
-      return ''
-    }
-
-    if (typeof runnerResult.data === 'string') {
-      return runnerResult.data
-    }
+    if (!runnerResult) return ''
+    if (typeof runnerResult.data === 'string') return runnerResult.data
 
     return JSON.stringify(runnerResult.data, null, 2)
   }, [runnerResult])

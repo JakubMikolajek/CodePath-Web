@@ -3,7 +3,7 @@ import { URL } from 'node:url'
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import type { Nullable } from '@workspace/codepath-common/globals'
-import type { IngestJobRequestV1 } from '@workspace/codepath-common/ingest'
+import type { IngestJobRequestV2 } from '@workspace/codepath-common/ingest'
 import crypto from 'crypto'
 import { and, eq } from 'drizzle-orm'
 import { readdir, readFile, rm, stat, unlink, writeFile } from 'fs/promises'
@@ -29,6 +29,10 @@ interface CloneConfig {
 
 type RepoGitAuthType = 'https_token' | 'none' | 'ssh_key'
 
+const INGEST_CONTRACT_VERSION_V2 = 'ingest.v2'
+const INGEST_MESSAGE_TYPE_JOB_REQUEST = 'ingest.job.request'
+const INGEST_PRODUCER_WEB_API = 'web-api'
+
 @Injectable()
 export class RepoFetcherService {
   private logger: Logger = new Logger(RepoFetcherService.name)
@@ -40,26 +44,18 @@ export class RepoFetcherService {
 
   @Cron(CronExpression.EVERY_10_SECONDS)
   async pollForPending() {
-    const [repoToClone] = await this.dbService.dbClient.select({
-      id: repos.id
-    })
+    const [repoToClone] = await this.dbService.dbClient.select({ id: repos.id })
       .from(repos)
       .where(eq(repos.cloneStatus, 'pending'))
       .limit(1)
 
-    if (!repoToClone) {
-      return
-    }
+    if (!repoToClone) return
 
-    const [claimedRepo] = await this.dbService.dbClient.update(repos).set({
-      cloneStatus: 'cloning'
-    })
+    const [claimedRepo] = await this.dbService.dbClient.update(repos).set({ cloneStatus: 'cloning' })
       .where(and(eq(repos.id, repoToClone.id), eq(repos.cloneStatus, 'pending')))
       .returning()
 
-    if (!claimedRepo) {
-      return
-    }
+    if (!claimedRepo) return
 
     await this.cloneRepo(claimedRepo)
   }
@@ -69,9 +65,7 @@ export class RepoFetcherService {
     const configuredSecret = this.trimOrNull(repo.gitAuthSecret)
     const effectiveSecret = configuredSecret ?? legacySecret
     const configuredAuthType = (repo.gitAuthType ?? 'none') as RepoGitAuthType
-    const effectiveAuthType = configuredAuthType === 'none' && !configuredSecret && legacySecret
-      ? 'ssh_key'
-      : configuredAuthType
+    const effectiveAuthType = configuredAuthType === 'none' && !configuredSecret && legacySecret ? 'ssh_key' : configuredAuthType
 
     if (effectiveAuthType === 'none') {
       return {
@@ -82,9 +76,7 @@ export class RepoFetcherService {
       }
     }
 
-    if (!effectiveSecret) {
-      throw new Error('Git auth secret is required for private repository clone')
-    }
+    if (!effectiveSecret) throw new Error('Git auth secret is required for private repository clone')
 
     if (effectiveAuthType === 'https_token') {
       const username = this.trimOrNull(repo.gitAuthUsername) ?? 'oauth2'
@@ -117,17 +109,13 @@ export class RepoFetcherService {
     repoId: number,
     commitSha: string,
     snapshot: { bucket: null | string, key: null | string, provider: 'local' | 'minio' }
-  ): IngestJobRequestV1 {
-    if (snapshot.provider !== 'minio' || !snapshot.bucket || !snapshot.key) {
-      throw new Error(
-        'Ingest contract requires MinIO snapshot location. Configure REPO_STORAGE_PROVIDER=minio and ensure snapshot upload succeeded.'
-      )
-    }
+  ): IngestJobRequestV2 {
+    if (snapshot.provider !== 'minio' || !snapshot.bucket || !snapshot.key) throw new Error('Ingest contract requires MinIO snapshot location. Configure REPO_STORAGE_PROVIDER=minio and ensure snapshot upload succeeded.')
 
     return {
-      contractVersion: 'ingest.v1',
+      contractVersion: INGEST_CONTRACT_VERSION_V2,
       correlationId: `ingest-${repoId}-${crypto.randomUUID()}`,
-      messageType: 'ingest.job.request' as IngestJobRequestV1['messageType'],
+      messageType: INGEST_MESSAGE_TYPE_JOB_REQUEST as IngestJobRequestV2['messageType'],
       payload: {
         parseOptions: {
           includeConfigFiles: env.ingestIncludeConfigFiles,
@@ -143,7 +131,7 @@ export class RepoFetcherService {
         }
       },
       producedAt: new Date().toISOString(),
-      producer: 'web-api' as IngestJobRequestV1['producer'],
+      producer: INGEST_PRODUCER_WEB_API as IngestJobRequestV2['producer'],
       repoId
     }
   }
@@ -151,6 +139,7 @@ export class RepoFetcherService {
   private async cloneRepo(repo: SelectRepo) {
     const git = simpleGit()
     const targetPath = this.repoStorageService.getCloneWorkspacePath(repo.id, repo.name)
+
     let cloneConfig: CloneConfig = {
       cloneUrl: repo.gitUrl,
       safeLogUrl: this.sanitizeAuthUrl(repo.gitUrl),
@@ -160,6 +149,7 @@ export class RepoFetcherService {
 
     let tmpKeyPath: Nullable<string> = null
     const gitEnvBackup = process.env.GIT_SSH_COMMAND
+
     try {
       cloneConfig = this.buildCloneConfig(repo)
       this.logger.log(`Cloning: ${cloneConfig.safeLogUrl} -> ${targetPath}`)
@@ -185,26 +175,20 @@ export class RepoFetcherService {
       const repoGit = simpleGit(targetPath)
       const checkedOutBranch = (await repoGit.revparse(['--abbrev-ref', 'HEAD'])).trim()
       const commitSha = (await repoGit.revparse(['HEAD'])).trim()
-      const snapshot = await this.repoStorageService.persistSnapshot({
-        commitSha,
-        repoId: repo.id,
-        sourceDir: targetPath
-      })
+      const snapshot = await this.repoStorageService.persistSnapshot({ commitSha, repoId: repo.id, sourceDir: targetPath })
 
-      await this.dbService.dbClient.update(repos)
-        .set({
-          cloneStatus: 'cloned',
-          defaultBranch: checkedOutBranch,
-          docsStatus: 'pending',
-          documentation: null,
-          embeddingStatus: 'pending',
-          path: targetPath,
-          sourceCommitSha: commitSha,
-          storageBucket: snapshot.bucket,
-          storageKey: snapshot.key,
-          storageProvider: snapshot.provider
-        })
-        .where(eq(repos.id, repo.id))
+      await this.dbService.dbClient.update(repos).set({
+        cloneStatus: 'cloned',
+        defaultBranch: checkedOutBranch,
+        docsStatus: 'pending',
+        documentation: null,
+        embeddingStatus: 'pending',
+        path: targetPath,
+        sourceCommitSha: commitSha,
+        storageBucket: snapshot.bucket,
+        storageKey: snapshot.key,
+        storageProvider: snapshot.provider
+      }).where(eq(repos.id, repo.id))
 
       const filePaths = await this.getAllFiles(targetPath)
       const filesData = await Promise.all(
@@ -219,8 +203,7 @@ export class RepoFetcherService {
             path: relPath,
             repoId: repo.id
           }
-        }),
-
+        })
       )
 
       await this.dbService.dbClient.delete(files).where(eq(files.repoId, repo.id))
@@ -229,6 +212,7 @@ export class RepoFetcherService {
       try {
         const ingestMessage = this.buildIngestJobRequest(repo.id, commitSha, snapshot)
         await enqueueIngestJob(ingestMessage)
+
         emitTelemetry({
           component: 'repo-fetcher.service',
           details: {
@@ -243,16 +227,15 @@ export class RepoFetcherService {
           service: 'web-api',
           status: 'ok'
         })
+
         this.logger.log(`✓ Cloned, indexed, and queued ingest for ${repo.name}`)
       } catch (cause) {
         const safeCauseMessage = this.sanitizeErrorMessage(cause, cloneConfig.secretsToMask)
 
-        await this.dbService.dbClient.update(repos)
-          .set({
-            docsStatus: 'failed',
-            embeddingStatus: 'failed'
-          })
-          .where(eq(repos.id, repo.id))
+        await this.dbService.dbClient.update(repos).set({
+          docsStatus: 'failed',
+          embeddingStatus: 'failed'
+        }).where(eq(repos.id, repo.id))
 
         emitTelemetry({
           component: 'repo-fetcher.service',
@@ -268,25 +251,20 @@ export class RepoFetcherService {
           service: 'web-api',
           status: 'error'
         })
+
         this.logger.error(`✗ Failed to enqueue ingest for ${repo.name}: ${safeCauseMessage}`)
       }
     } catch (error: unknown) {
       const safeErrorMessage = this.sanitizeErrorMessage(error, cloneConfig.secretsToMask)
       this.logger.error(`✗ Error cloning ${repo.name}: ${safeErrorMessage}`)
 
-      await this.dbService.dbClient.update(repos)
-        .set({ cloneStatus: 'failed' })
-        .where(eq(repos.id, repo.id))
+      await this.dbService.dbClient.update(repos).set({ cloneStatus: 'failed' }).where(eq(repos.id, repo.id))
       throw new Error(safeErrorMessage)
     } finally {
-      if (tmpKeyPath) {
-        await unlink(tmpKeyPath).catch(() => { })
-      }
-      if (gitEnvBackup === undefined) {
-        delete process.env.GIT_SSH_COMMAND
-      } else {
-        process.env.GIT_SSH_COMMAND = gitEnvBackup
-      }
+      if (tmpKeyPath) await unlink(tmpKeyPath).catch(() => { })
+
+      if (gitEnvBackup === undefined) delete process.env.GIT_SSH_COMMAND
+      else process.env.GIT_SSH_COMMAND = gitEnvBackup
     }
   }
 
@@ -297,9 +275,7 @@ export class RepoFetcherService {
 
       for (const line of output.split('\n')) {
         const match = line.match(/refs\/heads\/(.+)$/)
-        if (match?.[1]) {
-          branches.add(match[1].trim())
-        }
+        if (match?.[1]) branches.add(match[1].trim())
       }
 
       return branches
@@ -334,12 +310,7 @@ export class RepoFetcherService {
         }
       } else {
         const ext = path.extname(entry.name).toLowerCase()
-        if (
-          !IGNORED_EXTENSIONS.has(ext)
-          && !IGNORED_FILES.has(entry.name)
-        ) {
-          files.push(entryPath)
-        }
+        if (!IGNORED_EXTENSIONS.has(ext) && !IGNORED_FILES.has(entry.name)) files.push(entryPath)
       }
     }
 
@@ -359,11 +330,7 @@ export class RepoFetcherService {
     }
   }
 
-  private async resolveBranchToClone(
-    git: SimpleGit,
-    cloneUrl: string,
-    configuredBranch: null | string
-  ): Promise<null | string> {
+  private async resolveBranchToClone(git: SimpleGit, cloneUrl: string, configuredBranch: null | string): Promise<null | string> {
     const remoteDefaultBranch = await this.fetchRemoteDefaultBranch(git, cloneUrl)
     const remoteBranches = await this.fetchRemoteBranches(git, cloneUrl)
     const candidates = [
@@ -423,11 +390,10 @@ export class RepoFetcherService {
   }
 
   private toHttpsRepoUrl(gitUrl: string): string {
-    if (gitUrl.startsWith('https://') || gitUrl.startsWith('http://')) {
-      return gitUrl
-    }
+    if (gitUrl.startsWith('https://') || gitUrl.startsWith('http://')) return gitUrl
 
     const scpStyleMatch = gitUrl.match(/^git@([^:]+):(.+)$/)
+
     if (scpStyleMatch) {
       const [, host, repoPath] = scpStyleMatch
       return `https://${host}/${repoPath}`

@@ -73,9 +73,7 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
   const handleDialogChange = (open: boolean) => {
     setDialogOpen(open)
 
-    if (!open) {
-      form.reset()
-    }
+    if (!open) form.reset()
   }
 
   return (

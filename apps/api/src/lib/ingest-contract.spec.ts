@@ -1,15 +1,21 @@
 import {
   INGEST_CONTRACT_VERSION_V1,
+  INGEST_CONTRACT_VERSION_V2,
   INGEST_ERROR_CODES,
   INGEST_MESSAGE_JSON_SCHEMA_ID_V1,
+  INGEST_MESSAGE_JSON_SCHEMA_ID_V2,
   INGEST_MESSAGE_JSON_SCHEMA_V1,
+  INGEST_MESSAGE_JSON_SCHEMA_V2,
   INGEST_MESSAGE_TYPES,
   INGEST_PRODUCERS,
   IngestMessageType,
   IngestProducer,
   isIngestMessageV1,
+  isIngestMessageV2,
   validateIngestConsumerMessageV1,
-  validateIngestProducerMessageV1
+  validateIngestConsumerMessageV2,
+  validateIngestProducerMessageV1,
+  validateIngestProducerMessageV2
 } from '../../../../packages/codepath-common/ingest'
 
 describe('ingest.v1 contract', () => {
@@ -217,5 +223,160 @@ describe('ingest.v1 contract', () => {
       allowedProducers: [IngestProducer.Orchestrator]
     })
     expect(invalidResult.ok).toBe(false)
+  })
+})
+
+describe('ingest.v2 contract', () => {
+  it('exposes stable version and JSON schema with discriminated variants', () => {
+    expect(INGEST_CONTRACT_VERSION_V2).toBe('ingest.v2')
+    expect(INGEST_MESSAGE_JSON_SCHEMA_V2.$id).toBe(INGEST_MESSAGE_JSON_SCHEMA_ID_V2)
+    expect(Array.isArray(INGEST_MESSAGE_JSON_SCHEMA_V2.oneOf)).toBe(true)
+    expect((INGEST_MESSAGE_JSON_SCHEMA_V2.oneOf as unknown[]).length).toBe(3)
+  })
+
+  it('validates ingest.job.request payload', () => {
+    const message = {
+      contractVersion: 'ingest.v2',
+      correlationId: 'corr-1',
+      messageType: 'ingest.job.request',
+      payload: {
+        parseOptions: {
+          includeConfigFiles: true,
+          includeDocumentationFiles: true,
+          maxFileBytes: 5_000_000,
+          maxSegmentChars: 4_000
+        },
+        snapshot: {
+          bucket: 'codepath-repos',
+          key: 'repos/10/abcdef.tar.gz',
+          provider: 'minio',
+          sourceCommitSha: 'abcdef'
+        }
+      },
+      producedAt: '2026-04-04T20:00:00.000Z',
+      producer: 'web-api',
+      repoId: 10
+    }
+
+    expect(isIngestMessageV2(message)).toBe(true)
+  })
+
+  it('validates ingest.batch.ready semantic segment payload', () => {
+    const message = {
+      contractVersion: 'ingest.v2',
+      correlationId: 'corr-batch-1',
+      messageType: 'ingest.batch.ready',
+      payload: {
+        batchCount: 1,
+        batchId: 'batch-1',
+        batchIndex: 0,
+        isLastBatch: true,
+        segments: [{
+          astPath: ['program', 'function_declaration'],
+          category: 'code',
+          chunkCount: 1,
+          chunkIndex: 0,
+          comment: '/** Builds x. */',
+          content: 'export function x() { return 1 }',
+          contentSha256: 'f'.repeat(64),
+          decorators: ['@Trace()'],
+          endByte: 30,
+          endLine: 1,
+          fileExt: '.ts',
+          filePath: 'src/a.ts',
+          httpMethod: 'GET',
+          jsDoc: '/** Builds x. */',
+          language: 'typescript',
+          nodeType: 'function_declaration',
+          params: ['name: string'],
+          parseStrategy: 'tree_sitter',
+          returnType: 'number',
+          routePath: '/repos/:id',
+          segmentId: 'src/a.ts:function:x:1:1',
+          startByte: 0,
+          startLine: 1,
+          symbolKind: 'function',
+          symbolName: 'x'
+        }],
+        snapshot: {
+          bucket: 'codepath-repos',
+          key: 'repos/10/abcdef.tar.gz',
+          provider: 'minio',
+          sourceCommitSha: 'abcdef'
+        },
+        stats: {
+          filesDiscovered: 20,
+          filesParsed: 12,
+          segmentsInBatch: 1
+        }
+      },
+      producedAt: '2026-04-04T20:00:00.000Z',
+      producer: 'ingest-service',
+      repoId: 10
+    }
+
+    expect(isIngestMessageV2(message)).toBe(true)
+  })
+
+  it('rejects legacy v1 messages for v2 validators', () => {
+    const message = {
+      contractVersion: 'ingest.v1',
+      correlationId: 'corr-1',
+      messageType: 'ingest.job.request',
+      payload: {
+        parseOptions: {
+          includeConfigFiles: true,
+          includeDocumentationFiles: true,
+          maxFileBytes: 5_000_000,
+          maxSegmentChars: 4_000
+        },
+        snapshot: {
+          bucket: 'codepath-repos',
+          key: 'repos/10/abcdef.tar.gz',
+          provider: 'minio',
+          sourceCommitSha: 'abcdef'
+        }
+      },
+      producedAt: '2026-04-04T20:00:00.000Z',
+      producer: 'web-api',
+      repoId: 10
+    }
+
+    expect(isIngestMessageV2(message)).toBe(false)
+  })
+
+  it('validates v2 producer and consumer constraints', () => {
+    const producerMessage = {
+      contractVersion: 'ingest.v2',
+      correlationId: 'corr-producer-1',
+      messageType: 'ingest.job.request',
+      payload: {
+        parseOptions: {
+          includeConfigFiles: true,
+          includeDocumentationFiles: true,
+          maxFileBytes: 5_000_000,
+          maxSegmentChars: 4_000
+        },
+        snapshot: {
+          bucket: 'codepath-repos',
+          key: 'repos/10/abcdef.tar.gz',
+          provider: 'minio',
+          sourceCommitSha: 'abcdef'
+        }
+      },
+      producedAt: '2026-04-04T20:00:00.000Z',
+      producer: 'web-api',
+      repoId: 10
+    }
+
+    expect(validateIngestProducerMessageV2(producerMessage, {
+      allowedMessageTypes: [IngestMessageType.JobRequest],
+      expectedProducer: IngestProducer.WebApi
+    }).ok).toBe(true)
+
+    expect(validateIngestConsumerMessageV2(producerMessage, {
+      allowedMessageTypes: [IngestMessageType.BatchReady],
+      allowedProducers: [IngestProducer.IngestService]
+    }).ok).toBe(false)
   })
 })

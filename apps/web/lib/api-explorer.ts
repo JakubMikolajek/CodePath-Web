@@ -61,10 +61,7 @@ export async function listRepoRunnerCollections(repoId: number) {
 }
 
 export async function saveRepoRunnerCollection(repoId: number, payload: RepoApiRunnerSaveCollectionRequest) {
-  return await apiClient.post<RepoApiRunnerCollection, RepoApiRunnerSaveCollectionRequest>(
-    `/api-explorer/${repoId}/collections`,
-    payload
-  )
+  return await apiClient.post<RepoApiRunnerCollection, RepoApiRunnerSaveCollectionRequest>(`/api-explorer/${repoId}/collections`, payload)
 }
 
 export async function deleteRepoRunnerCollection(repoId: number, collectionId: number) {
@@ -76,10 +73,7 @@ export async function listRepoRunnerAuthPresets(repoId: number) {
 }
 
 export async function saveRepoRunnerAuthPreset(repoId: number, payload: RepoApiRunnerSaveAuthPresetRequest) {
-  return await apiClient.post<RepoApiRunnerAuthPreset, RepoApiRunnerSaveAuthPresetRequest>(
-    `/api-explorer/${repoId}/auth-presets`,
-    payload
-  )
+  return await apiClient.post<RepoApiRunnerAuthPreset, RepoApiRunnerSaveAuthPresetRequest>(`/api-explorer/${repoId}/auth-presets`, payload)
 }
 
 export async function deleteRepoRunnerAuthPreset(repoId: number, presetId: number) {
