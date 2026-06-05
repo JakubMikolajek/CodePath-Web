@@ -9,9 +9,18 @@ export type RepoGraphNodeType = 'repo' | 'module' | 'file' | 'symbol' | 'externa
 export type RepoGraphEdgeType = 'imports' | 'calls' | 'depends_on' | 'owns' | 'produces' | 'consumes'
 
 export interface RepoGraphNodeMetadata {
+  astPath?: string[]
+  endLine?: number
   fileId?: number
   filePath?: string
+  httpMethod?: string
   moduleId?: string
+  nodeType?: string
+  parentSymbolName?: string
+  parseStrategy?: string
+  routePath?: string
+  startLine?: number
+  symbolKind?: string
 }
 
 export interface RepoGraphNode {

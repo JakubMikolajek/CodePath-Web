@@ -19,12 +19,38 @@ export interface RepoOwnership {
 }
 
 export interface IngestSegmentPayload {
+  ast_path?: string[]
+  category?: string
   content?: string
+  end_line?: number
   file_ext?: string
   file_path?: string
+  http_method?: string
+  import_specifiers?: string[]
   language?: string
   message_type?: string
+  node_type?: string
+  parent_symbol_name?: string
+  parse_strategy?: string
+  route_path?: string
+  segment_id?: string
+  start_line?: number
+  symbol_kind?: string
   symbol_name?: string
+}
+
+interface CanonicalSymbol {
+  astPath?: string[]
+  endLine?: number
+  httpMethod?: string
+  id: string
+  label: string
+  nodeType?: string
+  parentSymbolName?: string
+  parseStrategy?: string
+  routePath?: string
+  startLine?: number
+  symbolKind: string
 }
 
 interface CanonicalFile {
@@ -32,8 +58,10 @@ interface CanonicalFile {
   fileExt: string
   filePath: string
   language: string
+  importSpecifiers: Set<string>
   segmentCount: number
-  symbolNames: Set<string>
+  symbolKeys: Set<string>
+  symbols: CanonicalSymbol[]
 }
 
 export interface CanonicalGraphBuildResult {
@@ -144,15 +172,24 @@ export class DependencyGraphBuilder {
       })
 
       if (options.includeSymbols) {
-        for (const symbolName of file.symbolNames) {
-          const symbolNodeId = this.toSymbolNodeId(file.filePath, symbolName)
-          const normalizedSymbolName = this.normalizeSymbolName(symbolName)
+        for (const symbol of file.symbols) {
+          const symbolNodeId = this.toSymbolNodeId(file.filePath, symbol)
+          const normalizedSymbolName = this.normalizeSymbolName(symbol.label)
           this.addNode(nodesById, {
             id: symbolNodeId,
-            label: symbolName,
+            label: symbol.label,
             metadata: {
+              astPath: symbol.astPath,
+              endLine: symbol.endLine,
               filePath: file.filePath,
-              moduleId: moduleNodeId
+              httpMethod: symbol.httpMethod,
+              moduleId: moduleNodeId,
+              nodeType: symbol.nodeType,
+              parentSymbolName: symbol.parentSymbolName,
+              parseStrategy: symbol.parseStrategy,
+              routePath: symbol.routePath,
+              startLine: symbol.startLine,
+              symbolKind: symbol.symbolKind
             },
             type: 'symbol'
           })
@@ -171,10 +208,39 @@ export class DependencyGraphBuilder {
             filePath: file.filePath,
             symbolNodeId
           })
+
+          if (symbol.routePath) {
+            const endpointLabel = this.toEndpointLabel(symbol.httpMethod, symbol.routePath)
+            const endpointNodeId = this.toEndpointNodeId(symbol.httpMethod, symbol.routePath)
+            this.addNode(nodesById, {
+              id: endpointNodeId,
+              label: endpointLabel,
+              metadata: {
+                filePath: file.filePath,
+                httpMethod: symbol.httpMethod,
+                moduleId: moduleNodeId,
+                routePath: symbol.routePath
+              },
+              type: 'external_package'
+            })
+
+            this.addEdge(edgesByKey, {
+              id: `${symbolNodeId}->${endpointNodeId}:produces`,
+              metadata: {
+                label: endpointLabel,
+                rawType: 'http_endpoint'
+              },
+              source: symbolNodeId,
+              target: endpointNodeId,
+              type: 'produces'
+            })
+          }
         }
       }
 
-      const imports = this.codeExtractor.extractImportSpecifiers(file.content, file.language, file.fileExt)
+      const imports = file.importSpecifiers.size > 0
+        ? file.importSpecifiers
+        : this.codeExtractor.extractImportSpecifiers(file.content, file.language, file.fileExt)
 
       for (const specifier of imports) {
         const resolution = topology.resolveImport(file.filePath, specifier, knownFilePaths)
@@ -271,6 +337,7 @@ export class DependencyGraphBuilder {
       }
 
       if (options.includeSymbols) {
+        // TODO(ingest.v2): replace this best-effort source fallback once Ingest emits call/reference metadata.
         const callCandidates = this.codeExtractor.extractCallIdentifiers(file.content, file.language, file.fileExt)
         let callEdgesAdded = 0
         for (const callIdentifier of callCandidates) {
@@ -316,6 +383,7 @@ export class DependencyGraphBuilder {
         }
       }
 
+      // TODO(ingest.v2): replace event regexes once event metadata is emitted by Ingest.
       const producedEvents = this.codeExtractor.extractEventNames(file.content, 'produces')
       let producedEdgesAdded = 0
       for (const eventName of producedEvents) {
@@ -420,9 +488,11 @@ export class DependencyGraphBuilder {
         content: '',
         fileExt: this.safeString(segment.file_ext) ?? pathPosix.extname(normalizedPath),
         filePath: normalizedPath,
+        importSpecifiers: new Set<string>(),
         language: this.safeString(segment.language) ?? 'unknown',
         segmentCount: 0,
-        symbolNames: new Set<string>()
+        symbolKeys: new Set<string>(),
+        symbols: []
       }
 
       const content = this.safeString(segment.content)
@@ -440,21 +510,101 @@ export class DependencyGraphBuilder {
         }
       }
       existing.segmentCount += 1
+      for (const importSpecifier of this.normalizeStringArray(segment.import_specifiers)) {
+        existing.importSpecifiers.add(importSpecifier)
+      }
 
-      const symbolName = this.safeString(segment.symbol_name)
-      const baseName = pathPosix.basename(normalizedPath)
-      if (
-        symbolName
-        && symbolName !== baseName
-        && existing.symbolNames.size < MAX_SYMBOLS_PER_FILE
-      ) {
-        existing.symbolNames.add(symbolName)
+      const symbol = this.toCanonicalSymbol(normalizedPath, segment)
+      if (symbol && existing.symbols.length < MAX_SYMBOLS_PER_FILE && !existing.symbolKeys.has(symbol.id)) {
+        existing.symbols.push(symbol)
+        existing.symbolKeys.add(symbol.id)
       }
 
       files.set(normalizedPath, existing)
     }
 
     return files
+  }
+
+  private normalizeStringArray(value: unknown) {
+    if (!Array.isArray(value)) {
+      return []
+    }
+
+    return value
+      .filter((item): item is string => typeof item === 'string')
+      .map(item => item.trim())
+      .filter(Boolean)
+  }
+
+  private normalizeAstPath(value: unknown) {
+    if (!Array.isArray(value)) {
+      return undefined
+    }
+
+    const astPath = value
+      .filter((item): item is string => typeof item === 'string')
+      .map(item => item.trim())
+      .filter(Boolean)
+
+    return astPath.length > 0 ? astPath : undefined
+  }
+
+  private normalizeLine(value: unknown) {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+      return undefined
+    }
+
+    return Math.trunc(value)
+  }
+
+  private toCanonicalSymbol(filePath: string, segment: IngestSegmentPayload): CanonicalSymbol | null {
+    const label = this.safeString(segment.symbol_name)
+    if (!label) {
+      return null
+    }
+
+    const symbolKind = this.safeString(segment.symbol_kind) ?? 'symbol'
+    const parseStrategy = this.safeString(segment.parse_strategy) ?? undefined
+    const nodeType = this.safeString(segment.node_type) ?? undefined
+    const routePath = this.safeString(segment.route_path) ?? undefined
+    const httpMethod = this.safeString(segment.http_method)?.toUpperCase()
+    const astPath = this.normalizeAstPath(segment.ast_path)
+    const isAstSemanticSegment = parseStrategy === 'tree_sitter' || Boolean(nodeType || routePath || httpMethod || astPath)
+    const nonSemanticKinds = new Set(['config', 'documentation', 'file'])
+
+    if (!isAstSemanticSegment && nonSemanticKinds.has(symbolKind.toLowerCase())) {
+      return null
+    }
+
+    if (!isAstSemanticSegment && label === pathPosix.basename(filePath)) {
+      return null
+    }
+
+    const explicitId = this.safeString(segment.segment_id)
+    const startLine = this.normalizeLine(segment.start_line)
+    const endLine = this.normalizeLine(segment.end_line)
+    const fallbackId = [
+      filePath,
+      symbolKind,
+      label,
+      startLine ?? '',
+      endLine ?? ''
+    ].join(':')
+
+    return {
+      astPath,
+      endLine,
+      httpMethod,
+      id: explicitId ?? fallbackId,
+      label,
+      nodeType,
+      parentSymbolName: this.safeString(segment.parent_symbol_name) ?? undefined,
+      parseStrategy,
+      routePath,
+      startLine,
+      symbolKind
+    }
   }
 
   private fallbackModuleLabel(filePath: string) {
@@ -497,6 +647,14 @@ export class DependencyGraphBuilder {
     return normalized.length > 0 ? normalized : null
   }
 
+  private toEndpointLabel(httpMethod: string | undefined, routePath: string) {
+    return httpMethod ? `${httpMethod} ${routePath}` : routePath
+  }
+
+  private toEndpointNodeId(httpMethod: string | undefined, routePath: string) {
+    return `external:http:${httpMethod ?? 'ANY'}:${routePath}`
+  }
+
   private toEventNodeId(eventName: string) {
     return `external:event:${eventName.toLowerCase()}`
   }
@@ -513,7 +671,7 @@ export class DependencyGraphBuilder {
     return `module:${repoId}:${moduleLabel}`
   }
 
-  private toSymbolNodeId(filePath: string, symbolName: string) {
-    return `symbol:${filePath}:${symbolName}`
+  private toSymbolNodeId(filePath: string, symbol: CanonicalSymbol) {
+    return `symbol:${filePath}:${symbol.id}`
   }
 }

@@ -735,8 +735,9 @@ export class RepoTopologyDetector {
       return candidatePath
     }
 
-    const hasExtension = pathPosix.extname(candidatePath) !== ''
-    const extensions = hasExtension
+    const candidateExtension = pathPosix.extname(candidatePath)
+    const hasKnownExtension = candidateExtension !== '' && DEFAULT_CODE_EXTENSIONS.includes(candidateExtension)
+    const extensions = hasKnownExtension
       ? ['']
       : DEFAULT_CODE_EXTENSIONS
 

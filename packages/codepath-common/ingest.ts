@@ -137,6 +137,7 @@ export interface IngestSegmentV2 {
   fileExt?: string
   filePath: string
   httpMethod?: string
+  importSpecifiers?: string[]
   jsDoc?: string
   language?: string
   nodeType?: string
@@ -270,6 +271,10 @@ const INGEST_SEGMENT_SCHEMA_V1: JsonSchemaObject = {
       type: 'string'
     },
     httpMethod: { type: 'string' },
+    importSpecifiers: {
+      items: { type: 'string' },
+      type: 'array'
+    },
     jsDoc: { type: 'string' },
     language: { type: 'string' },
     params: {
@@ -786,6 +791,7 @@ function isIngestSegmentV2(value: unknown): value is IngestSegmentV2 {
     && isOptionalString(value.returnType)
     && isOptionalString(value.routePath)
     && (value.decorators === undefined || isStringArray(value.decorators))
+    && (value.importSpecifiers === undefined || isStringArray(value.importSpecifiers))
     && (value.params === undefined || isStringArray(value.params))
     && (value.astPath === undefined || isStringArray(value.astPath))
 }

@@ -285,6 +285,7 @@ describe('ingest.v2 contract', () => {
           fileExt: '.ts',
           filePath: 'src/a.ts',
           httpMethod: 'GET',
+          importSpecifiers: ['@nestjs/common', '../repo.service'],
           jsDoc: '/** Builds x. */',
           language: 'typescript',
           nodeType: 'function_declaration',

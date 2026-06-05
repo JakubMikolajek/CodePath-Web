@@ -6,11 +6,23 @@ type RepoFixture = {
 }
 
 type SegmentFixture = {
+  ast_path?: string[]
+  category?: string
   content?: string
+  end_line?: number
   file_ext?: string
   file_path: string
+  http_method?: string
+  import_specifiers?: string[]
   language?: string
   message_type?: string
+  node_type?: string
+  parent_symbol_name?: string
+  parse_strategy?: string
+  route_path?: string
+  segment_id?: string
+  start_line?: number
+  symbol_kind?: string
   symbol_name?: string
 }
 
@@ -33,6 +45,26 @@ function jsonFile(filePath: string, content: string): SegmentFixture {
     file_path: filePath,
     language: 'json',
     message_type: 'ingest.batch.ready'
+  }
+}
+
+function astSegment(filePath: string, symbolName: string, extra: Partial<SegmentFixture> = {}): SegmentFixture {
+  return {
+    ast_path: extra.ast_path ?? ['program', 'class_declaration', 'method_definition'],
+    category: 'code',
+    content: extra.content ?? 'return this.service.list()',
+    end_line: extra.end_line ?? 24,
+    file_ext: extra.file_ext ?? '.ts',
+    file_path: filePath,
+    language: extra.language ?? 'typescript',
+    message_type: extra.message_type ?? 'ingest.batch.ready',
+    node_type: extra.node_type ?? 'method_definition',
+    parse_strategy: 'tree_sitter',
+    segment_id: extra.segment_id ?? `seg-${symbolName}`,
+    start_line: extra.start_line ?? 20,
+    symbol_kind: extra.symbol_kind ?? 'endpoint',
+    symbol_name: symbolName,
+    ...extra
   }
 }
 
@@ -359,5 +391,96 @@ describe('DependenciesService interactive graph topology resolution', () => {
     expect(graph.nodes.some(node => node.label === '/repo/node_modules/lodash/index.js')).toBe(false)
     expect(graph.nodes.some(node => node.type === 'external_package' && node.label === 'lodash')).toBe(false)
     expect(graph.edges.some(edge => edge.metadata?.label === 'lodash')).toBe(false)
+  })
+
+  it('builds symbol and HTTP endpoint nodes from ingest.v2 semantic metadata without reparsing decorators from source text', async () => {
+    const repo = { id: 5, name: 'semantic-graph' }
+    const service = createService(repo, [
+      astSegment('/repo/apps/api/src/users.controller.ts', 'listUsers', {
+        content: 'return this.usersService.list()',
+        http_method: 'GET',
+        parent_symbol_name: 'UsersController',
+        route_path: '/users',
+        symbol_kind: 'endpoint'
+      })
+    ])
+
+    const graph = await service.getRepoInteractiveGraph(5, repo.id, {
+      includeSymbols: 'true'
+    })
+
+    expect(graph.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'symbol:/repo/apps/api/src/users.controller.ts:seg-listUsers',
+        label: 'listUsers',
+        metadata: expect.objectContaining({
+          astPath: ['program', 'class_declaration', 'method_definition'],
+          endLine: 24,
+          filePath: '/repo/apps/api/src/users.controller.ts',
+          httpMethod: 'GET',
+          nodeType: 'method_definition',
+          parentSymbolName: 'UsersController',
+          parseStrategy: 'tree_sitter',
+          routePath: '/users',
+          startLine: 20,
+          symbolKind: 'endpoint'
+        }),
+        type: 'symbol'
+      }),
+      expect.objectContaining({
+        id: 'external:http:GET:/users',
+        label: 'GET /users',
+        metadata: expect.objectContaining({
+          httpMethod: 'GET',
+          routePath: '/users'
+        }),
+        type: 'external_package'
+      })
+    ]))
+
+    expect(graph.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          label: 'GET /users',
+          rawType: 'http_endpoint'
+        }),
+        source: 'symbol:/repo/apps/api/src/users.controller.ts:seg-listUsers',
+        target: 'external:http:GET:/users',
+        type: 'produces'
+      })
+    ]))
+  })
+
+  it('resolves import edges from ingest.v2 import metadata before falling back to source parsing', async () => {
+    const repo = { id: 6, name: 'semantic-imports' }
+    const service = createService(repo, [
+      astSegment('/repo/apps/api/src/users.controller.ts', 'listUsers', {
+        content: 'return this.usersService.list()',
+        import_specifiers: ['./users.service'],
+        symbol_kind: 'http_endpoint'
+      }),
+      astSegment('/repo/apps/api/src/users.service.ts', 'UsersService', {
+        content: 'export class UsersService {}',
+        node_type: 'class_declaration',
+        segment_id: 'seg-users-service',
+        symbol_kind: 'service'
+      })
+    ])
+
+    const graph = await service.getRepoInteractiveGraph(6, repo.id, {
+      includeSymbols: 'true'
+    })
+
+    expect(graph.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          label: './users.service',
+          rawType: 'import'
+        }),
+        source: 'file:/repo/apps/api/src/users.controller.ts',
+        target: 'file:/repo/apps/api/src/users.service.ts',
+        type: 'imports'
+      })
+    ]))
   })
 })
