@@ -30,6 +30,33 @@ function createService() {
   )
 }
 
+function createStaleDbMocks(returningRows: unknown[][]) {
+  const returningMock = jest.fn()
+  for (const rows of returningRows) returningMock.mockResolvedValueOnce(rows)
+
+  const whereMock = jest.fn(() => ({
+    returning: returningMock
+  }))
+  const setMock = jest.fn(() => ({
+    where: whereMock
+  }))
+  const updateMock = jest.fn(() => ({
+    set: setMock
+  }))
+
+  return {
+    dbClient: {
+      update: updateMock
+    },
+    mocks: {
+      returningMock,
+      setMock,
+      updateMock,
+      whereMock
+    }
+  }
+}
+
 describe('RepoFetcherService', () => {
   beforeEach(() => {
     jest.restoreAllMocks()
@@ -108,5 +135,32 @@ describe('RepoFetcherService', () => {
     expect(message).not.toContain('token-123')
     expect(message).not.toContain('oauth2:token-123@')
     expect(message).toContain('https://***@gitlab.com/acme/demo.git')
+  })
+
+  it('marks stale active pipeline stages as failed', async () => {
+    const dbMocks = createStaleDbMocks([[{ id: 1 }], [{ id: 2 }], [{ id: 3 }]])
+    const service = new RepoFetcherService(
+      { dbClient: dbMocks.dbClient } as never,
+      {} as never
+    )
+
+    await service.markStalePipelineStages()
+
+    expect(dbMocks.mocks.updateMock).toHaveBeenCalledTimes(3)
+    expect(dbMocks.mocks.setMock).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      cloneStatus: 'failed',
+      docsStatus: 'failed',
+      embeddingStatus: 'failed',
+      lastPipelineError: expect.stringContaining('Clone stage exceeded')
+    }))
+    expect(dbMocks.mocks.setMock).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      docsStatus: 'failed',
+      embeddingStatus: 'failed',
+      lastPipelineError: expect.stringContaining('Embedding stage exceeded')
+    }))
+    expect(dbMocks.mocks.setMock).toHaveBeenNthCalledWith(3, expect.objectContaining({
+      docsStatus: 'failed',
+      lastPipelineError: expect.stringContaining('Documentation stage exceeded')
+    }))
   })
 })

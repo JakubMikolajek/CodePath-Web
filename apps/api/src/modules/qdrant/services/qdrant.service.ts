@@ -31,6 +31,10 @@ export class QdrantService implements OnModuleInit {
     }
   }
 
+  async getCollections() {
+    return await this.client.getCollections()
+  }
+
   async scroll(collectionName: string, options?: ScrollOptions) {
     const {
       filter,

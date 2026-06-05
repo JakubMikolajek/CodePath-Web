@@ -6,6 +6,8 @@ import { emitTelemetry } from '../../../lib/telemetry'
 import { repos } from '../../db/schema'
 import { DbService } from '../../db/services/db.service'
 
+const nowIso = () => new Date().toISOString()
+
 @Injectable()
 export class DocsService {
   constructor(
@@ -46,7 +48,9 @@ export class DocsService {
 
     const [claimedRepo] = await this.dbService.dbClient.update(repos).set({
       docsStatus: 'processing',
-      documentation: null
+      documentation: null,
+      lastPipelineError: null,
+      pipelineUpdatedAt: nowIso()
     })
       .where(and(
         eq(repos.id, repoId),
@@ -78,7 +82,9 @@ export class DocsService {
       })
     } catch (cause) {
       await this.dbService.dbClient.update(repos).set({
-        docsStatus: 'failed'
+        docsStatus: 'failed',
+        lastPipelineError: cause instanceof Error ? cause.message : String(cause),
+        pipelineUpdatedAt: nowIso()
       }).where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
       emitTelemetry({
         component: 'docs.service',
@@ -119,7 +125,9 @@ export class DocsService {
       cloneStatus: repos.cloneStatus,
       docsStatus: repos.docsStatus,
       embeddingStatus: repos.embeddingStatus,
-      id: repos.id
+      id: repos.id,
+      lastPipelineError: repos.lastPipelineError,
+      pipelineUpdatedAt: repos.pipelineUpdatedAt
     })
       .from(repos)
       .where(and(eq(repos.id, repoId), eq(repos.userId, userId)))

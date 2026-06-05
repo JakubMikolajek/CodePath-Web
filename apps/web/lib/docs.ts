@@ -8,6 +8,8 @@ export interface RepoDocsStatusResponse {
   docsStatus: RepoDocsStatus
   embeddingStatus: RepoEmbeddingStatus
   id: number
+  lastPipelineError: Nullable<string>
+  pipelineUpdatedAt: Nullable<string>
 }
 
 interface GenerateRepoDocsResponse {

@@ -9,6 +9,8 @@ describe('reposSlice', () => {
     docsStatus: 'ready',
     embeddingStatus: 'embedded',
     id: 7,
+    lastPipelineError: null,
+    pipelineUpdatedAt: null,
     name: 'codepath-web'
   }
 

@@ -11,6 +11,7 @@ const DEFAULTS = {
   keycloakIssuer: 'http://127.0.0.1:8081/realms/codepath-local',
   orchestratorTimeoutMs: 60_000,
   orchestratorUrl: 'http://127.0.0.1:8080',
+  pipelineStaleAfterMs: 30 * 60 * 1000,
   port: 3001,
   qdrantEmbeddingsCollectionName: 'embeddings_embeddinggemma',
   qdrantHost: '127.0.0.1',
@@ -27,7 +28,8 @@ const DEFAULTS = {
   repoStorageMinioRegion: 'us-east-1',
   repoStorageMinioSecretKey: 'minioadmin',
   repoStorageMinioUseSsl: false,
-  repoStorageProvider: 'minio'
+  repoStorageProvider: 'minio',
+  systemStatusTimeoutMs: 2500
 } as const
 
 function parseInteger(value: string | undefined, fallback: number): number {
@@ -77,6 +79,7 @@ export const env = {
   keycloakIssuer: process.env.KEYCLOAK_ISSUER ?? DEFAULTS.keycloakIssuer,
   orchestratorTimeoutMs: parseInteger(process.env.ORCHESTRATOR_TIMEOUT_MS, DEFAULTS.orchestratorTimeoutMs),
   orchestratorUrl: process.env.ORCHESTRATOR_URL ?? DEFAULTS.orchestratorUrl,
+  pipelineStaleAfterMs: parseInteger(process.env.PIPELINE_STALE_AFTER_MS, DEFAULTS.pipelineStaleAfterMs),
   port: parseInteger(process.env.PORT, DEFAULTS.port),
   qdrantEmbeddingsCollectionName: process.env.QDRANT_EMBEDDINGS_COLLECTION_NAME ?? DEFAULTS.qdrantEmbeddingsCollectionName,
   qdrantHost: process.env.QDRANT_HOST ?? DEFAULTS.qdrantHost,
@@ -93,7 +96,8 @@ export const env = {
   repoStorageMinioRegion: process.env.REPO_STORAGE_MINIO_REGION ?? DEFAULTS.repoStorageMinioRegion,
   repoStorageMinioSecretKey: process.env.REPO_STORAGE_MINIO_SECRET_KEY ?? DEFAULTS.repoStorageMinioSecretKey,
   repoStorageMinioUseSsl: parseBoolean(process.env.REPO_STORAGE_MINIO_USE_SSL, DEFAULTS.repoStorageMinioUseSsl),
-  repoStorageProvider: parseStorageProvider(process.env.REPO_STORAGE_PROVIDER)
+  repoStorageProvider: parseStorageProvider(process.env.REPO_STORAGE_PROVIDER),
+  systemStatusTimeoutMs: parseInteger(process.env.SYSTEM_STATUS_TIMEOUT_MS, DEFAULTS.systemStatusTimeoutMs)
 }
 
 export function resolveCorsOrigin(): string[] | true {

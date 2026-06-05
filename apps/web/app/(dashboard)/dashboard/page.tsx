@@ -3,6 +3,7 @@ import { BotMessageSquare, Braces, CalendarDays, FolderGit2, GitPullRequestArrow
 
 import { MetricCard } from '@/components/MetricCard'
 import { PageHeader } from '@/components/PageHeader'
+import { SystemStatusPanel } from '@/components/SystemStatusPanel'
 
 const recentActivity = [
   { icon: GitPullRequestArrow, meta: 'in Nurt Cloud', time: '2m ago', title: 'Updated authentication flow', tone: 'from-pink-500 to-amber-400' },
@@ -41,6 +42,8 @@ export default function Page() {
 
         <MetricCard detail="Online now" icon={UsersRound} label="Active Users" value="12" />
       </section>
+
+      <SystemStatusPanel />
 
       <section className="grid gap-6 xl:grid-cols-[1.1fr_1fr_0.72fr]">
         <div className="glass-panel rounded-3xl p-6">

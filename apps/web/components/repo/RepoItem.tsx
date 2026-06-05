@@ -9,7 +9,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem
 } from '@workspace/ui/components/sidebar'
-import { BotMessageSquare, Braces, ChevronRight, FileText, GitBranch, GitFork, Plus, TriangleAlert } from 'lucide-react'
+import { BotMessageSquare, Braces, CheckCircle2, ChevronRight, CircleDot, Clock3, FileText, GitBranch, GitFork, Plus, TriangleAlert } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import React from 'react'
@@ -23,6 +23,24 @@ interface RepoItemProps {
   item: Repository
 }
 
+const formatStatus = (status: string) => status.replaceAll('_', ' ')
+
+const getPipelineTone = (status: string) => {
+  if (status === 'ready' || status === 'embedded' || status === 'cloned') return 'text-emerald-300'
+  if (status === 'failed') return 'text-red-300'
+  if (status === 'processing' || status === 'cloning') return 'text-cyan-300'
+
+  return 'text-amber-300'
+}
+
+const getPipelineIcon = (status: string) => {
+  if (status === 'ready' || status === 'embedded' || status === 'cloned') return CheckCircle2
+  if (status === 'failed') return TriangleAlert
+  if (status === 'processing' || status === 'cloning') return Clock3
+
+  return CircleDot
+}
+
 export default function RepoItem({ item }: RepoItemProps) {
   const dispatch = useAppDispatch()
   const pathname = usePathname()
@@ -34,6 +52,12 @@ export default function RepoItem({ item }: RepoItemProps) {
   const isRepoOpen = openRepoId === item.id
   const hasPipelineFailure = item.cloneStatus === 'failed' || item.embeddingStatus === 'failed' || item.docsStatus === 'failed'
   const hasPipelineInProgress = item.cloneStatus === 'pending' || item.cloneStatus === 'cloning' || item.embeddingStatus === 'pending' || item.embeddingStatus === 'processing' || item.docsStatus === 'processing'
+  const statusItems = [
+    { label: 'Clone', value: item.cloneStatus },
+    { label: 'Embeddings', value: item.embeddingStatus },
+    { label: 'Docs', value: item.docsStatus }
+  ]
+  const overallStatus = hasPipelineFailure ? 'failed' : hasPipelineInProgress ? 'active' : 'ready'
 
   const handleOpenChange = (open: boolean) => {
     void dispatch(setOpenRepoId(open ? item.id : null))
@@ -53,16 +77,43 @@ export default function RepoItem({ item }: RepoItemProps) {
 
             <span>{item.name}</span>
 
-            {(hasPipelineFailure || hasPipelineInProgress) && (
-              <TriangleAlert className={hasPipelineFailure ? 'ml-auto size-4 text-red-300' : 'ml-auto size-4 text-amber-300'} />
-            )}
+            <span className="ml-auto flex items-center gap-1.5">
+              <span className={`h-2 w-2 rounded-full ${overallStatus === 'failed' ? 'bg-red-300' : overallStatus === 'active' ? 'bg-cyan-300' : 'bg-emerald-300'}`} />
 
-            <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[state=open]/collapsible-main:rotate-90" />
+              <ChevronRight className="size-4 transition-transform duration-200 group-data-[state=open]/collapsible-main:rotate-90" />
+            </span>
           </SidebarMenuButton>
         </CollapsibleTrigger>
 
         <CollapsibleContent>
           <SidebarMenuSub className="ml-4 mt-2 gap-1 border-l border-sidebar-border/70 pl-3">
+            <SidebarMenuSubItem>
+              <div className="rounded-lg border border-sidebar-border/60 bg-sidebar-accent/30 px-3 py-2">
+                <div className="space-y-1.5">
+                  {statusItems.map(statusItem => {
+                    const Icon = getPipelineIcon(statusItem.value)
+
+                    return (
+                      <div className="flex items-center justify-between gap-2 text-[0.7rem]" key={statusItem.label}>
+                        <span className="text-muted-foreground">{statusItem.label}</span>
+
+                        <span className={`flex items-center gap-1 font-medium capitalize ${getPipelineTone(statusItem.value)}`}>
+                          <Icon className="size-3.5" />
+                          {formatStatus(statusItem.value)}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {item.lastPipelineError && (
+                  <p className="mt-2 line-clamp-3 text-[0.68rem] leading-4 text-red-200">
+                    {item.lastPipelineError}
+                  </p>
+                )}
+              </div>
+            </SidebarMenuSubItem>
+
             <Collapsible asChild className="group/collapsible-chat">
               <SidebarMenuSubItem>
                 <CollapsibleTrigger asChild>

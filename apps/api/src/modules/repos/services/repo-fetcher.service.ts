@@ -5,7 +5,7 @@ import { Cron, CronExpression } from '@nestjs/schedule'
 import type { Nullable } from '@workspace/codepath-common/globals'
 import type { IngestJobRequestV2 } from '@workspace/codepath-common/ingest'
 import crypto from 'crypto'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, lt } from 'drizzle-orm'
 import { readdir, readFile, rm, stat, unlink, writeFile } from 'fs/promises'
 import { map } from 'lodash'
 import NodeRSA from 'node-rsa'
@@ -33,6 +33,8 @@ const INGEST_CONTRACT_VERSION_V2 = 'ingest.v2'
 const INGEST_MESSAGE_TYPE_JOB_REQUEST = 'ingest.job.request'
 const INGEST_PRODUCER_WEB_API = 'web-api'
 
+const nowIso = () => new Date().toISOString()
+
 @Injectable()
 export class RepoFetcherService {
   private logger: Logger = new Logger(RepoFetcherService.name)
@@ -51,13 +53,64 @@ export class RepoFetcherService {
 
     if (!repoToClone) return
 
-    const [claimedRepo] = await this.dbService.dbClient.update(repos).set({ cloneStatus: 'cloning' })
+    const [claimedRepo] = await this.dbService.dbClient.update(repos).set({
+      cloneStatus: 'cloning',
+      lastPipelineError: null,
+      pipelineUpdatedAt: nowIso()
+    })
       .where(and(eq(repos.id, repoToClone.id), eq(repos.cloneStatus, 'pending')))
       .returning()
 
     if (!claimedRepo) return
 
     await this.cloneRepo(claimedRepo)
+  }
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  async markStalePipelineStages() {
+    const cutoff = new Date(Date.now() - env.pipelineStaleAfterMs).toISOString()
+
+    const staleClones = await this.dbService.dbClient.update(repos).set({
+      cloneStatus: 'failed',
+      docsStatus: 'failed',
+      embeddingStatus: 'failed',
+      lastPipelineError: `Clone stage exceeded ${env.pipelineStaleAfterMs}ms without completion`,
+      pipelineUpdatedAt: nowIso()
+    })
+      .where(and(eq(repos.cloneStatus, 'cloning'), lt(repos.pipelineUpdatedAt, cutoff)))
+      .returning({ id: repos.id })
+
+    const staleEmbeddings = await this.dbService.dbClient.update(repos).set({
+      docsStatus: 'failed',
+      embeddingStatus: 'failed',
+      lastPipelineError: `Embedding stage exceeded ${env.pipelineStaleAfterMs}ms without completion`,
+      pipelineUpdatedAt: nowIso()
+    })
+      .where(and(eq(repos.embeddingStatus, 'processing'), lt(repos.pipelineUpdatedAt, cutoff)))
+      .returning({ id: repos.id })
+
+    const staleDocs = await this.dbService.dbClient.update(repos).set({
+      docsStatus: 'failed',
+      lastPipelineError: `Documentation stage exceeded ${env.pipelineStaleAfterMs}ms without completion`,
+      pipelineUpdatedAt: nowIso()
+    })
+      .where(and(eq(repos.docsStatus, 'processing'), lt(repos.pipelineUpdatedAt, cutoff)))
+      .returning({ id: repos.id })
+
+    for (const repo of [...staleClones, ...staleEmbeddings, ...staleDocs]) {
+      emitTelemetry({
+        component: 'repo-fetcher.service',
+        details: {
+          staleAfterMs: env.pipelineStaleAfterMs
+        },
+        event: 'pipeline_stage_marked_stale',
+        level: 'warn',
+        repoId: repo.id,
+        runtimeFamily: 'pipeline',
+        service: 'web-api',
+        status: 'error'
+      })
+    }
   }
 
   private buildCloneConfig(repo: SelectRepo): CloneConfig {
@@ -136,6 +189,31 @@ export class RepoFetcherService {
     }
   }
 
+  async requeueIngestJob(repo: SelectRepo) {
+    const ingestMessage = this.buildIngestJobRequest(repo.id, repo.sourceCommitSha ?? '', {
+      bucket: repo.storageBucket,
+      key: repo.storageKey,
+      provider: repo.storageProvider
+    })
+
+    await enqueueIngestJob(ingestMessage)
+
+    emitTelemetry({
+      component: 'repo-fetcher.service',
+      details: {
+        bucket: ingestMessage.payload.snapshot.bucket,
+        key: ingestMessage.payload.snapshot.key
+      },
+      event: 'ingest_job_request_republished',
+      level: 'info',
+      queueName: 'ingest',
+      repoId: repo.id,
+      runtimeFamily: 'pipeline',
+      service: 'web-api',
+      status: 'ok'
+    })
+  }
+
   private async cloneRepo(repo: SelectRepo) {
     const git = simpleGit()
     const targetPath = this.repoStorageService.getCloneWorkspacePath(repo.id, repo.name)
@@ -183,7 +261,9 @@ export class RepoFetcherService {
         docsStatus: 'pending',
         documentation: null,
         embeddingStatus: 'pending',
+        lastPipelineError: null,
         path: targetPath,
+        pipelineUpdatedAt: nowIso(),
         sourceCommitSha: commitSha,
         storageBucket: snapshot.bucket,
         storageKey: snapshot.key,
@@ -234,7 +314,9 @@ export class RepoFetcherService {
 
         await this.dbService.dbClient.update(repos).set({
           docsStatus: 'failed',
-          embeddingStatus: 'failed'
+          embeddingStatus: 'failed',
+          lastPipelineError: safeCauseMessage,
+          pipelineUpdatedAt: nowIso()
         }).where(eq(repos.id, repo.id))
 
         emitTelemetry({
@@ -258,7 +340,13 @@ export class RepoFetcherService {
       const safeErrorMessage = this.sanitizeErrorMessage(error, cloneConfig.secretsToMask)
       this.logger.error(`✗ Error cloning ${repo.name}: ${safeErrorMessage}`)
 
-      await this.dbService.dbClient.update(repos).set({ cloneStatus: 'failed' }).where(eq(repos.id, repo.id))
+      await this.dbService.dbClient.update(repos).set({
+        cloneStatus: 'failed',
+        docsStatus: 'failed',
+        embeddingStatus: 'failed',
+        lastPipelineError: safeErrorMessage,
+        pipelineUpdatedAt: nowIso()
+      }).where(eq(repos.id, repo.id))
       throw new Error(safeErrorMessage)
     } finally {
       if (tmpKeyPath) await unlink(tmpKeyPath).catch(() => { })

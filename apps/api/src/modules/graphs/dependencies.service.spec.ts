@@ -1,3 +1,5 @@
+import { ServiceUnavailableException } from '@nestjs/common'
+
 import { DependenciesService } from './services/dependencies.service'
 
 type RepoFixture = {
@@ -92,10 +94,23 @@ function createQdrantServiceMock(segments: SegmentFixture[]) {
   } as never
 }
 
+function createFailingQdrantServiceMock(error: Error) {
+  return {
+    scroll: jest.fn().mockRejectedValue(error)
+  } as never
+}
+
 function createService(repo: RepoFixture, segments: SegmentFixture[]) {
   return new DependenciesService(
     createDbServiceMock(repo),
     createQdrantServiceMock(segments)
+  )
+}
+
+function createServiceWithQdrant(repo: RepoFixture, qdrantService: never) {
+  return new DependenciesService(
+    createDbServiceMock(repo),
+    qdrantService
   )
 }
 
@@ -482,5 +497,17 @@ describe('DependenciesService interactive graph topology resolution', () => {
         type: 'imports'
       })
     ]))
+  })
+
+  it('surfaces Qdrant failures instead of returning an empty graph', async () => {
+    const repo = { id: 7, name: 'qdrant-down' }
+    const service = createServiceWithQdrant(
+      repo,
+      createFailingQdrantServiceMock(new Error('connection refused'))
+    )
+
+    await expect(service.getRepoInteractiveGraph(7, repo.id, {
+      includeSymbols: 'false'
+    })).rejects.toBeInstanceOf(ServiceUnavailableException)
   })
 })

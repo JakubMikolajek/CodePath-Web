@@ -9,6 +9,7 @@ import { DocsModule } from './modules/docs/docs.module'
 import { DependenciesModule } from './modules/graphs/dependencies.module'
 import { MetricsModule } from './modules/metrics/metrics.module'
 import { RepoModule } from './modules/repos/repo.module'
+import { SystemStatusModule } from './modules/system-status/system-status.module'
 
 @Module({
   imports: [
@@ -20,7 +21,8 @@ import { RepoModule } from './modules/repos/repo.module'
     AuthModule,
     DependenciesModule,
     DocsModule,
-    MetricsModule
+    MetricsModule,
+    SystemStatusModule
   ]
 })
 export class AppModule { }

@@ -50,6 +50,27 @@ export class RepoStorageService {
     await mkdir(this.localReposPath, { recursive: true })
   }
 
+  async checkHealth(): Promise<{ message: string, provider: 'local' | 'minio' }> {
+    if (this.provider !== 'minio') {
+      await this.ensureLocalWorkspaceRoot()
+      return {
+        message: `Local repository storage available at ${this.localReposPath}`,
+        provider: 'local'
+      }
+    }
+
+    if (!this.s3Client) {
+      throw new Error('MinIO provider is enabled but S3 client is not initialized')
+    }
+
+    await this.s3Client.send(new HeadBucketCommand({ Bucket: this.minioBucket }))
+
+    return {
+      message: `MinIO bucket "${this.minioBucket}" is available`,
+      provider: 'minio'
+    }
+  }
+
   getCloneWorkspacePath(repoId: number, repoName: string): string {
     const sanitized = repoName.replace(/[^a-zA-Z0-9_-]/g, '_')
     return path.join(this.localReposPath, `${repoId}-${sanitized}`)

@@ -64,6 +64,13 @@
       "when": 1779450000000,
       "tag": "0008_keycloak_oidc_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1780681159000,
+      "tag": "0009_pipeline_status_metadata",
+      "breakpoints": true
     }
   ]
 }

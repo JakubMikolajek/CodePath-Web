@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
 import type {
   RepoGraphEdge,
   RepoGraphEdgeType,
@@ -341,7 +341,7 @@ export class DependenciesService {
     } catch (error) {
       const safeError = error instanceof Error ? error.message : String(error)
       this.logger.error(`Failed to load repo segments from Qdrant for repo=${repoId}: ${safeError}`)
-      return []
+      throw new ServiceUnavailableException('Repository graph is unavailable because Qdrant cannot be reached')
     }
 
     return payloads

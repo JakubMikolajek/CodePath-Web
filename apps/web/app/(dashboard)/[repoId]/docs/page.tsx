@@ -3,7 +3,7 @@
 import type { Nullable } from '@workspace/codepath-common/globals'
 import { Button } from '@workspace/ui/components/button'
 import { Card, CardContent } from '@workspace/ui/components/card'
-import { BookOpen, CheckCircle2, Clock3, FileText, RefreshCw, Sparkles, TriangleAlert } from 'lucide-react'
+import { BookOpen, CheckCircle2, Clock3, FileText, RefreshCw, RotateCcw, Sparkles, TriangleAlert } from 'lucide-react'
 import { useParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Markdown from 'react-markdown'
@@ -12,6 +12,7 @@ import remarkGfm from 'remark-gfm'
 
 import { PageHeader } from '@/components/PageHeader'
 import { generateRepoDocs, getRepoDocs, getRepoDocsStatus, type RepoDocsStatusResponse } from '@/lib/docs'
+import { retryRepoClone, retryRepoIngest } from '@/lib/repos/client'
 import { getFirstRouteParam } from '@/lib/route-params'
 
 const DOCS_STATUS_POLL_MS = 5_000
@@ -31,6 +32,14 @@ const resolveErrorMessage = (error: unknown) => {
 
 const formatStatus = (status: string) => status.replaceAll('_', ' ')
 
+const isPipelineWaitingOrRunning = (status: RepoDocsStatusResponse) => (
+  status.cloneStatus === 'pending'
+  || status.cloneStatus === 'cloning'
+  || status.embeddingStatus === 'pending'
+  || status.embeddingStatus === 'processing'
+  || status.docsStatus === 'processing'
+)
+
 const getStatusTone = (status?: string) => {
   if (status === 'ready' || status === 'embedded' || status === 'cloned') return 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
   if (status === 'processing') return 'border-cyan-300/30 bg-cyan-300/10 text-cyan-200'
@@ -47,6 +56,7 @@ export default function Page() {
   const [error, setError] = useState<Nullable<string>>(null)
   const [isGenerating, setIsGenerating] = useState<boolean>(false)
   const [loading, setLoading] = useState<boolean>(false)
+  const [pipelineAction, setPipelineAction] = useState<Nullable<'clone' | 'ingest'>>(null)
   const [status, setStatus] = useState<Nullable<RepoDocsStatusResponse>>(null)
   const [text, setText] = useState<string>('')
 
@@ -107,12 +117,46 @@ export default function Page() {
     }
   }
 
+  const handleRetryClone = async () => {
+    if (!Number.isFinite(repoId)) return
+
+    setPipelineAction('clone')
+    setError(null)
+
+    try {
+      const nextStatus = await retryRepoClone(repoId)
+      setStatus(nextStatus)
+      setText('')
+    } catch (nextError) {
+      setError(resolveErrorMessage(nextError))
+    } finally {
+      setPipelineAction(null)
+    }
+  }
+
+  const handleRetryIngest = async () => {
+    if (!Number.isFinite(repoId)) return
+
+    setPipelineAction('ingest')
+    setError(null)
+
+    try {
+      const nextStatus = await retryRepoIngest(repoId)
+      setStatus(nextStatus)
+      setText('')
+    } catch (nextError) {
+      setError(resolveErrorMessage(nextError))
+    } finally {
+      setPipelineAction(null)
+    }
+  }
+
   useEffect(() => {
     void loadPageState()
   }, [loadPageState])
 
   useEffect(() => {
-    if (!Number.isFinite(repoId) || status?.docsStatus !== 'processing') return
+    if (!Number.isFinite(repoId) || !status || !isPipelineWaitingOrRunning(status)) return
 
     const interval = setInterval(() => {
       void (async () => {
@@ -127,9 +171,12 @@ export default function Page() {
     }, DOCS_STATUS_POLL_MS)
 
     return () => clearInterval(interval)
-  }, [fetchDocs, fetchStatus, repoId, status?.docsStatus])
+  }, [fetchDocs, fetchStatus, repoId, status])
 
   const canGenerate = status ? status.cloneStatus === 'cloned' && status.embeddingStatus === 'embedded' && status.docsStatus !== 'processing' : false
+  const canRetryClone = status ? status.cloneStatus !== 'cloning' : false
+  const canRetryIngest = status ? status.cloneStatus === 'cloned' : false
+  const isPipelineActionRunning = pipelineAction !== null
 
   const statusItems = status ? [
     { label: 'Clone', value: status.cloneStatus },
@@ -141,17 +188,27 @@ export default function Page() {
     <div className="space-y-6">
       <PageHeader
         actions={(
-          <>
-            <Button disabled={!canGenerate || isGenerating} onClick={handleGenerate} type="button" variant="glow">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button disabled={!canRetryClone || isPipelineActionRunning || isGenerating} onClick={handleRetryClone} type="button" variant="glass">
+              <RotateCcw className="size-4" />
+              {pipelineAction === 'clone' ? 'Restarting...' : 'Restart clone'}
+            </Button>
+
+            <Button disabled={!canRetryIngest || isPipelineActionRunning || isGenerating} onClick={handleRetryIngest} type="button" variant="glass">
+              <RefreshCw className="size-4" />
+              {pipelineAction === 'ingest' ? 'Restarting...' : 'Restart ingest'}
+            </Button>
+
+            <Button disabled={!canGenerate || isGenerating || isPipelineActionRunning} onClick={handleGenerate} type="button" variant="glow">
               <Sparkles className="size-4" />
               {isGenerating ? 'Starting...' : 'Generate docs'}
             </Button>
 
-            <Button onClick={loadPageState} type="button" variant="glass">
+            <Button disabled={loading || isPipelineActionRunning || isGenerating} onClick={loadPageState} type="button" variant="glass">
               <RefreshCw className="size-4" />
               Refresh
             </Button>
-          </>
+          </div>
         )}
         description="Generated technical documentation for repository architecture, API surface and implementation notes."
         eyebrow={`Repo ${Number.isFinite(repoId) ? repoId : 'unknown'}`}
@@ -182,6 +239,15 @@ export default function Page() {
           </Card>
         )}
       </section>
+
+      {status?.lastPipelineError && (
+        <section aria-label="Pipeline error" className="rounded-2xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-sm text-red-100">
+          <div className="flex items-start gap-2">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+            <p>{status.lastPipelineError}</p>
+          </div>
+        </section>
+      )}
 
       <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
         <aside aria-label="Documentation navigation" className="glass-panel h-fit rounded-3xl p-4">
