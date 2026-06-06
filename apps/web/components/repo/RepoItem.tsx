@@ -1,6 +1,8 @@
 'use client'
 
 import type { Repository } from '@workspace/codepath-common/repository'
+import { RepoDocsStatus } from '@workspace/codepath-common/repository'
+import { RepoCloneStatus, RepoEmbeddingStatus } from '@workspace/codepath-common/repository'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@workspace/ui/components/collapsible'
 import {
   SidebarMenuButton,
@@ -50,8 +52,14 @@ export default function RepoItem({ item }: RepoItemProps) {
   const openRepoId = useAppSelector(state => state.collapsible.openRepoId)
 
   const isRepoOpen = openRepoId === item.id
-  const hasPipelineFailure = item.cloneStatus === 'failed' || item.embeddingStatus === 'failed' || item.docsStatus === 'failed'
-  const hasPipelineInProgress = item.cloneStatus === 'pending' || item.cloneStatus === 'cloning' || item.embeddingStatus === 'pending' || item.embeddingStatus === 'processing' || item.docsStatus === 'processing'
+  const hasPipelineFailure = item.cloneStatus === RepoCloneStatus.FAILED
+    || item.embeddingStatus === RepoEmbeddingStatus.FAILED
+    || item.docsStatus === RepoDocsStatus.FAILED
+  const hasPipelineInProgress = item.cloneStatus === RepoCloneStatus.PENDING
+    || item.cloneStatus === RepoCloneStatus.CLONING
+    || item.embeddingStatus === RepoEmbeddingStatus.PENDING
+    || item.embeddingStatus === RepoEmbeddingStatus.PROCESSING
+    || item.docsStatus === RepoDocsStatus.PROCESSING
   const statusItems = [
     { label: 'Clone', value: item.cloneStatus },
     { label: 'Embeddings', value: item.embeddingStatus },

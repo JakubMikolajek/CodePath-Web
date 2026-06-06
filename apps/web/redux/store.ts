@@ -6,13 +6,21 @@ import collapsibleReducer from './slices/collapsibleSlice'
 import graphsReducer from './slices/graphsSlice'
 import reposReducer from './slices/reposSlice'
 
+export enum SliceName {
+  AUTH = 'auth',
+  CHAT = 'chat',
+  COLLAPSIBLE = 'collapsible',
+  GRAPHS = 'graphs',
+  REPOS = 'repos'
+}
+
 export const store = configureStore({
   reducer: {
-    auth: authReducer,
-    chat: chatReducer,
-    collapsible: collapsibleReducer,
-    graphs: graphsReducer,
-    repos: reposReducer
+    [SliceName.AUTH]: authReducer,
+    [SliceName.CHAT]: chatReducer,
+    [SliceName.COLLAPSIBLE]: collapsibleReducer,
+    [SliceName.GRAPHS]: graphsReducer,
+    [SliceName.REPOS]: reposReducer
   }
 })
 

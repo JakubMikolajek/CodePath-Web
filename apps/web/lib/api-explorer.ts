@@ -1,7 +1,3 @@
-import {
-  RepoApiRunnerApiKeyPlacement,
-  RepoApiRunnerAuthMode
-} from '@workspace/codepath-common/api-explorer'
 import type {
   RepoApiFramework,
   RepoApiHttpMethod,
@@ -14,6 +10,10 @@ import type {
   RepoApiRunnerSaveCollectionRequest,
   RepoInteractiveApi,
   RepoOpenApiDocument
+} from '@workspace/codepath-common/api-explorer'
+import {
+  RepoApiRunnerApiKeyPlacement,
+  RepoApiRunnerAuthMode
 } from '@workspace/codepath-common/api-explorer'
 
 import { apiClient } from '@/lib/api/api'

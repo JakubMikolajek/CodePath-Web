@@ -2,6 +2,8 @@ import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/tool
 import type { Nullable } from '@workspace/codepath-common/globals'
 import type { IUser } from '@workspace/codepath-common/user'
 
+import { SliceName } from '@/redux/store'
+
 interface AuthState {
   error: Nullable<string>
   loading: boolean
@@ -18,7 +20,7 @@ export const logout = createAsyncThunk('auth/logout', () => window.location.assi
 
 const authSlice = createSlice({
   initialState,
-  name: 'auth',
+  name: SliceName.AUTH,
   extraReducers: builder => {
     builder.addCase(logout.pending, state => {
       state.loading = true
@@ -33,14 +35,11 @@ const authSlice = createSlice({
     })
   },
   reducers: {
-    clearError: state => {
-      state.error = null
-    },
     setMe: (state, action: PayloadAction<IUser>) => {
       state.user = action.payload
     }
   }
 })
 
-export const { clearError, setMe } = authSlice.actions
+export const { setMe } = authSlice.actions
 export default authSlice.reducer

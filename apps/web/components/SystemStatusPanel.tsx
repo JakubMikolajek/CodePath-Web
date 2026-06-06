@@ -61,7 +61,7 @@ export function SystemStatusPanel() {
   }, [loadStatus])
 
   const sortedComponents = useMemo(() => {
-    const rank = { down: 0, degraded: 1, ok: 2 }
+    const rank = { degraded: 1, down: 0, ok: 2 }
     return [...(status?.components ?? [])].sort((a, b) => rank[a.status] - rank[b.status] || a.name.localeCompare(b.name))
   }, [status?.components])
 

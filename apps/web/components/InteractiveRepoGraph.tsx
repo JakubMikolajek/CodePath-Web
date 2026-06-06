@@ -79,15 +79,14 @@ function getOverviewNodes(nodes: RepoGraphNode[], edges: RepoGraphEdge[], focuse
     [RepoGraphNodeType.SYMBOL]: 60
   }
 
-  const selectedIds = new Set([...nodes]
-    .sort((a, b) => {
-      const scoreA = (degreeByNode.get(a.id) ?? 0) * 9 + typeWeight[a.type]
-      const scoreB = (degreeByNode.get(b.id) ?? 0) * 9 + typeWeight[b.type]
+  const selectedIds = new Set([...nodes].sort((a, b) => {
+    const scoreA = (degreeByNode.get(a.id) ?? 0) * 9 + typeWeight[a.type]
+    const scoreB = (degreeByNode.get(b.id) ?? 0) * 9 + typeWeight[b.type]
 
-      if (scoreA !== scoreB) return scoreB - scoreA
+    if (scoreA !== scoreB) return scoreB - scoreA
 
-      return a.label.localeCompare(b.label)
-    }).slice(0, OVERVIEW_NODE_LIMIT).map(node => node.id)
+    return a.label.localeCompare(b.label)
+  }).slice(0, OVERVIEW_NODE_LIMIT).map(node => node.id)
   )
 
   return nodes.filter(node => selectedIds.has(node.id))
@@ -190,8 +189,7 @@ function buildCoreRingsLayout(visibleNodes: RepoGraphNode[], visibleEdges: RepoG
   if (repoNode) coreIds.add(repoNode.id)
 
   while (coreIds.size > coreCount) {
-    const removable = [...coreIds]
-      .map(id => nodeById.get(id))
+    const removable = [...coreIds].map(id => nodeById.get(id))
       .filter((node): node is RepoGraphNode => node !== undefined && node.id !== repoNode?.id)
       .sort((a, b) => {
         const scoreDelta = nodeScore(a) - nodeScore(b)
@@ -354,13 +352,17 @@ export default function InteractiveRepoGraph({ collapsedModuleIds, focusedNodeId
 
   const rawVisibleNodes = useMemo(() => graph.nodes.filter(node => !hiddenNodeIds.has(node.id)), [graph.nodes, hiddenNodeIds])
   const rawVisibleNodeIdSet = useMemo(() => new Set(rawVisibleNodes.map(node => node.id)), [rawVisibleNodes])
-  const rawVisibleEdges = useMemo(() => graph.edges.filter(edge => rawVisibleNodeIdSet.has(edge.source) && rawVisibleNodeIdSet.has(edge.target)), [graph.edges, rawVisibleNodeIdSet])
+  const rawVisibleEdges = useMemo(() => graph.edges.filter(
+    edge => rawVisibleNodeIdSet.has(edge.source) && rawVisibleNodeIdSet.has(edge.target)), [graph.edges, rawVisibleNodeIdSet]
+  )
   const visibleNodes = useMemo(() => getOverviewNodes(rawVisibleNodes, rawVisibleEdges, focusedNodeId), [focusedNodeId, rawVisibleEdges, rawVisibleNodes])
 
   const overviewHiddenCount = rawVisibleNodes.length - visibleNodes.length
 
   const visibleNodeIdSet = useMemo(() => new Set(visibleNodes.map(node => node.id)), [visibleNodes])
-  const visibleEdges = useMemo(() => rawVisibleEdges.filter(edge => visibleNodeIdSet.has(edge.source) && visibleNodeIdSet.has(edge.target)), [rawVisibleEdges, visibleNodeIdSet])
+  const visibleEdges = useMemo(() => rawVisibleEdges.filter(
+    edge => visibleNodeIdSet.has(edge.source) && visibleNodeIdSet.has(edge.target)), [rawVisibleEdges, visibleNodeIdSet]
+  )
 
   const positioned = useMemo(() => {
     if (layoutMode === LayoutMode.CORE_RINGS) return buildCoreRingsLayout(visibleNodes, visibleEdges)

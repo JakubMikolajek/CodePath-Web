@@ -3,6 +3,7 @@ import type { Nullable } from '@workspace/codepath-common/globals'
 import type { Graph, RepoGraphEdgeType, RepoInteractiveGraph } from '@workspace/codepath-common/graph'
 
 import { getRepoGraphs, getRepoInteractiveGraph } from '@/lib/graphs'
+import { SliceName } from '@/redux/store'
 
 interface GraphsState {
   graphs: Graph[]
@@ -18,11 +19,7 @@ const initialState: GraphsState = {
   loadingInteractive: false
 }
 
-export const getGraphs = createAsyncThunk('graphs/getGraphs',
-  async (repoId: number) => {
-    return await getRepoGraphs(repoId)
-  }
-)
+export const getGraphs = createAsyncThunk('graphs/getGraphs', async (repoId: number) => await getRepoGraphs(repoId))
 
 export const getInteractiveGraph = createAsyncThunk('graphs/getInteractiveGraph',
   async (payload: {
@@ -31,19 +28,17 @@ export const getInteractiveGraph = createAsyncThunk('graphs/getInteractiveGraph'
     includeSymbols?: boolean
     relationTypes?: RepoGraphEdgeType[]
     repoId: number
-  }) => {
-    return await getRepoInteractiveGraph(payload.repoId, {
-      depth: payload.depth,
-      focusNodeId: payload.focusNodeId,
-      includeSymbols: payload.includeSymbols,
-      relationTypes: payload.relationTypes
-    })
-  }
+  }) => await getRepoInteractiveGraph(payload.repoId, {
+    depth: payload.depth,
+    focusNodeId: payload.focusNodeId,
+    includeSymbols: payload.includeSymbols,
+    relationTypes: payload.relationTypes
+  })
 )
 
 const graphsSlice = createSlice({
   initialState,
-  name: 'graphs',
+  name: SliceName.GRAPHS,
   reducers: {},
   extraReducers: builder => {
     builder.addCase(getGraphs.pending, state => {

@@ -16,19 +16,14 @@ export const createAxiosServer = async (): Promise<AxiosInstance> => {
 
   const instance = axios.create({
     baseURL: internalApiBaseUrl,
-    headers: {
-      Authorization: `Bearer ${accessToken}`
-    }
+    headers: { Authorization: `Bearer ${accessToken}` }
   })
 
-  instance.interceptors.response.use(
-    res => res,
-    err => {
-      if (isUnauthorizedError(err)) redirect('/')
-      
-      return Promise.reject(toError(err, 'Server request failed'))
-    }
-  )
+  instance.interceptors.response.use(res => res, err => {
+    if (isUnauthorizedError(err)) redirect('/')
+
+    return Promise.reject(toError(err, 'Server request failed'))
+  })
 
   return instance
 }

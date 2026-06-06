@@ -4,6 +4,7 @@ import type { Repository } from '@workspace/codepath-common/repository'
 
 import { getApiErrorMessage } from '@/lib/api/error'
 import { createRepo as createRepoApi, getRepos as getReposApi } from '@/lib/repos/client'
+import { SliceName } from '@/redux/store'
 import type { CreateRepoFormData } from '@/utils/validators/createRepoForm'
 
 interface ReposState {
@@ -46,7 +47,7 @@ export const getRepos = createAsyncThunk('repos/getRepos',
 
 const reposSlice = createSlice({
   initialState,
-  name: 'repos',
+  name: SliceName.REPOS,
   extraReducers: builder => {
     builder.addCase(createRepo.pending, state => {
       state.loading = true
@@ -71,9 +72,6 @@ const reposSlice = createSlice({
     })
   },
   reducers: {
-    clearError: state => {
-      state.error = null
-    },
     dismissSyncError: state => {
       state.syncError = null
     },
@@ -83,5 +81,5 @@ const reposSlice = createSlice({
   }
 })
 
-export const { clearError, dismissSyncError, setRepos } = reposSlice.actions
+export const { dismissSyncError, setRepos } = reposSlice.actions
 export default reposSlice.reducer

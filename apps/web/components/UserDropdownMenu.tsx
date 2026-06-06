@@ -19,9 +19,7 @@ export default function UserDropdownMenu() {
   const dispatch = useAppDispatch()
   const user = useAppSelector(state => state.auth.user)
 
-  const handleLogout = async () => {
-    await dispatch(logout())
-  }
+  const handleLogout = async () => await dispatch(logout())
 
   return (
     <DropdownMenu>

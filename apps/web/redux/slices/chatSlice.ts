@@ -1,4 +1,5 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
+import type { Nullable } from '@workspace/codepath-common'
 import type { ChatSession, SessionDetail } from '@workspace/codepath-common/chat'
 
 import {
@@ -7,10 +8,11 @@ import {
   getSessionDetails as getSessionDetailsApi,
   sendMessage as sendMessageApi
 } from '@/lib/chat'
+import { SliceName } from '@/redux/store'
 
 interface ChatState {
   chatSessions: ChatSession[]
-  error: null | string
+  error: Nullable<string>
   loading: boolean
   sessionDetails: SessionDetail[]
 }
@@ -22,33 +24,17 @@ const initialState: ChatState = {
   sessionDetails: []
 }
 
-export const createSession = createAsyncThunk('chat/createSession',
-  async (repoId: number) => {
-    await createSessionApi(repoId)
-  }
-)
+export const createSession = createAsyncThunk('chat/createSession', async (repoId: number) => await createSessionApi(repoId))
 
-export const getChatSessions = createAsyncThunk('chat/getChatSessions',
-  async (repoId: number) => {
-    return await getChatSessionsApi(repoId)
-  }
-)
+export const getChatSessions = createAsyncThunk('chat/getChatSessions', async (repoId: number) => await getChatSessionsApi(repoId))
 
-export const getSessionDetails = createAsyncThunk('chat/getSessionDetails',
-  async ({ repoId, sessionId }: { repoId: number; sessionId: string }) => {
-    return await getSessionDetailsApi(repoId, sessionId)
-  }
-)
+export const getSessionDetails = createAsyncThunk('chat/getSessionDetails', async ({ repoId, sessionId }: { repoId: number; sessionId: string }) => await getSessionDetailsApi(repoId, sessionId))
 
-export const sendMessage = createAsyncThunk('chat/sendMessage',
-  async ({ question, repoId, sessionId }: { question: string; repoId: number; sessionId: string }) => {
-    return await sendMessageApi(repoId, { question, sessionId }) as string
-  }
-)
+export const sendMessage = createAsyncThunk('chat/sendMessage', async ({ question, repoId, sessionId }: { question: string; repoId: number; sessionId: string }) => await sendMessageApi(repoId, { question, sessionId }) as string)
 
 const chatSlice = createSlice({
   initialState,
-  name: 'chat',
+  name: SliceName.CHAT,
   reducers: {},
   extraReducers: builder => {
     builder.addCase(getChatSessions.pending, state => {

@@ -1,5 +1,6 @@
 'use client'
 
+import { RepoCloneStatus, RepoDocsStatus, RepoEmbeddingStatus } from '@workspace/codepath-common'
 import type { Nullable } from '@workspace/codepath-common/globals'
 import { Button } from '@workspace/ui/components/button'
 import { Card, CardContent } from '@workspace/ui/components/card'
@@ -44,11 +45,11 @@ const resolveErrorMessage = (error: unknown) => {
 const formatStatus = (status: string) => status.replaceAll('_', ' ')
 
 const isPipelineWaitingOrRunning = (status: RepoDocsStatusResponse) => (
-  status.cloneStatus === 'pending'
-  || status.cloneStatus === 'cloning'
-  || status.embeddingStatus === 'pending'
-  || status.embeddingStatus === 'processing'
-  || status.docsStatus === 'processing'
+  status.cloneStatus === RepoCloneStatus.PENDING
+  || status.cloneStatus === RepoCloneStatus.CLONING
+  || status.embeddingStatus === RepoEmbeddingStatus.PENDING
+  || status.embeddingStatus === RepoEmbeddingStatus.PROCESSING
+  || status.docsStatus === RepoDocsStatus.PROCESSING
 )
 
 const getStatusTone = (status?: string) => {
@@ -99,7 +100,7 @@ export default function Page() {
     try {
       const nextStatus = await fetchStatus()
 
-      if (nextStatus?.docsStatus === 'ready') await fetchDocs()
+      if (nextStatus?.docsStatus === RepoDocsStatus.READY) await fetchDocs()
       else setText('')
     } catch (nextError) {
       setError(resolveErrorMessage(nextError))
@@ -119,7 +120,7 @@ export default function Page() {
 
       const nextStatus = await fetchStatus()
 
-      if (nextStatus?.docsStatus !== 'ready') setText('')
+      if (nextStatus?.docsStatus !== RepoDocsStatus.READY) setText('')
       else await fetchDocs()
     } catch (nextError) {
       setError(resolveErrorMessage(nextError))
@@ -174,7 +175,7 @@ export default function Page() {
         try {
           const nextStatus = await fetchStatus()
 
-          if (nextStatus?.docsStatus === 'ready') await fetchDocs()
+          if (nextStatus?.docsStatus === RepoDocsStatus.READY) await fetchDocs()
         } catch (nextError) {
           setError(resolveErrorMessage(nextError))
         }
@@ -184,9 +185,13 @@ export default function Page() {
     return () => clearInterval(interval)
   }, [fetchDocs, fetchStatus, repoId, status])
 
-  const canGenerate = status ? status.cloneStatus === 'cloned' && status.embeddingStatus === 'embedded' && status.docsStatus !== 'processing' : false
-  const canRetryClone = status ? status.cloneStatus !== 'cloning' : false
-  const canRetryIngest = status ? status.cloneStatus === 'cloned' : false
+  const canGenerate = status
+    ? status.cloneStatus === RepoCloneStatus.CLONED
+    && status.embeddingStatus === RepoEmbeddingStatus.EMBEDDED
+    && status.docsStatus !== RepoDocsStatus.PROCESSING
+    : false
+  const canRetryClone = status ? status.cloneStatus !== RepoCloneStatus.CLONING : false
+  const canRetryIngest = status ? status.cloneStatus === RepoCloneStatus.CLONED : false
   const isPipelineActionRunning = pipelineAction !== null
 
   const statusItems = status ? [
@@ -282,7 +287,7 @@ export default function Page() {
           </nav>
 
           <div className="mt-6 rounded-2xl border border-white/10 bg-white/3 p-3 text-xs text-muted-foreground">
-            {status?.docsStatus === 'ready' ? (
+            {status?.docsStatus === RepoDocsStatus.READY ? (
               <span className="flex items-center gap-2 text-emerald-200">
                 <CheckCircle2 className="size-4" />
                 Documentation is ready.
@@ -309,19 +314,19 @@ export default function Page() {
                   </p>
                 )}
 
-                {!loading && !error && status?.docsStatus === 'pending' && (
+                {!loading && !error && status?.docsStatus === RepoDocsStatus.PENDING && (
                   <p className="text-sm text-muted-foreground">
                     Documentation is not generated yet. Start generation when embeddings are ready.
                   </p>
                 )}
 
-                {!loading && !error && status?.docsStatus === 'processing' && (
+                {!loading && !error && status?.docsStatus === RepoDocsStatus.PROCESSING && (
                   <p className="text-sm text-muted-foreground">
                     Documentation generation is in progress. This view refreshes automatically every {DOCS_STATUS_POLL_MS / 1000}s.
                   </p>
                 )}
 
-                {!loading && !error && status?.docsStatus === 'failed' && (
+                {!loading && !error && status?.docsStatus === RepoDocsStatus.FAILED && (
                   <p className="flex items-center gap-2 text-sm text-red-300" role="alert">
                     <TriangleAlert className="size-4" />
                     Documentation generation failed. Retry after confirming embeddings are ready.

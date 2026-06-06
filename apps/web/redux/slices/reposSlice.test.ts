@@ -15,8 +15,8 @@ describe('reposSlice', () => {
     embeddingStatus: RepoEmbeddingStatus.EMBEDDED,
     id: 7,
     lastPipelineError: null,
-    pipelineUpdatedAt: null,
-    name: 'codepath-web'
+    name: 'codepath-web',
+    pipelineUpdatedAt: null
   }
 
   it('sets syncing flag on getRepos.pending', () => {

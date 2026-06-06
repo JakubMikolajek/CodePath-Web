@@ -479,7 +479,7 @@ export default function Page() {
     }
 
     const name = collectionNameInput.trim()
-    
+
     if (!name) {
       setRunnerError('Collection name is required')
       return
@@ -550,7 +550,7 @@ export default function Page() {
     }
 
     const name = authPresetNameInput.trim()
-    
+
     if (!name) {
       setRunnerError('Auth preset name is required')
       return
@@ -594,7 +594,7 @@ export default function Page() {
 
     setExportingOpenApi(true)
     setError(null)
-    
+
     try {
       const spec = await getRepoOpenApiSpec(repoId, {
         frameworks: selectedFrameworks.length > 0 ? selectedFrameworks : undefined,
@@ -701,7 +701,7 @@ export default function Page() {
       }
 
       const shouldSendBody = METHOD_WITH_BODY.has(selectedEndpoint.method)
-      
+
       const response = await runRepoApiRequest(repoId, {
         body: shouldSendBody ? parsedBody : undefined,
         headers,
@@ -775,7 +775,7 @@ export default function Page() {
             <div className="flex flex-wrap gap-2 text-sm">
               {METHOD_OPTIONS.map(method => (
                 <label
-                  className={`flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 transition ${selectedMethods.includes(method) ? 'border-primary/50 bg-primary/15 text-white' : 'border-white/10 bg-white/[0.03] text-muted-foreground hover:border-primary/40 hover:text-white'}`}
+                  className={`flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 transition ${selectedMethods.includes(method) ? 'border-primary/50 bg-primary/15 text-white' : 'border-white/10 bg-white/3 text-muted-foreground hover:border-primary/40 hover:text-white'}`}
                   key={method}
                 >
                   <input
@@ -800,7 +800,7 @@ export default function Page() {
 
                 return (
                   <label
-                    className={`flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 transition ${selectedFrameworks.includes(framework) ? 'border-cyan-300/40 bg-cyan-300/10 text-cyan-100' : 'border-white/10 bg-white/[0.03] text-muted-foreground hover:border-cyan-300/30 hover:text-white'} ${enabled ? '' : 'opacity-40'}`}
+                    className={`flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 transition ${selectedFrameworks.includes(framework) ? 'border-cyan-300/40 bg-cyan-300/10 text-cyan-100' : 'border-white/10 bg-white/3 text-muted-foreground hover:border-cyan-300/30 hover:text-white'} ${enabled ? '' : 'opacity-40'}`}
                     key={framework}
                   >
                     <input

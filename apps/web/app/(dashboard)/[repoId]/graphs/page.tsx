@@ -253,7 +253,7 @@ export default function Page() {
 
                   return (
                     <label
-                      className={`flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 transition ${isSelected ? 'border-primary/50 bg-primary/15 text-white' : 'border-white/10 bg-white/[0.03] text-muted-foreground'} ${isAvailable ? '' : 'opacity-40'}`}
+                      className={`flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 transition ${isSelected ? 'border-primary/50 bg-primary/15 text-white' : 'border-white/10 bg-white/3 text-muted-foreground'} ${isAvailable ? '' : 'opacity-40'}`}
                       key={relationType}
                     >
                       <input
@@ -278,7 +278,7 @@ export default function Page() {
 
                       return (
                         <button
-                          className={`rounded-full border px-3 py-1.5 text-xs transition ${collapsed ? 'border-amber-300/50 bg-amber-300/10 text-amber-200' : 'border-white/10 bg-white/[0.03] text-muted-foreground hover:border-primary/40 hover:text-white'}`}
+                          className={`rounded-full border px-3 py-1.5 text-xs transition ${collapsed ? 'border-amber-300/50 bg-amber-300/10 text-amber-200' : 'border-white/10 bg-white/3 text-muted-foreground hover:border-primary/40 hover:text-white'}`}
                           key={moduleNode.id}
                           onClick={() => toggleModuleCollapse(moduleNode.id)}
                           type="button"

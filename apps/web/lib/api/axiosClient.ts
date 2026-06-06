@@ -11,9 +11,7 @@ axiosClient.interceptors.response.use(
   response => response,
   error => {
     if (isUnauthorizedError(error)) {
-      if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-        window.location.assign('/')
-      }
+      if (typeof window !== 'undefined' && window.location.pathname !== '/') window.location.assign('/')
     }
     return Promise.reject(toError(error, 'Client request failed'))
   }
