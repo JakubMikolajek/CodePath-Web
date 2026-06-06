@@ -1,9 +1,5 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common'
-import {
-  RepoApiHttpMethod,
-  RepoApiRunnerApiKeyPlacement,
-  RepoApiRunnerAuthMode
-} from '@workspace/codepath-common/api-explorer'
+import { Nullable } from '@workspace/codepath-common'
 import type {
   RepoApiRunnerAuthConfig,
   RepoApiRunnerAuthPreset,
@@ -14,8 +10,14 @@ import type {
   RepoApiRunnerSaveAuthPresetRequest,
   RepoApiRunnerSaveCollectionRequest
 } from '@workspace/codepath-common/api-explorer'
+import {
+  RepoApiHttpMethod,
+  RepoApiRunnerApiKeyPlacement,
+  RepoApiRunnerAuthMode
+} from '@workspace/codepath-common/api-explorer'
 import type { AxiosInstance } from 'axios'
 
+import { isAllowedRunnerTarget } from '../../../utils/helpers'
 import { HTTP_CLIENT } from '../../http-client/http-client.tokens'
 import { ApiRunnerAuthPresetsRepository } from '../repositories/api-runner-auth-presets.repository'
 import { ApiRunnerCollectionsRepository } from '../repositories/api-runner-collections.repository'
@@ -73,20 +75,13 @@ export class ApiRunnerService {
     }
 
     const targetUrl = this.normalizeRunnerUrl(input.url)
-    if (!this.isAllowedRunnerTarget(targetUrl)) {
-      throw new BadRequestException(
-        'Target URL must be localhost or private LAN address (10.x, 172.16-31.x, 192.168.x)'
-      )
-    }
+    if (!isAllowedRunnerTarget(targetUrl)) throw new BadRequestException('Target URL must be localhost or private LAN address (10.x, 172.16-31.x, 192.168.x)')
 
     const timeoutMs = this.normalizeRunnerTimeout(input.timeoutMs)
     const headers = this.normalizeRunnerHeaders(input.headers)
-    if ([RepoApiHttpMethod.POST, RepoApiHttpMethod.PUT, RepoApiHttpMethod.PATCH].includes(method) && !headers['content-type']) {
-      headers['content-type'] = 'application/json'
-    }
-    if (!headers.accept) {
-      headers.accept = 'application/json'
-    }
+
+    if ([RepoApiHttpMethod.POST, RepoApiHttpMethod.PUT, RepoApiHttpMethod.PATCH].includes(method) && !headers['content-type']) headers['content-type'] = 'application/json'
+    if (!headers.accept) headers.accept = 'application/json'
 
     const startedAt = Date.now()
 
@@ -123,31 +118,24 @@ export class ApiRunnerService {
     }
   }
 
-  async saveRunnerAuthPreset(
-    userId: number,
-    repoId: number,
-    input: RepoApiRunnerSaveAuthPresetRequest
-  ): Promise<RepoApiRunnerAuthPreset> {
+  async saveRunnerAuthPreset(userId: number, repoId: number, input: RepoApiRunnerSaveAuthPresetRequest): Promise<RepoApiRunnerAuthPreset> {
     const name = this.normalizeName(input.name, RUNNER_AUTH_PRESET_NAME_MAX_LENGTH, 'Auth preset name')
     const config = this.normalizeRunnerAuthConfig(input.config)
+
     return await this.runnerAuthPresetsRepository.save(userId, repoId, name, config)
   }
 
-  async saveRunnerCollection(
-    userId: number,
-    repoId: number,
-    input: RepoApiRunnerSaveCollectionRequest
-  ): Promise<RepoApiRunnerCollection> {
+  async saveRunnerCollection(userId: number, repoId: number, input: RepoApiRunnerSaveCollectionRequest): Promise<RepoApiRunnerCollection> {
     const name = this.normalizeCollectionName(input.name)
     const config = this.normalizeCollectionConfig(input.config)
+
     return await this.runnerCollectionsRepository.save(userId, repoId, name, config)
   }
 
-  private assertMethod(value: string): null | RepoApiHttpMethod {
+  private assertMethod(value: string): Nullable<RepoApiHttpMethod> {
     const method = value.trim().toUpperCase() as RepoApiHttpMethod
-    if (!SUPPORTED_METHODS.includes(method)) {
-      return null
-    }
+
+    if (!SUPPORTED_METHODS.includes(method)) return null
 
     return method
   }
@@ -180,61 +168,8 @@ export class ApiRunnerService {
     }
   }
 
-  private isAllowedRunnerTarget(urlString: string) {
-    let parsed: URL
-    try {
-      parsed = new URL(urlString)
-    } catch {
-      return false
-    }
-
-    if (!['http:', 'https:'].includes(parsed.protocol)) {
-      return false
-    }
-
-    const hostname = parsed.hostname.toLowerCase()
-    if (['localhost', '127.0.0.1', '::1'].includes(hostname)) {
-      return true
-    }
-
-    if (hostname.endsWith('.local') || hostname.endsWith('.lan')) {
-      return true
-    }
-
-    if (!hostname.includes('.')) {
-      // Single-label hostnames on local network (for example: raspberrypi).
-      return true
-    }
-
-    return this.isPrivateIpv4Host(hostname)
-  }
-
-  private isPrivateIpv4Host(hostname: string) {
-    const octets = hostname.split('.').map(value => Number.parseInt(value, 10))
-    if (octets.length !== 4 || octets.some(value => !Number.isInteger(value) || value < 0 || value > 255)) {
-      return false
-    }
-
-    const [first, second] = octets
-    if (first === 10) {
-      return true
-    }
-
-    if (first === 192 && second === 168) {
-      return true
-    }
-
-    if (first === 172 && second >= 16 && second <= 31) {
-      return true
-    }
-
-    return false
-  }
-
   private normalizeCollectionConfig(config: RepoApiRunnerCollectionConfig): RepoApiRunnerCollectionConfig {
-    if (!config || typeof config !== 'object') {
-      throw new BadRequestException('Collection config is required')
-    }
+    if (!config || typeof config !== 'object') throw new BadRequestException('Collection config is required')
 
     const timeoutMs = Number.isFinite(config.timeoutMs)
       ? Math.min(RUNNER_MAX_TIMEOUT_MS, Math.max(1_000, Math.trunc(config.timeoutMs)))
@@ -248,36 +183,29 @@ export class ApiRunnerService {
       endpointMethod: this.assertMethod(String(config.endpointMethod ?? '')) ?? null,
       endpointPath: config.endpointPath ? String(config.endpointPath) : null,
       headersJson: String(config.headersJson ?? '{}'),
-      pathValues: typeof config.pathValues === 'object' && config.pathValues !== null
-        ? Object.fromEntries(
-          Object.entries(config.pathValues).map(([key, value]) => [String(key), String(value)])
-        )
-        : {},
+      pathValues: typeof config.pathValues === 'object' && config.pathValues !== null ? Object.fromEntries(
+        Object.entries(config.pathValues).map(([key, value]) => [String(key), String(value)])
+      ) : {},
       queryJson: String(config.queryJson ?? '{}'),
       timeoutMs
     }
   }
 
-  private normalizeCollectionName(name: string) {
+  private normalizeCollectionName(name: string): string {
     return this.normalizeName(name, RUNNER_COLLECTION_NAME_MAX_LENGTH, 'Collection name')
   }
 
   private normalizeName(name: string, maxLength: number, label: string) {
     const normalizedName = typeof name === 'string' ? name.trim() : ''
-    if (!normalizedName) {
-      throw new BadRequestException(`${label} is required`)
-    }
-    if (normalizedName.length > maxLength) {
-      throw new BadRequestException(`${label} max length is ${maxLength}`)
-    }
+
+    if (!normalizedName) throw new BadRequestException(`${label} is required`)
+    if (normalizedName.length > maxLength) throw new BadRequestException(`${label} max length is ${maxLength}`)
 
     return normalizedName
   }
 
   private normalizeRunnerAuthConfig(input: unknown): RepoApiRunnerAuthConfig {
-    const safeAuth = input && typeof input === 'object'
-      ? (input as Record<string, unknown>)
-      : {}
+    const safeAuth = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
 
     const rawMode = String(safeAuth.mode ?? '')
     const mode: RepoApiRunnerAuthMode = RUNNER_AUTH_MODES.includes(rawMode as RepoApiRunnerAuthMode)
@@ -299,20 +227,17 @@ export class ApiRunnerService {
 
   private normalizeRunnerHeaders(headers?: Record<string, string>) {
     const normalized: Record<string, string> = {}
-    if (!headers || typeof headers !== 'object') {
-      return normalized
-    }
+
+    if (!headers || typeof headers !== 'object') return normalized
 
     for (const [rawKey, rawValue] of Object.entries(headers)) {
       const key = rawKey.trim().toLowerCase()
-      if (!key || ['connection', 'content-length', 'host'].includes(key)) {
-        continue
-      }
+
+      if (!key || ['connection', 'content-length', 'host'].includes(key)) continue
 
       const value = typeof rawValue === 'string' ? rawValue.trim() : String(rawValue)
-      if (!value) {
-        continue
-      }
+
+      if (!value) continue
 
       normalized[key] = value
     }
@@ -321,17 +246,13 @@ export class ApiRunnerService {
   }
 
   private normalizeRunnerTimeout(timeoutMs?: number) {
-    if (!Number.isFinite(timeoutMs)) {
-      return RUNNER_DEFAULT_TIMEOUT_MS
-    }
+    if (!Number.isFinite(timeoutMs)) return RUNNER_DEFAULT_TIMEOUT_MS
 
     return Math.min(RUNNER_MAX_TIMEOUT_MS, Math.max(1_000, Math.trunc(timeoutMs as number)))
   }
 
   private normalizeRunnerUrl(url: string) {
-    if (typeof url !== 'string' || !url.trim()) {
-      throw new BadRequestException('Runner URL is required')
-    }
+    if (typeof url !== 'string' || !url.trim()) throw new BadRequestException('Runner URL is required')
 
     try {
       return new URL(url.trim()).toString()
@@ -342,15 +263,13 @@ export class ApiRunnerService {
 
   private toPlainHeaders(headers: unknown) {
     const normalized: Record<string, string> = {}
-    if (!headers || typeof headers !== 'object') {
-      return normalized
-    }
+
+    if (!headers || typeof headers !== 'object') return normalized
 
     for (const [rawKey, rawValue] of Object.entries(headers)) {
       const key = rawKey.toLowerCase()
-      if (!key) {
-        continue
-      }
+
+      if (!key) continue
 
       if (Array.isArray(rawValue)) {
         normalized[key] = rawValue.map(value => String(value)).join(', ')
@@ -362,9 +281,7 @@ export class ApiRunnerService {
         continue
       }
 
-      if (rawValue === undefined || rawValue === null) {
-        continue
-      }
+      if (rawValue === undefined || rawValue === null) continue
 
       normalized[key] = String(rawValue)
     }

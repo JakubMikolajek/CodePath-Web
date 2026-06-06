@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
+import { Nullable } from '@workspace/codepath-common'
 import { readMigrationFiles } from 'drizzle-orm/migrator'
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
@@ -138,10 +139,8 @@ export class DbService implements OnModuleDestroy, OnModuleInit {
     } as Record<LegacyTableName, boolean>
 
     for (const tableName of LEGACY_REQUIRED_TABLES) {
-      const result = await this.pool.query<{ regclass: null | string }>(
-        'select to_regclass($1) as regclass',
-        [`public.${tableName}`]
-      )
+      const result = await this.pool.query<{ regclass: Nullable<string> }>('select to_regclass($1) as regclass', [`public.${tableName}`])
+
       presence[tableName] = Boolean(result.rows[0]?.regclass)
     }
 
@@ -158,9 +157,8 @@ export class DbService implements OnModuleDestroy, OnModuleInit {
     ]
 
     const folder = candidates.find(candidate => existsSync(candidate))
-    if (!folder) {
-      throw new Error(`Drizzle migrations folder not found. Checked: ${candidates.join(', ')}`)
-    }
+
+    if (!folder) throw new Error(`Drizzle migrations folder not found. Checked: ${candidates.join(', ')}`)
 
     return folder
   }

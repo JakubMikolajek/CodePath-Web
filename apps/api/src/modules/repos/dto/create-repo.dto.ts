@@ -1,6 +1,10 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator'
+import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator'
 
-export type RepoAuthType = 'https_token' | 'none' | 'ssh_key'
+export enum RepoAuthType {
+  HTTPS_TOKEN = 'https_token',
+  NONE = 'none',
+  SSH_KEY = 'ssh_key',
+}
 
 export class CreateRepoDto {
   @IsOptional()
@@ -13,7 +17,7 @@ export class CreateRepoDto {
   @MaxLength(20000)
   authSecret?: string
 
-  @IsIn(['none', 'https_token', 'ssh_key'])
+  @IsEnum(RepoAuthType)
   @IsOptional()
   authType?: RepoAuthType
 

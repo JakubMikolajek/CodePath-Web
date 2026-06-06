@@ -1,5 +1,3 @@
-import { v4 as uuidv4 } from 'uuid'
-
 import { OrchestratorClientError } from '../orchestrator-client/services/orchestrator-client.service'
 import { emitTelemetry } from '../telemetry/services/telemetry'
 import { ChatService } from './services/chat.service'
@@ -8,16 +6,11 @@ jest.mock('../telemetry/services/telemetry', () => ({
   emitTelemetry: jest.fn()
 }))
 
-jest.mock('uuid', () => ({
-  v4: jest.fn()
-}))
-
 describe('chat rpc integration', () => {
   const emitTelemetryMock = jest.mocked(emitTelemetry)
   const orchestratorClient = {
     requestChatRpc: jest.fn()
   }
-  const uuidV4Mock = uuidv4 as unknown as jest.MockedFunction<() => string>
 
   const service = new ChatService(
     { dbClient: {} } as never,
@@ -28,8 +21,6 @@ describe('chat rpc integration', () => {
     jest.restoreAllMocks()
     orchestratorClient.requestChatRpc.mockReset()
     emitTelemetryMock.mockReset()
-    uuidV4Mock.mockReset()
-    uuidV4Mock.mockReturnValue('corr-test-001')
   })
 
   it('keeps correlation id between request and timeout telemetry events', async () => {
@@ -48,10 +39,11 @@ describe('chat rpc integration', () => {
     expect(emitTelemetryMock).toHaveBeenCalledTimes(2)
 
     const [requestEvent, timeoutEvent] = emitTelemetryMock.mock.calls.map(([payload]) => payload)
+    const correlationId = requestEvent.correlationId
 
     expect(requestEvent).toMatchObject({
       component: 'chat.rpc',
-      correlationId: 'corr-test-001',
+      correlationId: expect.any(String),
       event: 'chat_rpc_request_published',
       queueName: 'chat',
       repoId: 42,
@@ -60,7 +52,7 @@ describe('chat rpc integration', () => {
     })
     expect(timeoutEvent).toMatchObject({
       component: 'chat.rpc',
-      correlationId: 'corr-test-001',
+      correlationId,
       event: 'chat_rpc_timeout',
       queueName: 'chat',
       repoId: 42,
@@ -83,14 +75,15 @@ describe('chat rpc integration', () => {
 
     expect(emitTelemetryMock).toHaveBeenCalledTimes(2)
     const [requestEvent, responseEvent] = emitTelemetryMock.mock.calls.map(([payload]) => payload)
+    const correlationId = requestEvent.correlationId
 
     expect(requestEvent).toMatchObject({
-      correlationId: 'corr-test-001',
+      correlationId: expect.any(String),
       event: 'chat_rpc_request_published',
       repoId: 77
     })
     expect(responseEvent).toMatchObject({
-      correlationId: 'corr-test-001',
+      correlationId,
       event: 'chat_rpc_response_received',
       repoId: 77,
       status: 'ok'

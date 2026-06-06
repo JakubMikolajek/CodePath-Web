@@ -4,12 +4,13 @@ import {
   Injectable,
   UnauthorizedException
 } from '@nestjs/common'
+import { Undefinable } from '@workspace/codepath-common'
 
 import { SelectUser } from '../../db/schema'
 import { AuthService } from '../services/auth.service'
 
 interface AuthenticatedRequest {
-  headers: Record<string, string | string[] | undefined>
+  headers: Record<string, Undefinable<string | string[]>>
   user?: SelectUser
 }
 

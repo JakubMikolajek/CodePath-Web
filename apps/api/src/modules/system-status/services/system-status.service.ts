@@ -1,5 +1,5 @@
-import * as amqp from 'amqplib'
 import { Injectable } from '@nestjs/common'
+import * as amqp from 'amqplib'
 import { sql } from 'drizzle-orm'
 
 import { env } from '../../../config/env'
@@ -7,7 +7,11 @@ import { DbService } from '../../db/services/db.service'
 import { QdrantService } from '../../qdrant/services/qdrant.service'
 import { RepoStorageService } from '../../repo-storage/services/repo-storage.service'
 
-export type ComponentStatus = 'degraded' | 'down' | 'ok'
+export enum ComponentStatus {
+  DEGRADED = 'degraded',
+  DOWN = 'down',
+  OK = 'ok'
+}
 
 export interface SystemComponentStatus {
   checkedAt: string
@@ -44,11 +48,7 @@ export class SystemStatusService {
       this.checkOrchestrator()
     ])
 
-    return {
-      checkedAt: new Date().toISOString(),
-      components,
-      status: this.resolveOverallStatus(components)
-    }
+    return { checkedAt: new Date().toISOString(), components, status: this.resolveOverallStatus(components) }
   }
 
   private async checkApi() {
@@ -58,6 +58,7 @@ export class SystemStatusService {
   private async checkDatabase() {
     return await this.measure('Postgres', async () => {
       await this.withTimeout(this.dbService.dbClient.execute(sql`select 1`), 'Postgres check timed out')
+
       return 'Database query succeeded'
     })
   }
@@ -65,7 +66,9 @@ export class SystemStatusService {
   private async checkOrchestrator() {
     return await this.measure('Orchestrator', async () => {
       const response = await this.withTimeout(fetch(new URL('/healthz', env.orchestratorUrl)), 'Orchestrator health check timed out')
+
       if (!response.ok) throw new Error(`Health check returned HTTP ${response.status}`)
+
       return `/healthz returned HTTP ${response.status}`
     })
   }
@@ -74,10 +77,8 @@ export class SystemStatusService {
     return await this.measure('Qdrant', async () => {
       const collections = await this.withTimeout(this.qdrantService.getCollections(), 'Qdrant check timed out')
       const count = Array.isArray(collections.collections) ? collections.collections.length : 0
-      return {
-        details: { collections: count },
-        message: `Collections reachable: ${count}`
-      }
+
+      return { details: { collections: count }, message: `Collections reachable: ${count}` }
     })
   }
 
@@ -91,10 +92,7 @@ export class SystemStatusService {
           await channel.checkQueue(queueName)
         }
 
-        return {
-          details: { queues: REQUIRED_QUEUES.length },
-          message: `Required queues available: ${REQUIRED_QUEUES.length}`
-        }
+        return { details: { queues: REQUIRED_QUEUES.length }, message: `Required queues available: ${REQUIRED_QUEUES.length}` }
       } finally {
         await channel.close().catch(() => undefined)
         await connection.close().catch(() => undefined)
@@ -105,10 +103,8 @@ export class SystemStatusService {
   private async checkRepoStorage() {
     return await this.measure('Repo storage', async () => {
       const result = await this.withTimeout(this.repoStorageService.checkHealth(), 'Repository storage check timed out')
-      return {
-        details: { provider: result.provider },
-        message: result.message
-      }
+
+      return { details: { provider: result.provider }, message: result.message }
     })
   }
 
@@ -129,7 +125,7 @@ export class SystemStatusService {
         latencyMs: Math.round(performance.now() - startedAt),
         message: normalized.message,
         name,
-        status: 'ok'
+        status: ComponentStatus.OK
       }
     } catch (error) {
       return {
@@ -137,15 +133,16 @@ export class SystemStatusService {
         latencyMs: Math.round(performance.now() - startedAt),
         message: error instanceof Error ? error.message : String(error),
         name,
-        status: 'down'
+        status: ComponentStatus.DOWN
       }
     }
   }
 
   private resolveOverallStatus(components: SystemComponentStatus[]): ComponentStatus {
-    if (components.some(component => component.status === 'down')) return 'down'
-    if (components.some(component => component.status === 'degraded')) return 'degraded'
-    return 'ok'
+    if (components.some(component => component.status === ComponentStatus.DOWN)) return ComponentStatus.DOWN
+    if (components.some(component => component.status === ComponentStatus.DEGRADED)) return ComponentStatus.DEGRADED
+
+    return ComponentStatus.OK
   }
 
   private async withTimeout<T>(promise: Promise<T>, message: string): Promise<T> {
@@ -153,6 +150,7 @@ export class SystemStatusService {
 
     const timeoutPromise = new Promise<never>((_resolve, reject) => {
       timeout = setTimeout(() => reject(new Error(message)), env.systemStatusTimeoutMs)
+
       if (typeof timeout === 'object' && timeout && 'unref' in timeout && typeof timeout.unref === 'function') timeout.unref()
     })
 

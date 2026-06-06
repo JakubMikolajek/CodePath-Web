@@ -29,10 +29,7 @@ interface InMemoryTopologyState {
 }
 
 function createInMemoryChannel(): {
-  channel: jest.Mocked<Pick<
-    amqp.Channel,
-    'assertExchange' | 'assertQueue' | 'bindQueue' | 'deleteExchange' | 'deleteQueue'
-  >>
+  channel: jest.Mocked<Pick<amqp.Channel, 'assertExchange' | 'assertQueue' | 'bindQueue' | 'deleteExchange' | 'deleteQueue'>>
   state: InMemoryTopologyState
 } {
   const state: InMemoryTopologyState = {
@@ -41,10 +38,7 @@ function createInMemoryChannel(): {
     queues: new Map()
   }
 
-  const channel: jest.Mocked<Pick<
-    amqp.Channel,
-    'assertExchange' | 'assertQueue' | 'bindQueue' | 'deleteExchange' | 'deleteQueue'
-  >> = {
+  const channel: jest.Mocked<Pick<amqp.Channel, 'assertExchange' | 'assertQueue' | 'bindQueue' | 'deleteExchange' | 'deleteQueue'>> = {
     assertExchange: jest.fn(async (exchange: string, type: string, options?: amqp.Options.AssertExchange) => {
       state.exchanges.set(exchange, {
         durable: options?.durable ?? false,

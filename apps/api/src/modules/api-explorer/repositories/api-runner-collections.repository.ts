@@ -21,14 +21,9 @@ export class ApiRunnerCollectionsRepository {
       ))
       .returning({ id: apiRunnerCollections.id })
 
-    if (!deleted) {
-      throw new NotFoundException('Runner collection not found')
-    }
+    if (!deleted) throw new NotFoundException('Runner collection not found')
 
-    return {
-      id: deleted.id,
-      ok: true as const
-    }
+    return { id: deleted.id, ok: true as const }
   }
 
   async list(userId: number, repoId: number): Promise<RepoApiRunnerCollection[]> {
@@ -55,37 +50,22 @@ export class ApiRunnerCollectionsRepository {
     }))
   }
 
-  async save(
-    userId: number,
-    repoId: number,
-    name: string,
-    config: RepoApiRunnerCollectionConfig
-  ): Promise<RepoApiRunnerCollection> {
-    const [saved] = await this.dbService.dbClient.insert(apiRunnerCollections)
-      .values({
-        config,
-        name,
-        repoId,
-        userId
-      })
-      .onConflictDoUpdate({
-        set: {
-          config,
-          updatedAt: new Date().toISOString()
-        },
-        target: [
-          apiRunnerCollections.repoId,
-          apiRunnerCollections.userId,
-          apiRunnerCollections.name
-        ]
-      })
-      .returning({
-        config: apiRunnerCollections.config,
-        createdAt: apiRunnerCollections.createdAt,
-        id: apiRunnerCollections.id,
-        name: apiRunnerCollections.name,
-        updatedAt: apiRunnerCollections.updatedAt
-      })
+  async save(userId: number, repoId: number, name: string, config: RepoApiRunnerCollectionConfig): Promise<RepoApiRunnerCollection> {
+    const [saved] = await this.dbService.dbClient.insert(apiRunnerCollections).values({
+      config,
+      name,
+      repoId,
+      userId
+    }).onConflictDoUpdate({
+      set: { config, updatedAt: new Date().toISOString() },
+      target: [apiRunnerCollections.repoId, apiRunnerCollections.userId, apiRunnerCollections.name]
+    }).returning({
+      config: apiRunnerCollections.config,
+      createdAt: apiRunnerCollections.createdAt,
+      id: apiRunnerCollections.id,
+      name: apiRunnerCollections.name,
+      updatedAt: apiRunnerCollections.updatedAt
+    })
 
     return {
       config: saved.config,

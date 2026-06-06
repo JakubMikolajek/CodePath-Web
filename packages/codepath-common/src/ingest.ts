@@ -4,7 +4,8 @@ export const INGEST_CONTRACT_VERSION_V1 = 'ingest.v1' as const
 export const INGEST_CONTRACT_VERSION_V2 = 'ingest.v2' as const
 
 export enum StorageProvider {
-  MINIO = 'minio'
+  MINIO = 'minio',
+  LOCAL = 'local'
 }
 
 export enum IngestMessageType {

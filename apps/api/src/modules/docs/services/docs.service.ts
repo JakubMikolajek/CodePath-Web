@@ -7,10 +7,10 @@ import {
 } from '@workspace/codepath-common/telemetry'
 import { and, eq, ne } from 'drizzle-orm'
 
-import { OrchestratorClient } from '../../orchestrator-client/services/orchestrator-client.service'
-import { emitTelemetry } from '../../telemetry/services/telemetry'
 import { repos } from '../../db/schema'
 import { DbService } from '../../db/services/db.service'
+import { OrchestratorClient } from '../../orchestrator-client/services/orchestrator-client.service'
+import { emitTelemetry } from '../../telemetry/services/telemetry'
 
 const nowIso = () => new Date().toISOString()
 
@@ -24,18 +24,12 @@ export class DocsService {
   async generateDocumentation(userId: number, repoId: number) {
     const repo = await this.assertRepoOwnership(userId, repoId)
 
-    if (repo.cloneStatus !== 'cloned') {
-      throw new ConflictException(
-        `Repository clone is not ready for documentation generation (cloneStatus=${repo.cloneStatus})`
-      )
-    }
+    if (repo.cloneStatus !== 'cloned') throw new ConflictException(`Repository clone is not ready for documentation generation (cloneStatus=${repo.cloneStatus})`)
 
     if (repo.embeddingStatus !== 'embedded') {
       emitTelemetry({
         component: 'docs.service',
-        details: {
-          embeddingStatus: repo.embeddingStatus
-        },
+        details: { embeddingStatus: repo.embeddingStatus },
         event: 'docs_job_blocked_embedding_not_ready',
         level: TelemetryLevel.WARN,
         repoId: repoId,
@@ -43,37 +37,24 @@ export class DocsService {
         service: TelemetryService.WEB_API,
         status: TelemetryStatus.ERROR
       })
+
       throw new ConflictException(this.embeddingStatusGateMessage(repo.embeddingStatus))
     }
 
-    if (repo.docsStatus === 'processing') {
-      return {
-        message: 'Documentation generation already in progress',
-        status: 'processing' as const
-      }
-    }
+    if (repo.docsStatus === 'processing') return { message: 'Documentation generation already in progress', status: 'processing' }
 
     const [claimedRepo] = await this.dbService.dbClient.update(repos).set({
       docsStatus: 'processing',
       documentation: null,
       lastPipelineError: null,
       pipelineUpdatedAt: nowIso()
-    })
-      .where(and(
-        eq(repos.id, repoId),
-        eq(repos.userId, userId),
-        ne(repos.docsStatus, 'processing')
-      ))
-      .returning({
-        id: repos.id
-      })
+    }).where(and(
+      eq(repos.id, repoId),
+      eq(repos.userId, userId),
+      ne(repos.docsStatus, 'processing')
+    )).returning({ id: repos.id })
 
-    if (!claimedRepo) {
-      return {
-        message: 'Documentation generation already in progress',
-        status: 'processing' as const
-      }
-    }
+    if (!claimedRepo) return { message: 'Documentation generation already in progress', status: 'processing' }
 
     try {
       await this.orchestratorClient.enqueueDocsJob({ repoId })
@@ -93,6 +74,7 @@ export class DocsService {
         lastPipelineError: cause instanceof Error ? cause.message : String(cause),
         pipelineUpdatedAt: nowIso()
       }).where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
+
       emitTelemetry({
         component: 'docs.service',
         details: {
@@ -110,17 +92,13 @@ export class DocsService {
       throw cause
     }
 
-    return {
-      message: 'Documentation generation started',
-      status: 'processing' as const
-    }
+    return { message: 'Documentation generation started', status: 'processing' }
   }
 
   async getDocumentation(userId: number, repoId: number) {
     await this.assertRepoOwnership(userId, repoId)
 
-    const [repo] = await this.dbService.dbClient.select()
-      .from(repos)
+    const [repo] = await this.dbService.dbClient.select().from(repos)
       .where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
       .limit(1)
 
@@ -135,14 +113,11 @@ export class DocsService {
       id: repos.id,
       lastPipelineError: repos.lastPipelineError,
       pipelineUpdatedAt: repos.pipelineUpdatedAt
-    })
-      .from(repos)
+    }).from(repos)
       .where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
       .limit(1)
 
-    if (!repo) {
-      throw new NotFoundException('Repository not found')
-    }
+    if (!repo) throw new NotFoundException('Repository not found')
 
     return repo
   }
@@ -153,18 +128,16 @@ export class DocsService {
       docsStatus: repos.docsStatus,
       embeddingStatus: repos.embeddingStatus,
       id: repos.id
-    })
-      .from(repos)
+    }).from(repos)
       .where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
       .limit(1)
 
-    if (!repo) {
-      throw new NotFoundException('Repository not found')
-    }
+    if (!repo) throw new NotFoundException('Repository not found')
 
     return repo
   }
 
+  // FIXME add enum
   private embeddingStatusGateMessage(status: 'embedded' | 'failed' | 'pending' | 'processing') {
     switch (status) {
       case 'failed':

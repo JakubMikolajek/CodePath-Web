@@ -1,12 +1,4 @@
-import {
-  OpenApiVersion,
-  RepoApiHttpMethod,
-  RepoApiParameterLocation,
-  RepoOpenApiOperationMethod,
-  RepoOpenApiParameterIn,
-  RepoOpenApiSchemaType,
-  RepoOpenApiSourceMode
-} from '@workspace/codepath-common/api-explorer'
+import type { Nullable, Undefinable } from '@workspace/codepath-common'
 import type {
   RepoApiEndpoint,
   RepoInteractiveApi,
@@ -16,6 +8,17 @@ import type {
   RepoOpenApiSchema,
   RepoOpenApiSourceMetadata
 } from '@workspace/codepath-common/api-explorer'
+import {
+  OpenApiVersion,
+  RepoApiHttpMethod,
+  RepoApiParameterLocation,
+  RepoOpenApiOperationMethod,
+  RepoOpenApiParameterIn,
+  RepoOpenApiSchemaType,
+  RepoOpenApiSourceMode
+} from '@workspace/codepath-common/api-explorer'
+
+import { normalizeHttpPath } from '../../../utils/helpers'
 
 const METHOD_TO_OPENAPI: Record<RepoApiHttpMethod, RepoOpenApiOperationMethod> = {
   [RepoApiHttpMethod.DELETE]: RepoOpenApiOperationMethod.DELETE,
@@ -38,7 +41,7 @@ const SUPPORTED_OPENAPI_METHODS: RepoOpenApiOperationMethod[] = [
 ]
 
 export class OpenApiDocumentBuilder {
-  buildStaticSpec(interactiveApi: RepoInteractiveApi,schemaRegistry: Record<string, RepoOpenApiSchema>): RepoOpenApiDocument {
+  buildStaticSpec(interactiveApi: RepoInteractiveApi, schemaRegistry: Record<string, RepoOpenApiSchema>): RepoOpenApiDocument {
     const paths: RepoOpenApiDocument['paths'] = {}
 
     for (const endpoint of interactiveApi.endpoints) {
@@ -49,7 +52,7 @@ export class OpenApiDocumentBuilder {
       if (!paths[openApiPath]) paths[openApiPath] = {}
 
       const existing = paths[openApiPath][openApiMethod]
-      
+
       if (!existing) {
         paths[openApiPath][openApiMethod] = nextOperation
         continue
@@ -62,7 +65,9 @@ export class OpenApiDocumentBuilder {
       }
     }
 
-    const tags = Array.from(new Set(interactiveApi.endpoints.map(endpoint => endpoint.moduleName || endpoint.framework))).sort((a, b) => a.localeCompare(b)).map(name => ({ name }))
+    const tags = Array.from(
+      new Set(interactiveApi.endpoints.map(endpoint => endpoint.moduleName || endpoint.framework))).sort((a, b) => a.localeCompare(b)).map(name => ({ name })
+    )
 
     const staticOperationCount = this.countOpenApiOperations(paths)
     const staticOperationsWithCodeSource = this.countOperationsWithCodeSource(paths)
@@ -106,7 +111,7 @@ export class OpenApiDocumentBuilder {
         if (!runtimeOperation) continue
 
         const staticOperation = this.findStaticOperationForRuntimePath(staticPaths, runtimePath, method)
-        
+
         if (!staticOperation) {
           mergedOperations[method] = runtimeOperation
           continue
@@ -130,11 +135,11 @@ export class OpenApiDocumentBuilder {
     for (const [staticPath, staticOperations] of Object.entries(staticPaths)) {
       for (const [rawMethod, staticOperation] of Object.entries(staticOperations ?? {})) {
         const method = rawMethod as RepoOpenApiOperationMethod
-        
+
         if (!staticOperation) continue
 
         const runtimeMatch = this.findRuntimePathForStatic(staticPath, method, runtimePaths)
-        
+
         if (runtimeMatch) continue
         if (!mergedPaths[staticPath]) mergedPaths[staticPath] = {}
 
@@ -179,7 +184,7 @@ export class OpenApiDocumentBuilder {
     }
   }
 
-  normalizeRuntimeOpenApiDocument(input: unknown): null | RepoOpenApiDocument {
+  normalizeRuntimeOpenApiDocument(input: unknown): Nullable<RepoOpenApiDocument> {
     if (!input || typeof input !== 'object') return null
 
     const raw = input as Record<string, unknown>
@@ -190,19 +195,15 @@ export class OpenApiDocumentBuilder {
 
     const rawOpenApi = typeof raw.openapi === 'string' ? raw.openapi : ''
     const rawSwagger = typeof raw.swagger === 'string' ? raw.swagger : ''
-    
+
     if (!rawOpenApi.startsWith('3.') && !rawSwagger.startsWith('2.')) return null
 
-    const runtimeTags = Array.isArray(raw.tags)
-      ? raw.tags
-        .map(item => {
-          if (!item || typeof item !== 'object') return null
-          
-          const name = (item as Record<string, unknown>).name
-          return typeof name === 'string' && name.trim() ? { name: name.trim() } : null
-        })
-        .filter((value): value is { name: string } => value !== null)
-      : undefined
+    const runtimeTags = Array.isArray(raw.tags) ? raw.tags.map(item => {
+      if (!item || typeof item !== 'object') return null
+
+      const name = (item as Record<string, unknown>).name
+      return typeof name === 'string' && name.trim() ? { name: name.trim() } : null
+    }).filter((value): value is { name: string } => value !== null) : undefined
 
     const componentsRaw = raw.components && typeof raw.components === 'object' ? raw.components as Record<string, unknown> : undefined
     const schemasRaw = componentsRaw?.schemas && typeof componentsRaw.schemas === 'object' && !Array.isArray(componentsRaw.schemas) ? componentsRaw.schemas as Record<string, RepoOpenApiSchema> : undefined
@@ -221,16 +222,12 @@ export class OpenApiDocumentBuilder {
   }
 
   private buildPathMatchCandidates(path: string) {
-    const normalized = this.normalizeHttpPath(path)
+    const normalized = normalizeHttpPath(path)
     const candidates = new Set<string>([normalized])
 
-    if (normalized.startsWith('/api/')) {
-      candidates.add(this.normalizeHttpPath(normalized.slice(4)))
-    } else if (normalized === '/api') {
-      candidates.add('/')
-    } else {
-      candidates.add(this.normalizeHttpPath(`/api${normalized}`))
-    }
+    if (normalized.startsWith('/api/')) candidates.add(normalizeHttpPath(normalized.slice(4)))
+    else if (normalized === '/api') candidates.add('/')
+    else candidates.add(normalizeHttpPath(`/api${normalized}`))
 
     return [...candidates]
   }
@@ -239,9 +236,7 @@ export class OpenApiDocumentBuilder {
     let total = 0
     for (const operations of Object.values(paths)) {
       for (const method of SUPPORTED_OPENAPI_METHODS) {
-        if (operations?.[method]) {
-          total += 1
-        }
+        if (operations?.[method]) total += 1
       }
     }
 
@@ -250,116 +245,72 @@ export class OpenApiDocumentBuilder {
 
   private countOperationsWithCodeSource(paths: RepoOpenApiDocument['paths']) {
     let total = 0
+
     for (const operations of Object.values(paths)) {
       for (const method of SUPPORTED_OPENAPI_METHODS) {
         const operation = operations?.[method]
-        if (!operation) {
-          continue
-        }
 
-        if (operation['x-codepath'] || (operation['x-codepath-sources']?.length ?? 0) > 0) {
-          total += 1
-        }
+        if (!operation) continue
+
+        if (operation['x-codepath'] || (operation['x-codepath-sources']?.length ?? 0) > 0) total += 1
       }
     }
 
     return total
   }
 
-  private findRuntimePathForStatic(
-    staticPath: string,
-    method: RepoOpenApiOperationMethod,
-    runtimePaths: RepoOpenApiDocument['paths']
-  ) {
+  private findRuntimePathForStatic(staticPath: string, method: RepoOpenApiOperationMethod, runtimePaths: RepoOpenApiDocument['paths']): Nullable<string> {
     const candidates = this.buildPathMatchCandidates(staticPath)
+
     for (const candidate of candidates) {
       const operation = runtimePaths[candidate]?.[method]
-      if (operation) {
-        return candidate
-      }
+
+      if (operation) return candidate
     }
 
     return null
   }
 
-  private findStaticOperationForRuntimePath(
-    staticPaths: RepoOpenApiDocument['paths'],
-    runtimePath: string,
-    method: RepoOpenApiOperationMethod
-  ) {
+  private findStaticOperationForRuntimePath(staticPaths: RepoOpenApiDocument['paths'], runtimePath: string, method: RepoOpenApiOperationMethod): Nullable<RepoOpenApiOperation> {
     const candidates = this.buildPathMatchCandidates(runtimePath)
+
     for (const candidate of candidates) {
       const operation = staticPaths[candidate]?.[method]
-      if (operation) {
-        return operation
-      }
+
+      if (operation) return operation
     }
 
     return null
   }
 
-  private mergeOperationSources(existing: RepoOpenApiOperation, nextOperation: RepoOpenApiOperation) {
+  private mergeOperationSources(existing: RepoOpenApiOperation, nextOperation: RepoOpenApiOperation): RepoOpenApiSourceMetadata[] {
     const allSources: RepoOpenApiSourceMetadata[] = []
 
-    if (existing['x-codepath']) {
-      allSources.push(existing['x-codepath'])
-    }
-    if (existing['x-codepath-sources']) {
-      allSources.push(...existing['x-codepath-sources'])
-    }
-    if (nextOperation['x-codepath']) {
-      allSources.push(nextOperation['x-codepath'])
-    }
+    if (existing['x-codepath']) allSources.push(existing['x-codepath'])
+    if (existing['x-codepath-sources']) allSources.push(...existing['x-codepath-sources'])
+    if (nextOperation['x-codepath']) allSources.push(nextOperation['x-codepath'])
 
     const unique = new Map<string, RepoOpenApiSourceMetadata>()
+
     for (const source of allSources) {
       const key = `${source.framework}:${source.filePath}:${source.symbolName ?? ''}`
+
       unique.set(key, source)
     }
 
     return [...unique.values()]
   }
 
-  private mergeTagValues(...tagsLists: Array<Array<string> | undefined>) {
+  private mergeTagValues(...tagsLists: Array<Undefinable<Array<string>>>) {
     return Array.from(
-      new Set(
-        tagsLists
-          .flatMap(list => list ?? [])
-          .map(value => value.trim())
-          .filter(Boolean)
-      )
+      new Set(tagsLists.flatMap(list => list ?? []).map(value => value.trim()).filter(Boolean))
     )
   }
 
-  private normalizeHttpPath(path: string) {
-    const trimmed = path.trim()
-    if (!trimmed || trimmed === '.') {
-      return '/'
-    }
+  private normalizeTypeName(value: unknown): Undefinable<string> {
+    if (typeof value !== 'string') return undefined
 
-    let normalized = trimmed
-      .replaceAll('\\', '/')
-      .replace(/\/{2,}/g, '/')
-      .replace(/^\.\/+/, '')
-
-    if (!normalized.startsWith('/')) {
-      normalized = `/${normalized}`
-    }
-
-    if (normalized.length > 1 && normalized.endsWith('/')) {
-      normalized = normalized.slice(0, -1)
-    }
-
-    return normalized
-  }
-
-  private normalizeTypeName(value: unknown): string | undefined {
-    if (typeof value !== 'string') {
-      return undefined
-    }
-
-    const normalized = value
-      .trim()
+    const normalized = value.trim()
       .split(/[\s<>\[\],|]/)[0]
       ?.replace(/^.*\./, '')
       ?.replace(/[^A-Za-z0-9_]/g, '')
@@ -384,52 +335,41 @@ export class OpenApiDocumentBuilder {
     openApiPath: string,
     schemaRegistry: Record<string, RepoOpenApiSchema>
   ): RepoOpenApiOperation {
-    const parameters: RepoOpenApiParameter[] = endpoint.params
-      .filter(
-        (
-          param
-        ): param is RepoApiEndpoint['params'][number] & {
-          location: RepoApiParameterLocation.HEADER | RepoApiParameterLocation.PATH | RepoApiParameterLocation.QUERY
-        } => param.location !== RepoApiParameterLocation.BODY
-      )
-      .map(param => ({
-        in: this.toOpenApiParameterIn(param.location),
-        name: param.name,
-        required: param.location === RepoApiParameterLocation.PATH ? true : param.required,
-        schema: {
-          type: RepoOpenApiSchemaType.STRING
-        }
-      }))
+    const parameters: RepoOpenApiParameter[] = endpoint.params.filter(
+      (param): param is RepoApiEndpoint['params'][number] & {
+        location: RepoApiParameterLocation.HEADER | RepoApiParameterLocation.PATH | RepoApiParameterLocation.QUERY
+      } => param.location !== RepoApiParameterLocation.BODY
+    ).map(param => ({
+      in: this.toOpenApiParameterIn(param.location),
+      name: param.name,
+      required: param.location === RepoApiParameterLocation.PATH ? true : param.required,
+      schema: { type: RepoOpenApiSchemaType.STRING }
+    }))
 
     const bodyParams = endpoint.params.filter(param => param.location === RepoApiParameterLocation.BODY)
+
     const bodyProperties = Object.fromEntries(
       bodyParams.map(param => [
         param.name === 'body' ? 'payload' : param.name,
-        {
-          type: RepoOpenApiSchemaType.STRING
-        }
+        { type: RepoOpenApiSchemaType.STRING }
       ])
     )
+
     const requiredBodyProperties = bodyParams
       .filter(param => param.required)
       .map(param => param.name === 'body' ? 'payload' : param.name)
+
     const requestBodyTypeName = this.normalizeTypeName(endpoint.requestBodyTypeName)
 
     const operation: RepoOpenApiOperation = {
       operationId: this.toOperationId(endpoint),
-      responses: {
-        '200': {
-          description: 'Successful response'
-        }
-      },
+      responses: { '200': { description: 'Successful response' } },
       summary: `${endpoint.method} ${openApiPath}`,
       tags: [endpoint.moduleName || endpoint.framework],
       'x-codepath': this.sourceFromEndpoint(endpoint)
     }
 
-    if (parameters.length > 0) {
-      operation.parameters = parameters
-    }
+    if (parameters.length > 0) operation.parameters = parameters
 
     if (bodyParams.length > 0 || (requestBodyTypeName && schemaRegistry[requestBodyTypeName])) {
       const schema = requestBodyTypeName && schemaRegistry[requestBodyTypeName]
@@ -442,22 +382,12 @@ export class OpenApiDocumentBuilder {
         }
 
       operation.requestBody = {
-        content: {
-          'application/json': {
-            schema
-          }
-        },
+        content: { 'application/json': { schema } },
         required: requestBodyTypeName ? true : requiredBodyProperties.length > 0
       }
     }
 
     return operation
-  }
-
-  private toOpenApiPath(path: string) {
-    return this.normalizeHttpPath(path)
-      .replace(/:([A-Za-z0-9_]+)/g, '{$1}')
-      .replace(/<(?:(?:[A-Za-z0-9_]+):)?([A-Za-z0-9_]+)>/g, '{$1}')
   }
 
   private toOpenApiParameterIn(location: RepoApiParameterLocation): RepoOpenApiParameterIn {
@@ -467,8 +397,15 @@ export class OpenApiDocumentBuilder {
     return RepoOpenApiParameterIn.QUERY
   }
 
+  private toOpenApiPath(path: string) {
+    return normalizeHttpPath(path)
+      .replace(/:([A-Za-z0-9_]+)/g, '{$1}')
+      .replace(/<(?:(?:[A-Za-z0-9_]+):)?([A-Za-z0-9_]+)>/g, '{$1}')
+  }
+
   private toOperationId(endpoint: RepoApiEndpoint) {
     const methodPart = endpoint.method.toLowerCase()
+
     const pathPart = endpoint.path
       .replace(/^\/+/, '')
       .replace(/[{}<>:]/g, '')
@@ -476,22 +413,20 @@ export class OpenApiDocumentBuilder {
       .replace(/[/-]+/g, '_')
       .replace(/^_+|_+$/g, '')
       || 'root'
+
     const filePart = endpoint.filePath
       .replace(/[^A-Za-z0-9/_-]+/g, '')
       .replace(/[/-]+/g, '_')
       .replace(/^_+|_+$/g, '')
       || 'file'
-    const symbolPart = endpoint.symbolName
-      ? endpoint.symbolName.replace(/[^A-Za-z0-9_]+/g, '_').replace(/^_+|_+$/g, '')
-      : 'handler'
+
+    const symbolPart = endpoint.symbolName ? endpoint.symbolName.replace(/[^A-Za-z0-9_]+/g, '_').replace(/^_+|_+$/g, '') : 'handler'
 
     return `${methodPart}_${pathPart}_${filePart}_${symbolPart}`
   }
 
   private toRatio(value: number, total: number) {
-    if (total <= 0) {
-      return 0
-    }
+    if (total <= 0) return 0
 
     return Number((value / total).toFixed(4))
   }

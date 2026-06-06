@@ -2,8 +2,13 @@ import { URL } from 'node:url'
 
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
-import type { Nullable } from '@workspace/codepath-common/globals'
-import { type IngestJobRequestV2, StorageProvider } from '@workspace/codepath-common/ingest'
+import type { Nullable, Undefinable } from '@workspace/codepath-common/globals'
+import {
+  INGEST_CONTRACT_VERSION_V2,
+  type IngestJobRequestV2,
+  IngestMessageType, IngestProducer,
+  StorageProvider
+} from '@workspace/codepath-common/ingest'
 import {
   TelemetryLevel,
   TelemetryRuntimeFamily,
@@ -19,12 +24,13 @@ import path from 'path'
 import simpleGit, { type SimpleGit } from 'simple-git'
 
 import { env } from '../../../config/env'
-import { OrchestratorClient } from '../../orchestrator-client/services/orchestrator-client.service'
-import { emitTelemetry } from '../../telemetry/services/telemetry'
 import { IGNORED_DIRS, IGNORED_EXTENSIONS, IGNORED_FILES } from '../../../utils/ignores'
 import { files, InsertFile, repos, SelectRepo } from '../../db/schema'
 import { DbService } from '../../db/services/db.service'
+import { OrchestratorClient } from '../../orchestrator-client/services/orchestrator-client.service'
 import { RepoStorageService } from '../../repo-storage/services/repo-storage.service'
+import { emitTelemetry } from '../../telemetry/services/telemetry'
+import { RepoAuthType } from '../dto/create-repo.dto'
 
 interface CloneConfig {
   cloneUrl: string
@@ -32,12 +38,6 @@ interface CloneConfig {
   secretsToMask: string[]
   sshPrivateKey: Nullable<string>
 }
-
-type RepoGitAuthType = 'https_token' | 'none' | 'ssh_key'
-
-const INGEST_CONTRACT_VERSION_V2 = 'ingest.v2'
-const INGEST_MESSAGE_TYPE_JOB_REQUEST = 'ingest.job.request'
-const INGEST_PRODUCER_WEB_API = 'web-api'
 
 const nowIso = () => new Date().toISOString()
 
@@ -50,6 +50,45 @@ export class RepoFetcherService {
     private readonly repoStorageService: RepoStorageService,
     private readonly orchestratorClient: OrchestratorClient,
   ) { }
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  async markStalePipelineStages() {
+    const cutoff = new Date(Date.now() - env.pipelineStaleAfterMs).toISOString()
+
+    const staleClones = await this.dbService.dbClient.update(repos).set({
+      cloneStatus: 'failed',
+      docsStatus: 'failed',
+      embeddingStatus: 'failed',
+      lastPipelineError: `Clone stage exceeded ${env.pipelineStaleAfterMs}ms without completion`,
+      pipelineUpdatedAt: nowIso()
+    }).where(and(eq(repos.cloneStatus, 'cloning'), lt(repos.pipelineUpdatedAt, cutoff))).returning({ id: repos.id })
+
+    const staleEmbeddings = await this.dbService.dbClient.update(repos).set({
+      docsStatus: 'failed',
+      embeddingStatus: 'failed',
+      lastPipelineError: `Embedding stage exceeded ${env.pipelineStaleAfterMs}ms without completion`,
+      pipelineUpdatedAt: nowIso()
+    }).where(and(eq(repos.embeddingStatus, 'processing'), lt(repos.pipelineUpdatedAt, cutoff))).returning({ id: repos.id })
+
+    const staleDocs = await this.dbService.dbClient.update(repos).set({
+      docsStatus: 'failed',
+      lastPipelineError: `Documentation stage exceeded ${env.pipelineStaleAfterMs}ms without completion`,
+      pipelineUpdatedAt: nowIso()
+    }).where(and(eq(repos.docsStatus, 'processing'), lt(repos.pipelineUpdatedAt, cutoff))).returning({ id: repos.id })
+
+    for (const repo of [...staleClones, ...staleEmbeddings, ...staleDocs]) {
+      emitTelemetry({
+        component: 'repo-fetcher.service',
+        details: { staleAfterMs: env.pipelineStaleAfterMs },
+        event: 'pipeline_stage_marked_stale',
+        level: TelemetryLevel.WARN,
+        repoId: repo.id,
+        runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+        service: TelemetryService.WEB_API,
+        status: TelemetryStatus.ERROR
+      })
+    }
+  }
 
   @Cron(CronExpression.EVERY_10_SECONDS)
   async pollForPending() {
@@ -64,70 +103,46 @@ export class RepoFetcherService {
       cloneStatus: 'cloning',
       lastPipelineError: null,
       pipelineUpdatedAt: nowIso()
-    })
-      .where(and(eq(repos.id, repoToClone.id), eq(repos.cloneStatus, 'pending')))
-      .returning()
+    }).where(and(eq(repos.id, repoToClone.id), eq(repos.cloneStatus, 'pending'))).returning()
 
     if (!claimedRepo) return
 
     await this.cloneRepo(claimedRepo)
   }
 
-  @Cron(CronExpression.EVERY_MINUTE)
-  async markStalePipelineStages() {
-    const cutoff = new Date(Date.now() - env.pipelineStaleAfterMs).toISOString()
-
-    const staleClones = await this.dbService.dbClient.update(repos).set({
-      cloneStatus: 'failed',
-      docsStatus: 'failed',
-      embeddingStatus: 'failed',
-      lastPipelineError: `Clone stage exceeded ${env.pipelineStaleAfterMs}ms without completion`,
-      pipelineUpdatedAt: nowIso()
+  async requeueIngestJob(repo: SelectRepo) {
+    const ingestMessage = this.buildIngestJobRequest(repo.id, repo.sourceCommitSha ?? '', {
+      bucket: repo.storageBucket,
+      key: repo.storageKey,
+      provider: repo.storageProvider
     })
-      .where(and(eq(repos.cloneStatus, 'cloning'), lt(repos.pipelineUpdatedAt, cutoff)))
-      .returning({ id: repos.id })
 
-    const staleEmbeddings = await this.dbService.dbClient.update(repos).set({
-      docsStatus: 'failed',
-      embeddingStatus: 'failed',
-      lastPipelineError: `Embedding stage exceeded ${env.pipelineStaleAfterMs}ms without completion`,
-      pipelineUpdatedAt: nowIso()
+    await this.orchestratorClient.enqueueIngestJob(ingestMessage)
+
+    emitTelemetry({
+      component: 'repo-fetcher.service',
+      details: {
+        bucket: ingestMessage.payload.snapshot.bucket,
+        key: ingestMessage.payload.snapshot.key
+      },
+      event: 'ingest_job_request_republished',
+      level: TelemetryLevel.INFO,
+      queueName: 'ingest',
+      repoId: repo.id,
+      runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+      service: TelemetryService.WEB_API,
+      status: TelemetryStatus.OK
     })
-      .where(and(eq(repos.embeddingStatus, 'processing'), lt(repos.pipelineUpdatedAt, cutoff)))
-      .returning({ id: repos.id })
-
-    const staleDocs = await this.dbService.dbClient.update(repos).set({
-      docsStatus: 'failed',
-      lastPipelineError: `Documentation stage exceeded ${env.pipelineStaleAfterMs}ms without completion`,
-      pipelineUpdatedAt: nowIso()
-    })
-      .where(and(eq(repos.docsStatus, 'processing'), lt(repos.pipelineUpdatedAt, cutoff)))
-      .returning({ id: repos.id })
-
-    for (const repo of [...staleClones, ...staleEmbeddings, ...staleDocs]) {
-      emitTelemetry({
-        component: 'repo-fetcher.service',
-        details: {
-          staleAfterMs: env.pipelineStaleAfterMs
-        },
-        event: 'pipeline_stage_marked_stale',
-        level: TelemetryLevel.WARN,
-        repoId: repo.id,
-        runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
-        service: TelemetryService.WEB_API,
-        status: TelemetryStatus.ERROR
-      })
-    }
   }
 
   private buildCloneConfig(repo: SelectRepo): CloneConfig {
     const legacySecret = this.trimOrNull(repo.accessKey)
     const configuredSecret = this.trimOrNull(repo.gitAuthSecret)
     const effectiveSecret = configuredSecret ?? legacySecret
-    const configuredAuthType = (repo.gitAuthType ?? 'none') as RepoGitAuthType
-    const effectiveAuthType = configuredAuthType === 'none' && !configuredSecret && legacySecret ? 'ssh_key' : configuredAuthType
+    const configuredAuthType = (repo.gitAuthType ?? RepoAuthType.NONE) as RepoAuthType
+    const effectiveAuthType = configuredAuthType === RepoAuthType.NONE && !configuredSecret && legacySecret ? RepoAuthType.SSH_KEY : configuredAuthType
 
-    if (effectiveAuthType === 'none') {
+    if (effectiveAuthType === RepoAuthType.NONE) {
       return {
         cloneUrl: repo.gitUrl,
         safeLogUrl: this.sanitizeAuthUrl(repo.gitUrl),
@@ -138,7 +153,7 @@ export class RepoFetcherService {
 
     if (!effectiveSecret) throw new Error('Git auth secret is required for private repository clone')
 
-    if (effectiveAuthType === 'https_token') {
+    if (effectiveAuthType === RepoAuthType.HTTPS_TOKEN) {
       const username = this.trimOrNull(repo.gitAuthUsername) ?? 'oauth2'
       const cloneUrl = this.buildHttpsAuthCloneUrl(repo.gitUrl, username, effectiveSecret)
       return {
@@ -168,14 +183,14 @@ export class RepoFetcherService {
   private buildIngestJobRequest(
     repoId: number,
     commitSha: string,
-    snapshot: { bucket: null | string, key: null | string, provider: 'local' | 'minio' }
+    snapshot: { bucket: Nullable<string>, key: Nullable<string>, provider: 'local' | 'minio' }
   ): IngestJobRequestV2 {
     if (snapshot.provider !== 'minio' || !snapshot.bucket || !snapshot.key) throw new Error('Ingest contract requires MinIO snapshot location. Configure REPO_STORAGE_PROVIDER=minio and ensure snapshot upload succeeded.')
 
     return {
       contractVersion: INGEST_CONTRACT_VERSION_V2,
       correlationId: `ingest-${repoId}-${crypto.randomUUID()}`,
-      messageType: INGEST_MESSAGE_TYPE_JOB_REQUEST as IngestJobRequestV2['messageType'],
+      messageType: IngestMessageType.JOB_REQUEST,
       payload: {
         parseOptions: {
           includeConfigFiles: env.ingestIncludeConfigFiles,
@@ -191,37 +206,12 @@ export class RepoFetcherService {
         }
       },
       producedAt: new Date().toISOString(),
-      producer: INGEST_PRODUCER_WEB_API as IngestJobRequestV2['producer'],
+      producer: IngestProducer.WEB_API,
       repoId
     }
   }
 
-  async requeueIngestJob(repo: SelectRepo) {
-    const ingestMessage = this.buildIngestJobRequest(repo.id, repo.sourceCommitSha ?? '', {
-      bucket: repo.storageBucket,
-      key: repo.storageKey,
-      provider: repo.storageProvider
-    })
-
-    await this.orchestratorClient.enqueueIngestJob(ingestMessage)
-
-    emitTelemetry({
-      component: 'repo-fetcher.service',
-      details: {
-        bucket: ingestMessage.payload.snapshot.bucket,
-        key: ingestMessage.payload.snapshot.key
-      },
-      event: 'ingest_job_request_republished',
-      level: TelemetryLevel.INFO,
-      queueName: 'ingest',
-      repoId: repo.id,
-      runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
-      service: TelemetryService.WEB_API,
-      status: TelemetryStatus.OK
-    })
-  }
-
-  private async cloneRepo(repo: SelectRepo) {
+  private async cloneRepo(repo: SelectRepo): Promise<void> {
     const git = simpleGit()
     const targetPath = this.repoStorageService.getCloneWorkspacePath(repo.id, repo.name)
 
@@ -284,12 +274,7 @@ export class RepoFetcherService {
           const stats = await stat(filePath)
           const hash = await this.hashFile(filePath)
 
-          return {
-            hash,
-            lastModified: stats.mtime.toISOString(),
-            path: relPath,
-            repoId: repo.id
-          }
+          return { hash, lastModified: stats.mtime.toISOString(), path: relPath, repoId: repo.id }
         })
       )
 
@@ -354,6 +339,7 @@ export class RepoFetcherService {
         lastPipelineError: safeErrorMessage,
         pipelineUpdatedAt: nowIso()
       }).where(eq(repos.id, repo.id))
+
       throw new Error(safeErrorMessage)
     } finally {
       if (tmpKeyPath) await unlink(tmpKeyPath).catch(() => { })
@@ -370,6 +356,7 @@ export class RepoFetcherService {
 
       for (const line of output.split('\n')) {
         const match = line.match(/refs\/heads\/(.+)$/)
+
         if (match?.[1]) branches.add(match[1].trim())
       }
 
@@ -380,7 +367,7 @@ export class RepoFetcherService {
     }
   }
 
-  private async fetchRemoteDefaultBranch(git: SimpleGit, cloneUrl: string): Promise<null | string> {
+  private async fetchRemoteDefaultBranch(git: SimpleGit, cloneUrl: string): Promise<Nullable<string>> {
     try {
       const output = await git.listRemote(['--symref', cloneUrl, 'HEAD'])
       const match = output.match(/ref:\s+refs\/heads\/([^\s]+)\s+HEAD/)
@@ -425,9 +412,10 @@ export class RepoFetcherService {
     }
   }
 
-  private async resolveBranchToClone(git: SimpleGit, cloneUrl: string, configuredBranch: null | string): Promise<null | string> {
+  private async resolveBranchToClone(git: SimpleGit, cloneUrl: string, configuredBranch: Nullable<string>): Promise<Nullable<string>> {
     const remoteDefaultBranch = await this.fetchRemoteDefaultBranch(git, cloneUrl)
     const remoteBranches = await this.fetchRemoteBranches(git, cloneUrl)
+
     const candidates = [
       this.trimOrNull(configuredBranch),
       remoteDefaultBranch,
@@ -478,9 +466,11 @@ export class RepoFetcherService {
 
   private sanitizeErrorMessage(error: unknown, secretsToMask: string[]): string {
     let message = error instanceof Error ? error.message : String(error)
+
     for (const secret of secretsToMask.filter(Boolean)) {
       message = message.split(secret).join('***')
     }
+
     return message.replace(/https?:\/\/[^@\s]+@/g, 'https://***@')
   }
 
@@ -503,7 +493,7 @@ export class RepoFetcherService {
     throw new Error('Unsupported git URL format for HTTPS token auth')
   }
 
-  private trimOrNull(value: null | string | undefined): null | string {
+  private trimOrNull(value: Nullable<Undefinable<string>>): Nullable<string> {
     const trimmed = value?.trim()
     return trimmed ? trimmed : null
   }

@@ -6,10 +6,7 @@ import {
   verifyQueueTopologies
 } from './topology'
 
-function createChannelMock(): jest.Mocked<Pick<
-  amqp.Channel,
-  'assertExchange' | 'assertQueue' | 'bindQueue' | 'deleteExchange' | 'deleteQueue'
->> {
+function createChannelMock(): jest.Mocked<Pick<amqp.Channel, 'assertExchange' | 'assertQueue' | 'bindQueue' | 'deleteExchange' | 'deleteQueue'>> {
   return {
     assertExchange: jest.fn().mockResolvedValue(undefined),
     assertQueue: jest.fn().mockResolvedValue({} as amqp.Replies.AssertQueue),

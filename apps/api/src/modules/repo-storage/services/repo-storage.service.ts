@@ -1,22 +1,19 @@
 import { execFile } from 'node:child_process'
-import { createWriteStream } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import * as path from 'node:path'
-import { pipeline } from 'node:stream/promises'
 import { promisify } from 'node:util'
 
 import {
   CreateBucketCommand,
-  GetObjectCommand,
   HeadBucketCommand,
   PutObjectCommand,
   S3Client
 } from '@aws-sdk/client-s3'
 import { Injectable, Logger } from '@nestjs/common'
+import { Nullable, StorageProvider } from '@workspace/codepath-common'
 
 import { env } from '../../../config/env'
-import { SelectRepo } from '../../db/schema'
 
 const execFileAsync = promisify(execFile)
 const projectRoot = path.resolve(__dirname, '../../../../../../')
@@ -28,14 +25,9 @@ interface PersistSnapshotInput {
 }
 
 interface SnapshotLocation {
-  bucket: null | string
-  key: null | string
-  provider: 'local' | 'minio'
-}
-
-interface PreparedWorkspace {
-  cleanup: () => Promise<void>
-  workspacePath: string
+  bucket: Nullable<string>
+  key: Nullable<string>
+  provider: StorageProvider
 }
 
 @Injectable()
@@ -43,32 +35,24 @@ export class RepoStorageService {
   private readonly localReposPath = path.resolve(projectRoot, env.repoStorageLocalPath)
   private readonly logger = new Logger(RepoStorageService.name)
   private readonly minioBucket = env.repoStorageMinioBucket
-  private readonly provider = env.repoStorageProvider
-  private readonly s3Client: null | S3Client = this.buildS3Client()
+  private readonly provider = env.repoStorageProvider as StorageProvider
+  private readonly s3Client: Nullable<S3Client> = this.buildS3Client()
 
-  async ensureLocalWorkspaceRoot(): Promise<void> {
-    await mkdir(this.localReposPath, { recursive: true })
-  }
-
-  async checkHealth(): Promise<{ message: string, provider: 'local' | 'minio' }> {
-    if (this.provider !== 'minio') {
+  async checkHealth(): Promise<{ message: string, provider: StorageProvider }> {
+    if (this.provider !== StorageProvider.MINIO) {
       await this.ensureLocalWorkspaceRoot()
-      return {
-        message: `Local repository storage available at ${this.localReposPath}`,
-        provider: 'local'
-      }
+      return { message: `Local repository storage available at ${this.localReposPath}`, provider: StorageProvider.LOCAL }
     }
 
-    if (!this.s3Client) {
-      throw new Error('MinIO provider is enabled but S3 client is not initialized')
-    }
+    if (!this.s3Client) throw new Error('MinIO provider is enabled but S3 client is not initialized')
 
     await this.s3Client.send(new HeadBucketCommand({ Bucket: this.minioBucket }))
 
-    return {
-      message: `MinIO bucket "${this.minioBucket}" is available`,
-      provider: 'minio'
-    }
+    return { message: `MinIO bucket "${this.minioBucket}" is available`, provider: StorageProvider.MINIO }
+  }
+
+  async ensureLocalWorkspaceRoot(): Promise<void> {
+    await mkdir(this.localReposPath, { recursive: true })
   }
 
   getCloneWorkspacePath(repoId: number, repoName: string): string {
@@ -77,17 +61,9 @@ export class RepoStorageService {
   }
 
   async persistSnapshot(input: PersistSnapshotInput): Promise<SnapshotLocation> {
-    if (this.provider !== 'minio') {
-      return {
-        bucket: null,
-        key: null,
-        provider: 'local'
-      }
-    }
+    if (this.provider !== StorageProvider.MINIO) return { bucket: null, key: null, provider: StorageProvider.LOCAL }
 
-    if (!this.s3Client) {
-      throw new Error('MinIO provider is enabled but S3 client is not initialized')
-    }
+    if (!this.s3Client) throw new Error('MinIO provider is enabled but S3 client is not initialized')
 
     await this.ensureMinioBucket()
 
@@ -96,9 +72,8 @@ export class RepoStorageService {
 
     try {
       const archiveBytes = await readFile(archivePath)
-      this.logger.log(
-        `Uploading snapshot to MinIO: repo=${input.repoId} key=${key} size=${archiveBytes.byteLength}B`
-      )
+      this.logger.log(`Uploading snapshot to MinIO: repo=${input.repoId} key=${key} size=${archiveBytes.byteLength}B`)
+
       await this.s3Client.send(new PutObjectCommand({
         Body: archiveBytes,
         Bucket: this.minioBucket,
@@ -110,63 +85,11 @@ export class RepoStorageService {
       await rm(path.dirname(archivePath), { force: true, recursive: true })
     }
 
-    return {
-      bucket: this.minioBucket,
-      key,
-      provider: 'minio'
-    }
+    return { bucket: this.minioBucket, key, provider: StorageProvider.MINIO }
   }
 
-  async prepareWorkspace(repo: SelectRepo): Promise<PreparedWorkspace> {
-    const storageProvider = this.resolveStorageProvider(repo)
-    if (
-      storageProvider === 'minio'
-      && repo.storageBucket
-      && repo.storageKey
-    ) {
-      if (!this.s3Client) {
-        throw new Error('MinIO snapshot requested but S3 client is not configured')
-      }
-
-      const workspacePath = await mkdtemp(path.join(tmpdir(), `codepath-repo-${repo.id}-`))
-      const archivePath = path.join(workspacePath, 'snapshot.tar.gz')
-
-      try {
-        const response = await this.s3Client.send(new GetObjectCommand({
-          Bucket: repo.storageBucket,
-          Key: repo.storageKey
-        }))
-
-        if (!response.Body) {
-          throw new Error(`Snapshot body is empty for repo ${repo.id}`)
-        }
-
-        await pipeline(response.Body as NodeJS.ReadableStream, createWriteStream(archivePath))
-        await this.extractArchive(archivePath, workspacePath)
-        await rm(archivePath, { force: true })
-
-        return {
-          cleanup: async () => rm(workspacePath, { force: true, recursive: true }),
-          workspacePath
-        }
-      } catch (error) {
-        await rm(workspacePath, { force: true, recursive: true })
-        throw error
-      }
-    }
-
-    if (!repo.path) {
-      throw new Error(`Repository ${repo.id} does not have local path or snapshot location`)
-    }
-
-    return {
-      cleanup: async () => Promise.resolve(),
-      workspacePath: repo.path
-    }
-  }
-
-  private buildS3Client(): null | S3Client {
-    if (this.provider !== 'minio') {
+  private buildS3Client(): Nullable<S3Client> {
+    if (this.provider !== StorageProvider.MINIO) {
       return null
     }
 
@@ -198,9 +121,7 @@ export class RepoStorageService {
   }
 
   private async ensureMinioBucket(): Promise<void> {
-    if (!this.s3Client) {
-      return
-    }
+    if (!this.s3Client) return
 
     try {
       await this.s3Client.send(new HeadBucketCommand({ Bucket: this.minioBucket }))
@@ -210,17 +131,5 @@ export class RepoStorageService {
     }
 
     await this.s3Client.send(new CreateBucketCommand({ Bucket: this.minioBucket }))
-  }
-
-  private async extractArchive(archivePath: string, targetDir: string): Promise<void> {
-    await execFileAsync('tar', ['-xzf', archivePath, '-C', targetDir])
-  }
-
-  private resolveStorageProvider(repo: SelectRepo): 'local' | 'minio' {
-    const provider = repo.storageProvider?.trim().toLowerCase()
-    if (provider === 'minio') {
-      return 'minio'
-    }
-    return 'local'
   }
 }

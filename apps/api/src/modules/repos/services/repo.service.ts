@@ -12,7 +12,7 @@ import { pick } from 'lodash'
 import { env } from '../../../config/env'
 import { repos } from '../../db/schema'
 import { DbService } from '../../db/services/db.service'
-import type { RepoAuthType } from '../dto/create-repo.dto'
+import { RepoAuthType } from '../dto/create-repo.dto'
 import { RepoFetcherService } from './repo-fetcher.service'
 
 const nowIso = () => new Date().toISOString()
@@ -64,9 +64,7 @@ export class RepoService {
       lastPipelineError: repos.lastPipelineError,
       name: repos.name,
       pipelineUpdatedAt: repos.pipelineUpdatedAt
-    })
-      .from(repos)
-      .where(eq(repos.userId, userId))
+    }).from(repos).where(eq(repos.userId, userId))
 
     return userRepos
   }
@@ -74,9 +72,7 @@ export class RepoService {
   async retryClonePipeline(userId: number, repoId: number) {
     const repo = await this.findUserRepo(userId, repoId)
 
-    if (repo.cloneStatus === 'cloning') {
-      throw new ConflictException('Repository clone is already running')
-    }
+    if (repo.cloneStatus === 'cloning') throw new ConflictException('Repository clone is already running')
 
     const [updatedRepo] = await this.dbService.dbClient.update(repos).set({
       cloneStatus: 'pending',
@@ -97,9 +93,7 @@ export class RepoService {
   async retryIngestPipeline(userId: number, repoId: number) {
     const repo = await this.findUserRepo(userId, repoId)
 
-    if (repo.cloneStatus !== 'cloned') {
-      throw new ConflictException(`Repository clone is not ready for ingest retry (cloneStatus=${repo.cloneStatus})`)
-    }
+    if (repo.cloneStatus !== 'cloned') throw new ConflictException(`Repository clone is not ready for ingest retry (cloneStatus=${repo.cloneStatus})`)
 
     if (
       repo.storageProvider !== 'minio'
@@ -144,8 +138,7 @@ export class RepoService {
   }
 
   private async findUserRepo(userId: number, repoId: number) {
-    const [repo] = await this.dbService.dbClient.select()
-      .from(repos)
+    const [repo] = await this.dbService.dbClient.select().from(repos)
       .where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
       .limit(1)
 
@@ -165,24 +158,22 @@ export class RepoService {
     const effectiveSecret = providedSecret ?? legacyAccessKey
     const requestedAuthType = payload.authType ?? (effectiveSecret ? 'ssh_key' : 'none')
 
-    if (requestedAuthType === 'none') {
+    if (requestedAuthType === RepoAuthType.NONE) {
       return {
         accessKey: legacyAccessKey,
         gitAuthSecret: null,
-        gitAuthType: 'none',
+        gitAuthType: RepoAuthType.NONE,
         gitAuthUsername: null
       }
     }
 
-    if (!effectiveSecret) {
-      throw new BadRequestException('Auth secret is required for selected auth type')
-    }
+    if (!effectiveSecret) throw new BadRequestException('Auth secret is required for selected auth type')
 
-    if (requestedAuthType === 'https_token') {
+    if (requestedAuthType === RepoAuthType.HTTPS_TOKEN) {
       return {
         accessKey: legacyAccessKey,
         gitAuthSecret: effectiveSecret,
-        gitAuthType: 'https_token',
+        gitAuthType: RepoAuthType.HTTPS_TOKEN,
         gitAuthUsername: payload.authUsername?.trim() || 'oauth2'
       }
     }
@@ -190,7 +181,7 @@ export class RepoService {
     return {
       accessKey: legacyAccessKey ?? effectiveSecret,
       gitAuthSecret: effectiveSecret,
-      gitAuthType: 'ssh_key',
+      gitAuthType: RepoAuthType.SSH_KEY,
       gitAuthUsername: payload.authUsername?.trim() || null
     }
   }

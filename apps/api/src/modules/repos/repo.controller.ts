@@ -15,10 +15,7 @@ export class RepoController {
     @Req() req: { user: SelectUser },
     @Body() body: CreateRepoDto
   ) {
-    return this.repoService.createRepo({
-      ...body,
-      userId: req.user.id
-    })
+    return this.repoService.createRepo({ ...body, userId: req.user.id })
   }
 
   @Get()

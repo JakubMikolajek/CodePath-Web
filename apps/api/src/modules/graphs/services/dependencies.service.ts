@@ -1,4 +1,5 @@
-import { Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { Nullable, Undefinable } from '@workspace/codepath-common'
 import type {
   RepoGraphEdge,
   RepoGraphNode,
@@ -8,16 +9,16 @@ import {
   RepoGraphEdgeType,
   RepoGraphNodeType
 } from '@workspace/codepath-common/graph'
-import { and, desc, eq } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 
 import { env } from '../../../config/env'
-import { dependencies, repos } from '../../db/schema'
+import { assertRepoOwnership } from '../../../utils/helpers'
+import { dependencies } from '../../db/schema'
 import { DbService } from '../../db/services/db.service'
 import { QdrantService } from '../../qdrant/services/qdrant.service'
 import {
   DependencyGraphBuilder,
-  type IngestSegmentPayload,
-  type RepoOwnership
+  type IngestSegmentPayload
 } from '../builders/dependency-graph.builder'
 
 interface InteractiveGraphQuery {
@@ -50,7 +51,7 @@ export class DependenciesService {
   ) { }
 
   async getRepoDependencies(userId: number, repoId: number) {
-    await this.assertRepoOwnership(userId, repoId)
+    await assertRepoOwnership(this.dbService, userId, repoId)
 
     const allDependencies = await this.dbService.dbClient.select()
       .from(dependencies)
@@ -66,7 +67,7 @@ export class DependenciesService {
   }
 
   async getRepoInteractiveGraph(userId: number, repoId: number, query: InteractiveGraphQuery): Promise<RepoInteractiveGraph> {
-    const repo = await this.assertRepoOwnership(userId, repoId)
+    const repo = await assertRepoOwnership(this.dbService, userId, repoId)
     const includeSymbols = this.parseIncludeSymbols(query.includeSymbols)
     const segments = await this.fetchRepoSegmentsFromQdrant(repo.id)
     const canonicalGraph = this.graphBuilder.build(repo, segments, { includeSymbols })
@@ -75,9 +76,8 @@ export class DependenciesService {
     const depth = this.parseDepth(query.depth)
 
     let filteredEdges = canonicalGraph.edges
-    if (requestedRelationTypes.length > 0) {
-      filteredEdges = filteredEdges.filter(edge => requestedRelationTypes.includes(edge.type))
-    }
+
+    if (requestedRelationTypes.length > 0) filteredEdges = filteredEdges.filter(edge => requestedRelationTypes.includes(edge.type))
 
     let scopedNodeIds = new Set(canonicalGraph.nodes.map(node => node.id))
     const repoNodeId = `repo:${repo.id}`
@@ -96,9 +96,7 @@ export class DependenciesService {
         referencedNodeIds.add(edge.target)
       }
 
-      if (focusNodeId && canonicalGraph.nodes.some(node => node.id === focusNodeId)) {
-        referencedNodeIds.add(focusNodeId)
-      }
+      if (focusNodeId && canonicalGraph.nodes.some(node => node.id === focusNodeId)) referencedNodeIds.add(focusNodeId)
 
       scopedNodeIds = referencedNodeIds
     }
@@ -106,13 +104,9 @@ export class DependenciesService {
     const filteredNodes = canonicalGraph.nodes.filter(node => scopedNodeIds.has(node.id))
     const limitedGraph = this.applyGraphScaleLimits(filteredNodes, filteredEdges)
     const availableEdgeTypes = this.availableEdgeTypes(limitedGraph.edges)
-    const importResolutionCoverage = canonicalGraph.importResolutionCoverage.total > 0
-      ? canonicalGraph.importResolutionCoverage.ratio
-      : 1
+    const importResolutionCoverage = canonicalGraph.importResolutionCoverage.total > 0 ? canonicalGraph.importResolutionCoverage.ratio : 1
 
-    this.logger.log(
-      `Interactive graph built from qdrant for repo=${repoId}, nodes=${limitedGraph.nodes.length}, edges=${limitedGraph.edges.length}, includeSymbols=${includeSymbols}, topologyMode=${canonicalGraph.topologyMode}, importResolutionCoverage=${importResolutionCoverage.toFixed(3)}, truncated=${limitedGraph.truncated}`
-    )
+    this.logger.log(`Interactive graph built from qdrant for repo=${repoId}, nodes=${limitedGraph.nodes.length}, edges=${limitedGraph.edges.length}, includeSymbols=${includeSymbols}, topologyMode=${canonicalGraph.topologyMode}, importResolutionCoverage=${importResolutionCoverage.toFixed(3)}, truncated=${limitedGraph.truncated}`)
 
     const metadata: RepoInteractiveGraph['metadata'] = {
       availableEdgeTypes,
@@ -147,7 +141,7 @@ export class DependenciesService {
 
   private applyGraphScaleLimits(nodes: RepoGraphNode[], edges: RepoGraphEdge[]) {
     let truncated = false
-    let truncationReason: string | undefined = undefined
+    let truncationReason: Undefinable<string> = undefined
     let limitedNodes = nodes
     let limitedEdges = edges
 
@@ -164,9 +158,9 @@ export class DependenciesService {
 
       const sortedNodes = [...limitedNodes].sort((a, b) => {
         const byType = typePriority[a.type] - typePriority[b.type]
-        if (byType !== 0) {
-          return byType
-        }
+
+        if (byType !== 0) return byType
+
         return a.label.localeCompare(b.label)
       })
 
@@ -189,14 +183,15 @@ export class DependenciesService {
 
       const sortedEdges = [...limitedEdges].sort((a, b) => {
         const byType = edgePriority[a.type] - edgePriority[b.type]
-        if (byType !== 0) {
-          return byType
-        }
+
+        if (byType !== 0) return byType
+
         return a.id.localeCompare(b.id)
       })
 
       limitedEdges = sortedEdges.slice(0, MAX_RETURN_EDGES)
       const referencedNodeIds = new Set<string>()
+
       for (const edge of limitedEdges) {
         referencedNodeIds.add(edge.source)
         referencedNodeIds.add(edge.target)
@@ -205,32 +200,17 @@ export class DependenciesService {
       limitedNodes = limitedNodes.filter(node => node.type === RepoGraphNodeType.REPO || referencedNodeIds.has(node.id))
     }
 
-    return {
-      edges: limitedEdges,
-      nodes: limitedNodes,
-      truncated,
-      truncationReason
-    }
+    return { edges: limitedEdges, nodes: limitedNodes, truncated, truncationReason }
   }
 
-  private async assertRepoOwnership(userId: number, repoId: number): Promise<RepoOwnership> {
-    const [repo] = await this.dbService.dbClient.select({
-      id: repos.id,
-      name: repos.name
-    })
-      .from(repos)
-      .where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
-      .limit(1)
-
-    if (!repo) {
-      throw new NotFoundException('Repository not found')
-    }
-
-    return repo
+  private assertRelationType(value: string): Nullable<RepoGraphEdgeType> {
+    const normalized = value.trim().toLowerCase()
+    return SUPPORTED_RELATION_TYPES.find(type => type === normalized) ?? null
   }
 
-  private availableEdgeTypes(edges: RepoGraphEdge[]) {
+  private availableEdgeTypes(edges: RepoGraphEdge[]): RepoGraphEdgeType[] {
     const available = new Set<RepoGraphEdgeType>()
+
     for (const edge of edges) {
       available.add(edge.type)
     }
@@ -238,16 +218,12 @@ export class DependenciesService {
     return SUPPORTED_RELATION_TYPES.filter(type => available.has(type))
   }
 
-  private collectNodeIdsWithinDepth(focusNodeId: string, edges: RepoGraphEdge[], depth: number) {
+  private collectNodeIdsWithinDepth(focusNodeId: string, edges: RepoGraphEdge[], depth: number): Set<string> {
     const adjacency = new Map<string, Set<string>>()
 
     for (const edge of edges) {
-      if (!adjacency.has(edge.source)) {
-        adjacency.set(edge.source, new Set())
-      }
-      if (!adjacency.has(edge.target)) {
-        adjacency.set(edge.target, new Set())
-      }
+      if (!adjacency.has(edge.source)) adjacency.set(edge.source, new Set())
+      if (!adjacency.has(edge.target)) adjacency.set(edge.target, new Set())
 
       adjacency.get(edge.source)?.add(edge.target)
       adjacency.get(edge.target)?.add(edge.source)
@@ -258,18 +234,12 @@ export class DependenciesService {
 
     while (queue.length > 0) {
       const current = queue.shift()
-      if (!current) {
-        break
-      }
 
-      if (current.remaining <= 0) {
-        continue
-      }
+      if (!current) break
+      if (current.remaining <= 0) continue
 
       for (const adjacentNodeId of adjacency.get(current.nodeId) ?? []) {
-        if (visited.has(adjacentNodeId)) {
-          continue
-        }
+        if (visited.has(adjacentNodeId)) continue
 
         visited.add(adjacentNodeId)
         queue.push({ nodeId: adjacentNodeId, remaining: current.remaining - 1 })
@@ -281,22 +251,13 @@ export class DependenciesService {
 
   private async fetchRepoSegmentsFromQdrant(repoId: number): Promise<IngestSegmentPayload[]> {
     const payloads: IngestSegmentPayload[] = []
-    let offset: number | string | undefined = undefined
+    let offset: Undefinable<number | string> = undefined
     const collectionName = env.qdrantEmbeddingsCollectionName
 
     try {
       while (true) {
         const result = await this.qdrantService.scroll(collectionName, {
-          filter: {
-            must: [
-              {
-                key: 'repo_id',
-                match: {
-                  value: repoId
-                }
-              }
-            ]
-          },
+          filter: { must: [{ key: 'repo_id', match: { value: repoId } }] },
           limit: 256,
           offset,
           withPayload: true,
@@ -307,39 +268,25 @@ export class DependenciesService {
         }
 
         const points = Array.isArray(result?.points) ? result.points : []
+
         for (const point of points) {
-          if (!point?.payload || typeof point.payload !== 'object') {
-            continue
-          }
+          if (!point?.payload || typeof point.payload !== 'object') continue
 
           const payload = point.payload as IngestSegmentPayload
-          if (
-            typeof payload.message_type === 'string'
-            && payload.message_type !== 'ingest.batch.ready'
-          ) {
-            continue
-          }
+
+          if (typeof payload.message_type === 'string' && payload.message_type !== 'ingest.batch.ready') continue
 
           const filePath = this.normalizeFilePath(payload.file_path)
-          if (!filePath) {
-            continue
-          }
 
-          payloads.push({
-            ...payload,
-            file_path: filePath
-          })
+          if (!filePath) continue
+
+          payloads.push({ ...payload, file_path: filePath })
         }
 
-        if (result?.next_page_offset === undefined || result?.next_page_offset === null) {
-          break
-        }
+        if (result?.next_page_offset === undefined || result?.next_page_offset === null) break
 
-        if (typeof result.next_page_offset === 'number' || typeof result.next_page_offset === 'string') {
-          offset = result.next_page_offset
-        } else {
-          break
-        }
+        if (typeof result.next_page_offset === 'number' || typeof result.next_page_offset === 'string') offset = result.next_page_offset
+        else break
       }
     } catch (error) {
       const safeError = error instanceof Error ? error.message : String(error)
@@ -350,13 +297,10 @@ export class DependenciesService {
     return payloads
   }
 
-  private normalizeFilePath(filePath: unknown) {
-    if (typeof filePath !== 'string') {
-      return null
-    }
+  private normalizeFilePath(filePath: unknown): Nullable<string> {
+    if (typeof filePath !== 'string') return null
 
-    const normalized = filePath
-      .trim()
+    const normalized = filePath.trim()
       .replaceAll('\\', '/')
       .replace(/^\.\/+/, '')
       .replace(/\/{2,}/g, '/')
@@ -364,36 +308,27 @@ export class DependenciesService {
     return normalized.length > 0 ? normalized : null
   }
 
-  private parseDepth(depth?: string) {
+  private parseDepth(depth?: string): number {
     const parsedDepth = Number(depth)
-    if (!Number.isFinite(parsedDepth)) {
-      return 2
-    }
+
+    if (!Number.isFinite(parsedDepth)) return 2
 
     return Math.min(5, Math.max(1, Math.trunc(parsedDepth)))
   }
 
-  private parseIncludeSymbols(includeSymbols?: string) {
-    if (includeSymbols === undefined) {
-      return true
-    }
+  private parseIncludeSymbols(includeSymbols?: string): boolean {
+    if (includeSymbols === undefined) return true
 
     const normalized = includeSymbols.trim().toLowerCase()
-    if (['0', 'false', 'no', 'off'].includes(normalized)) {
-      return false
-    }
 
-    if (['1', 'true', 'yes', 'on'].includes(normalized)) {
-      return true
-    }
+    if (['0', 'false', 'no', 'off'].includes(normalized)) return false
+    if (['1', 'true', 'yes', 'on'].includes(normalized)) return true
 
     return true
   }
 
-  private parseRelationTypes(relationTypes?: string) {
-    if (!relationTypes) {
-      return [] as RepoGraphEdgeType[]
-    }
+  private parseRelationTypes(relationTypes?: string): RepoGraphEdgeType[] {
+    if (!relationTypes) return [] as RepoGraphEdgeType[]
 
     const requestedTypes = relationTypes
       .split(',')
@@ -402,10 +337,5 @@ export class DependenciesService {
       .filter(type => SUPPORTED_RELATION_TYPES.includes(type))
 
     return Array.from(new Set(requestedTypes))
-  }
-
-  private assertRelationType(value: string): null | RepoGraphEdgeType {
-    const normalized = value.trim().toLowerCase()
-    return SUPPORTED_RELATION_TYPES.find(type => type === normalized) ?? null
   }
 }

@@ -1,10 +1,10 @@
-import type * as amqp from 'amqplib'
 import {
   TelemetryLevel,
   TelemetryRuntimeFamily,
   TelemetryService,
   TelemetryStatus
 } from '@workspace/codepath-common/telemetry'
+import type * as amqp from 'amqplib'
 
 import { emitTelemetry } from '../telemetry/services/telemetry'
 
@@ -32,27 +32,20 @@ function topologyNames(queueName: string): TopologyNames {
 }
 
 function isPreconditionFailed(error: unknown): boolean {
-  if (!error || typeof error !== 'object') {
-    return false
-  }
+  if (!error || typeof error !== 'object') return false
 
   const maybeCode = Reflect.get(error, 'code') as unknown
-  if (typeof maybeCode === 'number' && maybeCode === 406) {
-    return true
-  }
+
+  if (typeof maybeCode === 'number' && maybeCode === 406) return true
 
   const maybeMessage = Reflect.get(error, 'message') as unknown
-  if (typeof maybeMessage !== 'string') {
-    return false
-  }
+
+  if (typeof maybeMessage !== 'string') return false
 
   return maybeMessage.includes('PRECONDITION_FAILED')
 }
 
-async function declareTopology(
-  channel: amqp.Channel,
-  config: QueueTopologyConfig
-): Promise<void> {
+async function declareTopology(channel: amqp.Channel, config: QueueTopologyConfig): Promise<void> {
   const { queueName, retryDelayMs } = config
   const { dlq, dlx, retryQueue } = topologyNames(queueName)
 
@@ -79,9 +72,7 @@ async function declareTopology(
 
   emitTelemetry({
     component: 'rabbitmq.topology',
-    details: {
-      retryDelayMs
-    },
+    details: { retryDelayMs },
     event: 'queue_topology_verified',
     level: TelemetryLevel.INFO,
     queueName,
@@ -91,10 +82,7 @@ async function declareTopology(
   })
 }
 
-async function recreateTopology(
-  channel: amqp.Channel,
-  config: QueueTopologyConfig
-): Promise<void> {
+async function recreateTopology(channel: amqp.Channel, config: QueueTopologyConfig): Promise<void> {
   const { queueName } = config
   const { dlq, dlx, retryQueue } = topologyNames(queueName)
 
@@ -109,9 +97,7 @@ async function recreateTopology(
 
   emitTelemetry({
     component: 'rabbitmq.topology',
-    details: {
-      action: 'recreate'
-    },
+    details: { action: 'recreate' },
     event: 'queue_topology_migrated',
     level: TelemetryLevel.WARN,
     queueName,
@@ -129,11 +115,7 @@ function mismatchMessage(queueName: string): string {
   ].join(' ')
 }
 
-export async function ensureQueueTopology(
-  channel: amqp.Channel,
-  config: QueueTopologyConfig,
-  options: EnsureQueueTopologyOptions = {}
-): Promise<void> {
+export async function ensureQueueTopology(channel: amqp.Channel, config: QueueTopologyConfig, options: EnsureQueueTopologyOptions = {}): Promise<void> {
   try {
     await declareTopology(channel, config)
   } catch (error) {
@@ -167,19 +149,13 @@ export async function ensureQueueTopology(
   }
 }
 
-export async function verifyQueueTopologies(
-  channel: amqp.Channel,
-  configs: QueueTopologyConfig[]
-): Promise<void> {
+export async function verifyQueueTopologies(channel: amqp.Channel, configs: QueueTopologyConfig[]): Promise<void> {
   for (const config of configs) {
     await ensureQueueTopology(channel, config)
   }
 }
 
-export async function migrateQueueTopologies(
-  channel: amqp.Channel,
-  configs: QueueTopologyConfig[]
-): Promise<void> {
+export async function migrateQueueTopologies(channel: amqp.Channel, configs: QueueTopologyConfig[]): Promise<void> {
   for (const config of configs) {
     await recreateTopology(channel, config)
   }

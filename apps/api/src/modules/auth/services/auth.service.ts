@@ -7,7 +7,7 @@ import {
 } from 'node:crypto'
 
 import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common'
-import { Nullable } from '@workspace/codepath-common/globals'
+import { Nullable, Undefinable } from '@workspace/codepath-common/globals'
 import type { AxiosInstance } from 'axios'
 import * as bcrypt from 'bcrypt'
 import { eq, or } from 'drizzle-orm'
@@ -62,11 +62,7 @@ export class AuthService {
 
       if (claims.email_verified !== true) return null
 
-      return await this.findOrCreateExternalUser({
-        email: claims.email,
-        login: claims.preferred_username,
-        subject: claims.sub
-      })
+      return await this.findOrCreateExternalUser({ email: claims.email, login: claims.preferred_username, subject: claims.sub })
     } catch (error) {
       this.logger.warn(`Keycloak token validation failed: ${error instanceof Error ? error.message : 'unknown error'}`)
       return null
@@ -99,11 +95,11 @@ export class AuthService {
   }): Promise<SelectUser> {
     if (!identity.subject) throw new UnauthorizedException('Missing Keycloak subject')
 
-    const normalizedEmail = identity.email?.trim().toLowerCase()
+    const normalizedEmail: Undefinable<string> = identity.email?.trim().toLowerCase()
 
     if (!normalizedEmail) throw new UnauthorizedException('Missing Keycloak email')
 
-    const normalizedLogin = identity.login?.trim() || normalizedEmail.split('@')[0] || `kc-${Date.now()}`
+    const normalizedLogin: string = identity.login?.trim() || normalizedEmail.split('@')[0] || `kc-${Date.now()}`
 
     const [existingUser] = await this.dbService.dbClient.select().from(users)
       .where(or(eq(users.authSubject, identity.subject), eq(users.email, normalizedEmail)))
@@ -172,6 +168,7 @@ export class AuthService {
 
     const key = await this.resolveKeyObject(header)
     const verifier = createVerify('RSA-SHA256')
+
     verifier.update(`${encodedHeader}.${encodedPayload}`)
     verifier.end()
 

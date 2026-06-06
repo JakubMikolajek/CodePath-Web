@@ -21,14 +21,9 @@ export class ApiRunnerAuthPresetsRepository {
       ))
       .returning({ id: apiRunnerAuthPresets.id })
 
-    if (!deleted) {
-      throw new NotFoundException('Runner auth preset not found')
-    }
+    if (!deleted) throw new NotFoundException('Runner auth preset not found')
 
-    return {
-      id: deleted.id,
-      ok: true as const
-    }
+    return { id: deleted.id, ok: true as const }
   }
 
   async list(userId: number, repoId: number): Promise<RepoApiRunnerAuthPreset[]> {
@@ -55,37 +50,22 @@ export class ApiRunnerAuthPresetsRepository {
     }))
   }
 
-  async save(
-    userId: number,
-    repoId: number,
-    name: string,
-    config: RepoApiRunnerAuthConfig
-  ): Promise<RepoApiRunnerAuthPreset> {
-    const [saved] = await this.dbService.dbClient.insert(apiRunnerAuthPresets)
-      .values({
-        config,
-        name,
-        repoId,
-        userId
-      })
-      .onConflictDoUpdate({
-        set: {
-          config,
-          updatedAt: new Date().toISOString()
-        },
-        target: [
-          apiRunnerAuthPresets.repoId,
-          apiRunnerAuthPresets.userId,
-          apiRunnerAuthPresets.name
-        ]
-      })
-      .returning({
-        config: apiRunnerAuthPresets.config,
-        createdAt: apiRunnerAuthPresets.createdAt,
-        id: apiRunnerAuthPresets.id,
-        name: apiRunnerAuthPresets.name,
-        updatedAt: apiRunnerAuthPresets.updatedAt
-      })
+  async save(userId: number, repoId: number, name: string, config: RepoApiRunnerAuthConfig): Promise<RepoApiRunnerAuthPreset> {
+    const [saved] = await this.dbService.dbClient.insert(apiRunnerAuthPresets).values({
+      config,
+      name,
+      repoId,
+      userId
+    }).onConflictDoUpdate({
+      set: { config, updatedAt: new Date().toISOString() },
+      target: [apiRunnerAuthPresets.repoId, apiRunnerAuthPresets.userId, apiRunnerAuthPresets.name]
+    }).returning({
+      config: apiRunnerAuthPresets.config,
+      createdAt: apiRunnerAuthPresets.createdAt,
+      id: apiRunnerAuthPresets.id,
+      name: apiRunnerAuthPresets.name,
+      updatedAt: apiRunnerAuthPresets.updatedAt
+    })
 
     return {
       config: saved.config,

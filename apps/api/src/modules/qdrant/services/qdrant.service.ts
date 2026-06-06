@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
+// @ts-expect-error cjs error
 import { QdrantClient, type Schemas } from '@qdrant/js-client-rest'
 
 import { env } from '../../../config/env'
@@ -16,6 +17,10 @@ export class QdrantService implements OnModuleInit {
   private client: QdrantClient
   private readonly logger = new Logger(QdrantService.name)
 
+  async getCollections() {
+    return await this.client.getCollections()
+  }
+
   async onModuleInit() {
     this.client = new QdrantClient({
       host: env.qdrantHost,
@@ -29,10 +34,6 @@ export class QdrantService implements OnModuleInit {
     } catch (error) {
       this.logger.error('Failed to connect to Qdrant', error)
     }
-  }
-
-  async getCollections() {
-    return await this.client.getCollections()
   }
 
   async scroll(collectionName: string, options?: ScrollOptions) {
