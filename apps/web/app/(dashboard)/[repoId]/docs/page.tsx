@@ -16,6 +16,17 @@ import { retryRepoClone, retryRepoIngest } from '@/lib/repos/client'
 import { getFirstRouteParam } from '@/lib/route-params'
 
 const DOCS_STATUS_POLL_MS = 5_000
+const DOCUMENTATION_SECTIONS = [
+  'Overview',
+  'Architecture',
+  'Key Components',
+  'Data Flow',
+  'Public Interfaces',
+  'Configuration',
+  'Operations',
+  'Testing',
+  'Risks & Limitations'
+] as const
 
 const resolveErrorMessage = (error: unknown) => {
   if (typeof error === 'object' && error !== null && 'response' in error) {
