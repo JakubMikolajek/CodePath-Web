@@ -4,6 +4,10 @@ import type {
   RepoGraphEdge,
   RepoGraphNode
 } from '@workspace/codepath-common/graph'
+import {
+  RepoGraphEdgeType,
+  RepoGraphNodeType
+} from '@workspace/codepath-common/graph'
 
 import { DependencyCodeExtractor } from '../extractors/dependency-code.extractor'
 import { GraphNoiseFilter } from '../filters/graph-noise.filter'
@@ -98,7 +102,7 @@ export class DependencyGraphBuilder {
         {
           id: repoNodeId,
           label: repo.name,
-          type: 'repo'
+          type: RepoGraphNodeType.REPO
         }
       ]
     ])
@@ -144,7 +148,7 @@ export class DependencyGraphBuilder {
       this.addNode(nodesById, {
         id: moduleNodeId,
         label: moduleLabel,
-        type: 'module'
+        type: RepoGraphNodeType.MODULE
       })
 
       this.addNode(nodesById, {
@@ -154,21 +158,21 @@ export class DependencyGraphBuilder {
           filePath: file.filePath,
           moduleId: moduleNodeId
         },
-        type: 'file'
+        type: RepoGraphNodeType.FILE
       })
 
       this.addEdge(edgesByKey, {
         id: `${repoNodeId}->${moduleNodeId}:owns`,
         source: repoNodeId,
         target: moduleNodeId,
-        type: 'owns'
+        type: RepoGraphEdgeType.OWNS
       })
 
       this.addEdge(edgesByKey, {
         id: `${moduleNodeId}->${fileNodeId}:owns`,
         source: moduleNodeId,
         target: fileNodeId,
-        type: 'owns'
+        type: RepoGraphEdgeType.OWNS
       })
 
       if (options.includeSymbols) {
@@ -191,14 +195,14 @@ export class DependencyGraphBuilder {
               startLine: symbol.startLine,
               symbolKind: symbol.symbolKind
             },
-            type: 'symbol'
+            type: RepoGraphNodeType.SYMBOL
           })
 
           this.addEdge(edgesByKey, {
             id: `${fileNodeId}->${symbolNodeId}:owns`,
             source: fileNodeId,
             target: symbolNodeId,
-            type: 'owns'
+            type: RepoGraphEdgeType.OWNS
           })
 
           if (!symbolRefsByNormalizedName.has(normalizedSymbolName)) {
@@ -221,7 +225,7 @@ export class DependencyGraphBuilder {
                 moduleId: moduleNodeId,
                 routePath: symbol.routePath
               },
-              type: 'external_package'
+              type: RepoGraphNodeType.EXTERNAL_PACKAGE
             })
 
             this.addEdge(edgesByKey, {
@@ -232,7 +236,7 @@ export class DependencyGraphBuilder {
               },
               source: symbolNodeId,
               target: endpointNodeId,
-              type: 'produces'
+              type: RepoGraphEdgeType.PRODUCES
             })
           }
         }
@@ -261,7 +265,7 @@ export class DependencyGraphBuilder {
             },
             source: sourceNodeId,
             target: targetNodeId,
-            type: 'imports'
+            type: RepoGraphEdgeType.IMPORTS
           })
 
           continue
@@ -280,7 +284,7 @@ export class DependencyGraphBuilder {
         this.addNode(nodesById, {
           id: externalNodeId,
           label: specifier,
-          type: 'external_package'
+          type: RepoGraphNodeType.EXTERNAL_PACKAGE
         })
         this.addEdge(edgesByKey, {
           id: `${sourceNodeId}->${externalNodeId}:imports`,
@@ -290,7 +294,7 @@ export class DependencyGraphBuilder {
           },
           source: sourceNodeId,
           target: externalNodeId,
-          type: 'imports'
+          type: RepoGraphEdgeType.IMPORTS
         })
       }
     }
@@ -319,7 +323,7 @@ export class DependencyGraphBuilder {
           },
           source: sourceModuleNodeId,
           target: targetModuleNodeId,
-          type: 'depends_on'
+          type: RepoGraphEdgeType.DEPENDS_ON
         })
       }
 
@@ -332,7 +336,7 @@ export class DependencyGraphBuilder {
           },
           source: sourceModuleNodeId,
           target: this.toExternalNodeId(externalSpecifier),
-          type: 'depends_on'
+          type: RepoGraphEdgeType.DEPENDS_ON
         })
       }
 
@@ -377,7 +381,7 @@ export class DependencyGraphBuilder {
             },
             source: sourceFileNodeId,
             target: matchingRef.symbolNodeId,
-            type: 'calls'
+            type: RepoGraphEdgeType.CALLS
           })
           callEdgesAdded += 1
         }
@@ -395,7 +399,7 @@ export class DependencyGraphBuilder {
         this.addNode(nodesById, {
           id: eventNodeId,
           label: `event:${eventName}`,
-          type: 'external_package'
+          type: RepoGraphNodeType.EXTERNAL_PACKAGE
         })
 
         this.addEdge(edgesByKey, {
@@ -406,7 +410,7 @@ export class DependencyGraphBuilder {
           },
           source: sourceFileNodeId,
           target: eventNodeId,
-          type: 'produces'
+          type: RepoGraphEdgeType.PRODUCES
         })
 
         producedEdgesAdded += 1
@@ -423,7 +427,7 @@ export class DependencyGraphBuilder {
         this.addNode(nodesById, {
           id: eventNodeId,
           label: `event:${eventName}`,
-          type: 'external_package'
+          type: RepoGraphNodeType.EXTERNAL_PACKAGE
         })
 
         this.addEdge(edgesByKey, {
@@ -434,7 +438,7 @@ export class DependencyGraphBuilder {
           },
           source: sourceFileNodeId,
           target: eventNodeId,
-          type: 'consumes'
+          type: RepoGraphEdgeType.CONSUMES
         })
 
         consumedEdgesAdded += 1

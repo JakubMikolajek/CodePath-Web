@@ -1,15 +1,30 @@
-export type RepoApiFramework = 'django' | 'express' | 'fastapi' | 'flask' | 'nestjs' | 'unknown'
+import {Nullable} from "./globals";
 
-export type RepoApiHttpMethod =
-  | 'DELETE'
-  | 'GET'
-  | 'HEAD'
-  | 'OPTIONS'
-  | 'PATCH'
-  | 'POST'
-  | 'PUT'
+export enum RepoApiFramework {
+  DJANGO = 'django',
+  EXPRESS = 'express',
+  FASTAPI = 'fastapi',
+  FLASK = 'flask',
+  NESTJS = 'nestjs',
+  UNKNOWN = 'unknown'
+}
 
-export type RepoApiParameterLocation = 'body' | 'header' | 'path' | 'query'
+export enum RepoApiHttpMethod {
+  DELETE = 'DELETE',
+  GET = 'GET',
+  HEAD = 'HEAD',
+  OPTIONS = 'OPTIONS',
+  PATCH = 'PATCH',
+  POST = 'POST',
+  PUT = 'PUT'
+}
+
+export enum RepoApiParameterLocation {
+  BODY = 'body',
+  HEADER = 'header',
+  PATH = 'path',
+  QUERY = 'query'
+}
 
 export interface RepoApiEndpointParameter {
   location: RepoApiParameterLocation
@@ -59,20 +74,45 @@ export interface RepoInteractiveApi {
   }
 }
 
-export type RepoOpenApiOperationMethod = 'delete' | 'get' | 'head' | 'options' | 'patch' | 'post' | 'put'
+export enum RepoOpenApiOperationMethod {
+  DELETE = 'delete',
+  GET = 'get',
+  HEAD = 'head',
+  OPTIONS = 'options',
+  PATCH = 'patch',
+  POST = 'post',
+  PUT = 'put'
+}
 
-export type RepoOpenApiSchema =
-  | { $ref: string }
-  | {
-      additionalProperties?: boolean
-      items?: RepoOpenApiSchema
-      properties?: Record<string, RepoOpenApiSchema>
-      required?: string[]
-      type: 'array' | 'boolean' | 'integer' | 'number' | 'object' | 'string'
-    }
+export enum OpenApiVersion {
+  V3_1_0 = '3.1.0'
+}
+
+export enum RepoOpenApiSchemaType {
+  ARRAY = 'array',
+  BOOLEAN = 'boolean',
+  INTEGER = 'integer',
+  NUMBER = 'number',
+  OBJECT = 'object',
+  STRING = 'string'
+}
+
+export type RepoOpenApiSchema = { $ref: string } | {
+  additionalProperties?: boolean
+  items?: RepoOpenApiSchema
+  properties?: Record<string, RepoOpenApiSchema>
+  required?: string[]
+  type: RepoOpenApiSchemaType
+}
+
+export enum RepoOpenApiParameterIn {
+  HEADER = 'header',
+  PATH = 'path',
+  QUERY = 'query'
+}
 
 export interface RepoOpenApiParameter {
-  in: 'header' | 'path' | 'query'
+  in: RepoOpenApiParameterIn
   name: string
   required: boolean
   schema: RepoOpenApiSchema
@@ -111,7 +151,7 @@ export interface RepoOpenApiDocument {
     title: string
     version: string
   }
-  openapi: '3.1.0'
+  openapi: OpenApiVersion
   paths: Record<string, Partial<Record<RepoOpenApiOperationMethod, RepoOpenApiOperation>>>
   tags?: Array<{ name: string }>
   'x-codepath-metrics'?: {
@@ -123,9 +163,15 @@ export interface RepoOpenApiDocument {
     runtimeOperationCount: number
     runtimeResolvedUrl?: string
     schemaComponentCount: number
-    sourceMode: 'hybrid' | 'runtime' | 'static'
+    sourceMode: RepoOpenApiSourceMode
     staticOperationCount: number
   }
+}
+
+export enum RepoOpenApiSourceMode {
+  HYBRID = 'hybrid',
+  RUNTIME = 'runtime',
+  STATIC = 'static'
 }
 
 export interface RepoApiRunnerRequest {
@@ -146,8 +192,17 @@ export interface RepoApiRunnerResponse {
   url: string
 }
 
-export type RepoApiRunnerAuthMode = 'apiKey' | 'basic' | 'bearer' | 'none'
-export type RepoApiRunnerApiKeyPlacement = 'header' | 'query'
+export enum RepoApiRunnerAuthMode {
+  API_KEY = 'apiKey',
+  BASIC = 'basic',
+  BEARER = 'bearer',
+  NONE = 'none'
+}
+
+export enum RepoApiRunnerApiKeyPlacement {
+  HEADER = 'header',
+  QUERY = 'query'
+}
 
 export interface RepoApiRunnerAuthConfig {
   apiKeyName: string
@@ -163,9 +218,9 @@ export interface RepoApiRunnerCollectionConfig {
   auth: RepoApiRunnerAuthConfig
   baseUrl: string
   bodyJson: string
-  endpointId: null | string
-  endpointMethod: null | RepoApiHttpMethod
-  endpointPath: null | string
+  endpointId: Nullable<string>
+  endpointMethod: Nullable<RepoApiHttpMethod>
+  endpointPath: Nullable<string>
   headersJson: string
   pathValues: Record<string, string>
   queryJson: string

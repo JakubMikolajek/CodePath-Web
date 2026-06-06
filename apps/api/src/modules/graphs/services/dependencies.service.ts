@@ -1,9 +1,12 @@
 import { Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
 import type {
   RepoGraphEdge,
-  RepoGraphEdgeType,
   RepoGraphNode,
   RepoInteractiveGraph
+} from '@workspace/codepath-common/graph'
+import {
+  RepoGraphEdgeType,
+  RepoGraphNodeType
 } from '@workspace/codepath-common/graph'
 import { and, desc, eq } from 'drizzle-orm'
 
@@ -25,12 +28,12 @@ interface InteractiveGraphQuery {
 }
 
 const SUPPORTED_RELATION_TYPES: RepoGraphEdgeType[] = [
-  'imports',
-  'calls',
-  'depends_on',
-  'owns',
-  'produces',
-  'consumes'
+  RepoGraphEdgeType.IMPORTS,
+  RepoGraphEdgeType.CALLS,
+  RepoGraphEdgeType.DEPENDS_ON,
+  RepoGraphEdgeType.OWNS,
+  RepoGraphEdgeType.PRODUCES,
+  RepoGraphEdgeType.CONSUMES
 ]
 
 const MAX_RETURN_NODES = 1_600
@@ -152,11 +155,11 @@ export class DependenciesService {
       truncated = true
       truncationReason = 'node_cap'
       const typePriority: Record<RepoGraphNode['type'], number> = {
-        external_package: 3,
-        file: 2,
-        module: 1,
-        repo: 0,
-        symbol: 4
+        [RepoGraphNodeType.EXTERNAL_PACKAGE]: 3,
+        [RepoGraphNodeType.FILE]: 2,
+        [RepoGraphNodeType.MODULE]: 1,
+        [RepoGraphNodeType.REPO]: 0,
+        [RepoGraphNodeType.SYMBOL]: 4
       }
 
       const sortedNodes = [...limitedNodes].sort((a, b) => {
@@ -176,12 +179,12 @@ export class DependenciesService {
       truncated = true
       truncationReason = truncationReason ? `${truncationReason}+edge_cap` : 'edge_cap'
       const edgePriority: Record<RepoGraphEdgeType, number> = {
-        calls: 3,
-        consumes: 5,
-        depends_on: 0,
-        imports: 1,
-        owns: 2,
-        produces: 4
+        [RepoGraphEdgeType.CALLS]: 3,
+        [RepoGraphEdgeType.CONSUMES]: 5,
+        [RepoGraphEdgeType.DEPENDS_ON]: 0,
+        [RepoGraphEdgeType.IMPORTS]: 1,
+        [RepoGraphEdgeType.OWNS]: 2,
+        [RepoGraphEdgeType.PRODUCES]: 4
       }
 
       const sortedEdges = [...limitedEdges].sort((a, b) => {
@@ -199,7 +202,7 @@ export class DependenciesService {
         referencedNodeIds.add(edge.target)
       }
 
-      limitedNodes = limitedNodes.filter(node => node.type === 'repo' || referencedNodeIds.has(node.id))
+      limitedNodes = limitedNodes.filter(node => node.type === RepoGraphNodeType.REPO || referencedNodeIds.has(node.id))
     }
 
     return {
@@ -394,9 +397,15 @@ export class DependenciesService {
 
     const requestedTypes = relationTypes
       .split(',')
-      .map(type => type.trim().toLowerCase() as RepoGraphEdgeType)
+      .map(type => this.assertRelationType(type))
+      .filter((type): type is RepoGraphEdgeType => type !== null)
       .filter(type => SUPPORTED_RELATION_TYPES.includes(type))
 
     return Array.from(new Set(requestedTypes))
+  }
+
+  private assertRelationType(value: string): null | RepoGraphEdgeType {
+    const normalized = value.trim().toLowerCase()
+    return SUPPORTED_RELATION_TYPES.find(type => type === normalized) ?? null
   }
 }

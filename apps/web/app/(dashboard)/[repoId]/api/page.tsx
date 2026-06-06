@@ -2,15 +2,18 @@
 
 import type {
   RepoApiEndpoint,
-  RepoApiFramework,
-  RepoApiHttpMethod,
-  RepoApiRunnerApiKeyPlacement,
-  RepoApiRunnerAuthMode,
   RepoApiRunnerAuthPreset,
   RepoApiRunnerCollection,
   RepoApiRunnerCollectionConfig,
   RepoApiRunnerResponse,
   RepoInteractiveApi
+} from '@workspace/codepath-common/api-explorer'
+import {
+  RepoApiFramework,
+  RepoApiHttpMethod,
+  RepoApiParameterLocation,
+  RepoApiRunnerApiKeyPlacement,
+  RepoApiRunnerAuthMode
 } from '@workspace/codepath-common/api-explorer'
 import type { Nullable } from '@workspace/codepath-common/globals'
 import { Button } from '@workspace/ui/components/button'
@@ -37,34 +40,38 @@ import {
 import { getFirstRouteParam } from '@/lib/route-params'
 
 const FRAMEWORK_OPTIONS: RepoApiFramework[] = [
-  'django',
-  'express',
-  'fastapi',
-  'flask',
-  'nestjs',
-  'unknown'
+  RepoApiFramework.DJANGO,
+  RepoApiFramework.EXPRESS,
+  RepoApiFramework.FASTAPI,
+  RepoApiFramework.FLASK,
+  RepoApiFramework.NESTJS,
+  RepoApiFramework.UNKNOWN
 ]
 
 const METHOD_OPTIONS: RepoApiHttpMethod[] = [
-  'DELETE',
-  'GET',
-  'HEAD',
-  'OPTIONS',
-  'PATCH',
-  'POST',
-  'PUT'
+  RepoApiHttpMethod.DELETE,
+  RepoApiHttpMethod.GET,
+  RepoApiHttpMethod.HEAD,
+  RepoApiHttpMethod.OPTIONS,
+  RepoApiHttpMethod.PATCH,
+  RepoApiHttpMethod.POST,
+  RepoApiHttpMethod.PUT
 ]
 
-const METHOD_WITH_BODY = new Set<RepoApiHttpMethod>(['PATCH', 'POST', 'PUT'])
+const METHOD_WITH_BODY = new Set<RepoApiHttpMethod>([
+  RepoApiHttpMethod.PATCH,
+  RepoApiHttpMethod.POST,
+  RepoApiHttpMethod.PUT
+])
 
 const methodClasses: Record<RepoApiHttpMethod, string> = {
-  DELETE: 'border-red-400/40 bg-red-400/10 text-red-200',
-  GET: 'border-cyan-300/40 bg-cyan-300/10 text-cyan-200',
-  HEAD: 'border-slate-300/30 bg-slate-300/10 text-slate-200',
-  OPTIONS: 'border-zinc-300/30 bg-zinc-300/10 text-zinc-200',
-  PATCH: 'border-amber-300/40 bg-amber-300/10 text-amber-200',
-  POST: 'border-emerald-300/40 bg-emerald-300/10 text-emerald-200',
-  PUT: 'border-violet-300/40 bg-violet-300/10 text-violet-200'
+  [RepoApiHttpMethod.DELETE]: 'border-red-400/40 bg-red-400/10 text-red-200',
+  [RepoApiHttpMethod.GET]: 'border-cyan-300/40 bg-cyan-300/10 text-cyan-200',
+  [RepoApiHttpMethod.HEAD]: 'border-slate-300/30 bg-slate-300/10 text-slate-200',
+  [RepoApiHttpMethod.OPTIONS]: 'border-zinc-300/30 bg-zinc-300/10 text-zinc-200',
+  [RepoApiHttpMethod.PATCH]: 'border-amber-300/40 bg-amber-300/10 text-amber-200',
+  [RepoApiHttpMethod.POST]: 'border-emerald-300/40 bg-emerald-300/10 text-emerald-200',
+  [RepoApiHttpMethod.PUT]: 'border-violet-300/40 bg-violet-300/10 text-violet-200'
 }
 
 const fieldClassName = 'h-11 rounded-xl border-input bg-input/70 px-4 text-sm text-foreground shadow-[inset_0_1px_0_oklch(1_0_0/0.05)] transition-[border-color,box-shadow,background,color] focus-visible:border-ring focus-visible:bg-input focus-visible:ring-[3px] focus-visible:ring-ring/50'
@@ -215,13 +222,13 @@ const buildAuthArtifacts = (auth: RepoApiRunnerCollectionConfig['auth']) => {
   const headers: Record<string, string> = {}
   const query: Record<string, string> = {}
 
-  if (auth.mode === 'bearer') {
+  if (auth.mode === RepoApiRunnerAuthMode.BEARER) {
     if (!auth.bearerToken.trim()) throw new Error('Bearer token is required')
 
     headers.Authorization = `Bearer ${auth.bearerToken.trim()}`
   }
 
-  if (auth.mode === 'basic') {
+  if (auth.mode === RepoApiRunnerAuthMode.BASIC) {
     const username = auth.basicUsername.trim()
     const password = auth.basicPassword
 
@@ -232,7 +239,7 @@ const buildAuthArtifacts = (auth: RepoApiRunnerCollectionConfig['auth']) => {
     headers.Authorization = `Basic ${encoded}`
   }
 
-  if (auth.mode === 'apiKey') {
+  if (auth.mode === RepoApiRunnerAuthMode.API_KEY) {
     const keyName = auth.apiKeyName.trim()
     const keyValue = auth.apiKeyValue.trim()
 
@@ -240,7 +247,7 @@ const buildAuthArtifacts = (auth: RepoApiRunnerCollectionConfig['auth']) => {
 
     if (!keyValue) throw new Error('API key value is required')
 
-    if (auth.apiKeyPlacement === 'query') query[keyName] = keyValue
+    if (auth.apiKeyPlacement === RepoApiRunnerApiKeyPlacement.QUERY) query[keyName] = keyValue
     else headers[keyName] = keyValue
   }
 
@@ -406,7 +413,7 @@ export default function Page() {
     const seed = endpoint.id
     const pathParamNames = new Set<string>([
       ...parsePathParamNames(endpoint.path),
-      ...endpoint.params.filter(param => param.location === 'path').map(param => param.name)
+      ...endpoint.params.filter(param => param.location === RepoApiParameterLocation.PATH).map(param => param.name)
     ])
 
     const nextPathValues: Record<string, string> = {}
@@ -417,13 +424,13 @@ export default function Page() {
 
     const nextQuery: Record<string, unknown> = {}
 
-    for (const param of endpoint.params.filter(param => param.location === 'query')) {
+    for (const param of endpoint.params.filter(param => param.location === RepoApiParameterLocation.QUERY)) {
       nextQuery[param.name] = generateSampleValue(param.name, seed)
     }
 
     const nextBody: Record<string, unknown> = {}
 
-    for (const param of endpoint.params.filter(param => param.location === 'body')) {
+    for (const param of endpoint.params.filter(param => param.location === RepoApiParameterLocation.BODY)) {
       const key = param.name === 'body' ? 'payload' : param.name
       nextBody[key] = generateSampleValue(key, seed)
     }
@@ -903,18 +910,18 @@ export default function Page() {
                 onChange={event => setAuth(prev => ({ ...prev, mode: event.target.value as RepoApiRunnerAuthMode }))}
                 value={auth.mode}
               >
-                <option value="none">None</option>
+                <option value={RepoApiRunnerAuthMode.NONE}>None</option>
 
-                <option value="bearer">Bearer token</option>
+                <option value={RepoApiRunnerAuthMode.BEARER}>Bearer token</option>
 
-                <option value="basic">Basic auth</option>
+                <option value={RepoApiRunnerAuthMode.BASIC}>Basic auth</option>
 
-                <option value="apiKey">API key</option>
+                <option value={RepoApiRunnerAuthMode.API_KEY}>API key</option>
               </select>
             </label>
           </div>
 
-          {auth.mode === 'bearer' && (
+          {auth.mode === RepoApiRunnerAuthMode.BEARER && (
             <label className="flex flex-col gap-1 text-sm">
               <span>Bearer token</span>
 
@@ -927,7 +934,7 @@ export default function Page() {
             </label>
           )}
 
-          {auth.mode === 'basic' && (
+          {auth.mode === RepoApiRunnerAuthMode.BASIC && (
             <div className="grid gap-3 md:grid-cols-2">
               <label className="flex flex-col gap-1 text-sm">
                 <span>Username</span>
@@ -952,7 +959,7 @@ export default function Page() {
             </div>
           )}
 
-          {auth.mode === 'apiKey' && (
+          {auth.mode === RepoApiRunnerAuthMode.API_KEY && (
             <div className="grid gap-3 md:grid-cols-3">
               <label className="flex flex-col gap-1 text-sm">
                 <span>Key name</span>
@@ -983,9 +990,9 @@ export default function Page() {
                   onChange={event => setAuth(prev => ({ ...prev, apiKeyPlacement: event.target.value as RepoApiRunnerApiKeyPlacement }))}
                   value={auth.apiKeyPlacement}
                 >
-                  <option value="header">Header</option>
+                  <option value={RepoApiRunnerApiKeyPlacement.HEADER}>Header</option>
 
-                  <option value="query">Query</option>
+                  <option value={RepoApiRunnerApiKeyPlacement.QUERY}>Query</option>
                 </select>
               </label>
             </div>

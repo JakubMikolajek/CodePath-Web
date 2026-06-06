@@ -5,8 +5,22 @@ export interface Graph {
   graph: string
 }
 
-export type RepoGraphNodeType = 'repo' | 'module' | 'file' | 'symbol' | 'external_package'
-export type RepoGraphEdgeType = 'imports' | 'calls' | 'depends_on' | 'owns' | 'produces' | 'consumes'
+export enum RepoGraphNodeType {
+  EXTERNAL_PACKAGE = 'external_package',
+  FILE = 'file',
+  MODULE = 'module',
+  REPO = 'repo',
+  SYMBOL = 'symbol'
+}
+
+export enum RepoGraphEdgeType {
+  CALLS = 'calls',
+  CONSUMES = 'consumes',
+  DEPENDS_ON = 'depends_on',
+  IMPORTS = 'imports',
+  OWNS = 'owns',
+  PRODUCES = 'produces'
+}
 
 export interface RepoGraphNodeMetadata {
   astPath?: string[]

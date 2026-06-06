@@ -1,33 +1,40 @@
+import {
+  OpenApiVersion,
+  RepoApiHttpMethod,
+  RepoApiParameterLocation,
+  RepoOpenApiOperationMethod,
+  RepoOpenApiParameterIn,
+  RepoOpenApiSchemaType,
+  RepoOpenApiSourceMode
+} from '@workspace/codepath-common/api-explorer'
 import type {
   RepoApiEndpoint,
-  RepoApiHttpMethod,
   RepoInteractiveApi,
   RepoOpenApiDocument,
   RepoOpenApiOperation,
-  RepoOpenApiOperationMethod,
   RepoOpenApiParameter,
   RepoOpenApiSchema,
   RepoOpenApiSourceMetadata
 } from '@workspace/codepath-common/api-explorer'
 
 const METHOD_TO_OPENAPI: Record<RepoApiHttpMethod, RepoOpenApiOperationMethod> = {
-  DELETE: 'delete',
-  GET: 'get',
-  HEAD: 'head',
-  OPTIONS: 'options',
-  PATCH: 'patch',
-  POST: 'post',
-  PUT: 'put'
+  [RepoApiHttpMethod.DELETE]: RepoOpenApiOperationMethod.DELETE,
+  [RepoApiHttpMethod.GET]: RepoOpenApiOperationMethod.GET,
+  [RepoApiHttpMethod.HEAD]: RepoOpenApiOperationMethod.HEAD,
+  [RepoApiHttpMethod.OPTIONS]: RepoOpenApiOperationMethod.OPTIONS,
+  [RepoApiHttpMethod.PATCH]: RepoOpenApiOperationMethod.PATCH,
+  [RepoApiHttpMethod.POST]: RepoOpenApiOperationMethod.POST,
+  [RepoApiHttpMethod.PUT]: RepoOpenApiOperationMethod.PUT
 }
 
 const SUPPORTED_OPENAPI_METHODS: RepoOpenApiOperationMethod[] = [
-  'delete',
-  'get',
-  'head',
-  'options',
-  'patch',
-  'post',
-  'put'
+  RepoOpenApiOperationMethod.DELETE,
+  RepoOpenApiOperationMethod.GET,
+  RepoOpenApiOperationMethod.HEAD,
+  RepoOpenApiOperationMethod.OPTIONS,
+  RepoOpenApiOperationMethod.PATCH,
+  RepoOpenApiOperationMethod.POST,
+  RepoOpenApiOperationMethod.PUT
 ]
 
 export class OpenApiDocumentBuilder {
@@ -69,7 +76,7 @@ export class OpenApiDocumentBuilder {
         title: `${interactiveApi.metadata.repoName} Interactive API`,
         version: '0.1.0'
       },
-      openapi: '3.1.0',
+      openapi: OpenApiVersion.V3_1_0,
       paths,
       tags,
       'x-codepath-metrics': {
@@ -80,7 +87,7 @@ export class OpenApiDocumentBuilder {
         operationsWithCodeSource: staticOperationsWithCodeSource,
         runtimeOperationCount: 0,
         schemaComponentCount: staticSchemaComponentCount,
-        sourceMode: 'static',
+        sourceMode: RepoOpenApiSourceMode.STATIC,
         staticOperationCount
       }
     }
@@ -147,12 +154,14 @@ export class OpenApiDocumentBuilder {
     const operationsWithCodeSource = this.countOperationsWithCodeSource(mergedPaths)
     const moduleTagCount = mergedTags.length > 0 ? mergedTags.length : runtimeSpec.tags?.length ?? 0
     const schemaComponentCount = Object.keys(mergedSchemas).length
-    const sourceMode = runtimeOperationCount > 0 ? (staticOperationCount > 0 ? 'hybrid' : 'runtime') : 'static'
+    const sourceMode = runtimeOperationCount > 0
+      ? (staticOperationCount > 0 ? RepoOpenApiSourceMode.HYBRID : RepoOpenApiSourceMode.RUNTIME)
+      : RepoOpenApiSourceMode.STATIC
 
     return {
       components: Object.keys(mergedSchemas).length > 0 ? { schemas: mergedSchemas } : undefined,
       info: runtimeSpec.info?.title ? runtimeSpec.info : staticSpec.info,
-      openapi: '3.1.0',
+      openapi: OpenApiVersion.V3_1_0,
       paths: mergedPaths,
       tags: mergedTags.length > 0 ? mergedTags : runtimeSpec.tags,
       'x-codepath-metrics': {
@@ -205,7 +214,7 @@ export class OpenApiDocumentBuilder {
         title: typeof infoRaw.title === 'string' ? infoRaw.title : 'Runtime OpenAPI',
         version: typeof infoRaw.version === 'string' ? infoRaw.version : '0.1.0'
       },
-      openapi: '3.1.0',
+      openapi: OpenApiVersion.V3_1_0,
       paths: raw.paths as RepoOpenApiDocument['paths'],
       tags: runtimeTags
     }
@@ -379,23 +388,25 @@ export class OpenApiDocumentBuilder {
       .filter(
         (
           param
-        ): param is RepoApiEndpoint['params'][number] & { location: 'header' | 'path' | 'query' } => param.location !== 'body'
+        ): param is RepoApiEndpoint['params'][number] & {
+          location: RepoApiParameterLocation.HEADER | RepoApiParameterLocation.PATH | RepoApiParameterLocation.QUERY
+        } => param.location !== RepoApiParameterLocation.BODY
       )
       .map(param => ({
-        in: param.location,
+        in: this.toOpenApiParameterIn(param.location),
         name: param.name,
-        required: param.location === 'path' ? true : param.required,
+        required: param.location === RepoApiParameterLocation.PATH ? true : param.required,
         schema: {
-          type: 'string' as const
+          type: RepoOpenApiSchemaType.STRING
         }
       }))
 
-    const bodyParams = endpoint.params.filter(param => param.location === 'body')
+    const bodyParams = endpoint.params.filter(param => param.location === RepoApiParameterLocation.BODY)
     const bodyProperties = Object.fromEntries(
       bodyParams.map(param => [
         param.name === 'body' ? 'payload' : param.name,
         {
-          type: 'string' as const
+          type: RepoOpenApiSchemaType.STRING
         }
       ])
     )
@@ -427,7 +438,7 @@ export class OpenApiDocumentBuilder {
           additionalProperties: true,
           properties: bodyProperties,
           required: requiredBodyProperties.length > 0 ? requiredBodyProperties : undefined,
-          type: 'object' as const
+          type: RepoOpenApiSchemaType.OBJECT
         }
 
       operation.requestBody = {
@@ -447,6 +458,13 @@ export class OpenApiDocumentBuilder {
     return this.normalizeHttpPath(path)
       .replace(/:([A-Za-z0-9_]+)/g, '{$1}')
       .replace(/<(?:(?:[A-Za-z0-9_]+):)?([A-Za-z0-9_]+)>/g, '{$1}')
+  }
+
+  private toOpenApiParameterIn(location: RepoApiParameterLocation): RepoOpenApiParameterIn {
+    if (location === RepoApiParameterLocation.HEADER) return RepoOpenApiParameterIn.HEADER
+    if (location === RepoApiParameterLocation.PATH) return RepoOpenApiParameterIn.PATH
+
+    return RepoOpenApiParameterIn.QUERY
   }
 
   private toOperationId(endpoint: RepoApiEndpoint) {

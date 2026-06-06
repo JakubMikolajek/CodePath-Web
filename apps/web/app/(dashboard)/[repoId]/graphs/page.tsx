@@ -1,7 +1,10 @@
 'use client'
 
 import type { Nullable } from '@workspace/codepath-common/globals'
-import type { RepoGraphEdgeType } from '@workspace/codepath-common/graph'
+import {
+  RepoGraphEdgeType,
+  RepoGraphNodeType
+} from '@workspace/codepath-common/graph'
 import { Button } from '@workspace/ui/components/button'
 import { Input } from '@workspace/ui/components/input'
 import { Focus, GitFork, Layers3, Maximize2, RotateCcw, Search, SlidersHorizontal, Target } from 'lucide-react'
@@ -16,12 +19,12 @@ import { useAppDispatch, useAppSelector } from '@/redux/hooks'
 import { getGraphs, getInteractiveGraph } from '@/redux/slices/graphsSlice'
 
 const EDGE_TYPE_OPTIONS: RepoGraphEdgeType[] = [
-  'imports',
-  'calls',
-  'depends_on',
-  'owns',
-  'produces',
-  'consumes'
+  RepoGraphEdgeType.IMPORTS,
+  RepoGraphEdgeType.CALLS,
+  RepoGraphEdgeType.DEPENDS_ON,
+  RepoGraphEdgeType.OWNS,
+  RepoGraphEdgeType.PRODUCES,
+  RepoGraphEdgeType.CONSUMES
 ]
 
 const normalizeFilePath = (value: string) => value
@@ -66,7 +69,7 @@ export default function Page() {
   const moduleNodes = useMemo(() => {
     if (!interactiveGraph) return []
 
-    return interactiveGraph.nodes.filter(node => node.type === 'module')
+    return interactiveGraph.nodes.filter(node => node.type === RepoGraphNodeType.MODULE)
   }, [interactiveGraph])
 
   const applyFilters = () => {
@@ -117,8 +120,8 @@ export default function Page() {
 
   const focusedFilePath = useMemo(() => {
     if (!focusedNode) return null
-    if (focusedNode.type === 'file') return normalizeFilePath(focusedNode.metadata?.filePath ?? focusedNode.label)
-    if (focusedNode.type === 'symbol' && focusedNode.metadata?.filePath) return normalizeFilePath(focusedNode.metadata.filePath)
+    if (focusedNode.type === RepoGraphNodeType.FILE) return normalizeFilePath(focusedNode.metadata?.filePath ?? focusedNode.label)
+    if (focusedNode.type === RepoGraphNodeType.SYMBOL && focusedNode.metadata?.filePath) return normalizeFilePath(focusedNode.metadata.filePath)
 
     return null
   }, [focusedNode])
@@ -131,15 +134,15 @@ export default function Page() {
 
     if (moduleNode?.label) path.push(moduleNode.label)
 
-    if (focusedNode.type === 'file') {
+    if (focusedNode.type === RepoGraphNodeType.FILE) {
       path.push(focusedNode.label)
-    } else if (focusedNode.type === 'symbol') {
+    } else if (focusedNode.type === RepoGraphNodeType.SYMBOL) {
       if (focusedFilePath) path.push(focusedFilePath)
 
       path.push(focusedNode.label)
-    } else if (focusedNode.type === 'external_package') {
+    } else if (focusedNode.type === RepoGraphNodeType.EXTERNAL_PACKAGE) {
       path.push(focusedNode.label)
-    } else if (focusedNode.type === 'module') {
+    } else if (focusedNode.type === RepoGraphNodeType.MODULE) {
       path.push(focusedNode.label)
     }
 

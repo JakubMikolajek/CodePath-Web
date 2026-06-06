@@ -4,9 +4,9 @@ import type { Nullable } from '@workspace/codepath-common/globals'
 import type {
   RepoGraphEdge,
   RepoGraphNode,
-  RepoGraphNodeType,
   RepoInteractiveGraph
 } from '@workspace/codepath-common/graph'
+import { RepoGraphNodeType } from '@workspace/codepath-common/graph'
 import { Button } from '@workspace/ui/components/button'
 import { Maximize2, Minus, Plus, X } from 'lucide-react'
 import { type PointerEventHandler, useMemo, useState, type WheelEventHandler } from 'react'
@@ -29,13 +29,19 @@ interface PositionedGraph {
   width: number
 }
 
-const NODE_TYPE_ORDER: RepoGraphNodeType[] = ['repo', 'module', 'file', 'symbol', 'external_package']
+const NODE_TYPE_ORDER: RepoGraphNodeType[] = [
+  RepoGraphNodeType.REPO,
+  RepoGraphNodeType.MODULE,
+  RepoGraphNodeType.FILE,
+  RepoGraphNodeType.SYMBOL,
+  RepoGraphNodeType.EXTERNAL_PACKAGE
+]
 const NODE_TYPE_COLORS: Record<RepoGraphNodeType, { fill: string, stroke: string }> = {
-  external_package: { fill: '#322f45', stroke: '#7f8fca' },
-  file: { fill: '#08285f', stroke: '#2778ff' },
-  module: { fill: '#341172', stroke: '#8b3dff' },
-  repo: { fill: '#075c2f', stroke: '#29d967' },
-  symbol: { fill: '#7a3208', stroke: '#fb923c' }
+  [RepoGraphNodeType.EXTERNAL_PACKAGE]: { fill: '#322f45', stroke: '#7f8fca' },
+  [RepoGraphNodeType.FILE]: { fill: '#08285f', stroke: '#2778ff' },
+  [RepoGraphNodeType.MODULE]: { fill: '#341172', stroke: '#8b3dff' },
+  [RepoGraphNodeType.REPO]: { fill: '#075c2f', stroke: '#29d967' },
+  [RepoGraphNodeType.SYMBOL]: { fill: '#7a3208', stroke: '#fb923c' }
 }
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
@@ -66,11 +72,11 @@ function getOverviewNodes(nodes: RepoGraphNode[], edges: RepoGraphEdge[], focuse
   const degreeByNode = getDegreeByNode(edges)
 
   const typeWeight: Record<RepoGraphNodeType, number> = {
-    external_package: 90,
-    file: 130,
-    module: 520,
-    repo: 900,
-    symbol: 60
+    [RepoGraphNodeType.EXTERNAL_PACKAGE]: 90,
+    [RepoGraphNodeType.FILE]: 130,
+    [RepoGraphNodeType.MODULE]: 520,
+    [RepoGraphNodeType.REPO]: 900,
+    [RepoGraphNodeType.SYMBOL]: 60
   }
 
   const selectedIds = new Set([...nodes]
@@ -157,11 +163,11 @@ function buildCoreRingsLayout(visibleNodes: RepoGraphNode[], visibleEdges: RepoG
   }
 
   const typePriority: Record<RepoGraphNodeType, number> = {
-    external_package: 1,
-    file: 3,
-    module: 6,
-    repo: 9,
-    symbol: 2
+    [RepoGraphNodeType.EXTERNAL_PACKAGE]: 1,
+    [RepoGraphNodeType.FILE]: 3,
+    [RepoGraphNodeType.MODULE]: 6,
+    [RepoGraphNodeType.REPO]: 9,
+    [RepoGraphNodeType.SYMBOL]: 2
   }
 
   const nodeScore = (node: RepoGraphNode) => {
@@ -179,7 +185,7 @@ function buildCoreRingsLayout(visibleNodes: RepoGraphNode[], visibleEdges: RepoG
   })
 
   const coreIds = new Set(sortedByScore.slice(0, coreCount).map(node => node.id))
-  const repoNode = visibleNodes.find(node => node.type === 'repo')
+  const repoNode = visibleNodes.find(node => node.type === RepoGraphNodeType.REPO)
 
   if (repoNode) coreIds.add(repoNode.id)
 
@@ -335,7 +341,12 @@ export default function InteractiveRepoGraph({ collapsedModuleIds, focusedNodeId
       const moduleId = node.metadata?.moduleId
 
       if (!moduleId || !collapsed.has(moduleId)) continue
-      if ((node.type === 'file' || node.type === 'symbol') && node.id !== focusedNodeId) ids.add(node.id)
+      if (
+        (node.type === RepoGraphNodeType.FILE || node.type === RepoGraphNodeType.SYMBOL)
+        && node.id !== focusedNodeId
+      ) {
+        ids.add(node.id)
+      }
     }
 
     return ids

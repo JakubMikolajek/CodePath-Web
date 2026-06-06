@@ -1,6 +1,6 @@
 # Telemetry Contract v1 (`codepath.telemetry.v1`)
 
-Canonical source in code: `packages/codepath-common/telemetry.ts`.
+Canonical source in code: `../packages/codepath-common/src/telemetry.ts`.
 
 ## Required fields
 

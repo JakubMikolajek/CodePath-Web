@@ -4,8 +4,6 @@ import { BadRequestException, Inject, Injectable, Logger, NotFoundException } fr
 import type {
   RepoApiEndpoint,
   RepoApiEndpointParameter,
-  RepoApiFramework,
-  RepoApiHttpMethod,
   RepoApiRunnerAuthPreset,
   RepoApiRunnerCollection,
   RepoApiRunnerRequest,
@@ -16,6 +14,7 @@ import type {
   RepoOpenApiDocument,
   RepoOpenApiSchema
 } from '@workspace/codepath-common/api-explorer'
+import { RepoApiFramework, RepoApiHttpMethod } from '@workspace/codepath-common/api-explorer'
 import type { AxiosInstance } from 'axios'
 import { and, eq } from 'drizzle-orm'
 
@@ -38,22 +37,22 @@ const MAX_CONTENT_PER_FILE = 220_000
 const MAX_SEGMENTS_PER_FILE = 400
 
 const SUPPORTED_FRAMEWORKS: RepoApiFramework[] = [
-  'django',
-  'express',
-  'fastapi',
-  'flask',
-  'nestjs',
-  'unknown'
+  RepoApiFramework.DJANGO,
+  RepoApiFramework.EXPRESS,
+  RepoApiFramework.FASTAPI,
+  RepoApiFramework.FLASK,
+  RepoApiFramework.NESTJS,
+  RepoApiFramework.UNKNOWN
 ]
 
 const SUPPORTED_METHODS: RepoApiHttpMethod[] = [
-  'DELETE',
-  'GET',
-  'HEAD',
-  'OPTIONS',
-  'PATCH',
-  'POST',
-  'PUT'
+  RepoApiHttpMethod.DELETE,
+  RepoApiHttpMethod.GET,
+  RepoApiHttpMethod.HEAD,
+  RepoApiHttpMethod.OPTIONS,
+  RepoApiHttpMethod.PATCH,
+  RepoApiHttpMethod.POST,
+  RepoApiHttpMethod.PUT
 ]
 
 const RUNNER_MAX_RESPONSE_BYTES = 1_000_000
@@ -271,6 +270,11 @@ export class ApiExplorerService {
   ): Promise<RepoApiRunnerCollection> {
     await this.assertRepoOwnership(userId, repoId)
     return await this.apiRunnerService.saveRunnerCollection(userId, repoId, input)
+  }
+
+  private assertFramework(value: string): null | RepoApiFramework {
+    const normalized = value.trim().toLowerCase()
+    return SUPPORTED_FRAMEWORKS.find(framework => framework === normalized) ?? null
   }
 
   private assertMethod(value: string): null | RepoApiHttpMethod {
@@ -519,8 +523,8 @@ export class ApiExplorerService {
 
     const values = frameworks
       .split(',')
-      .map(value => value.trim().toLowerCase() as RepoApiFramework)
-      .filter(value => SUPPORTED_FRAMEWORKS.includes(value))
+      .map(value => this.assertFramework(value))
+      .filter((value): value is RepoApiFramework => value !== null)
 
     return Array.from(new Set(values))
   }

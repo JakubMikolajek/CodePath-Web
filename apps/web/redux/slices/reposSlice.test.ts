@@ -1,13 +1,18 @@
 import type { Repository } from '@workspace/codepath-common/repository'
+import {
+  RepoCloneStatus,
+  RepoDocsStatus,
+  RepoEmbeddingStatus
+} from '@workspace/codepath-common/repository'
 import { describe, expect, it } from 'vitest'
 
 import reposReducer, { dismissSyncError, getRepos } from './reposSlice'
 
 describe('reposSlice', () => {
   const repoFixture: Repository = {
-    cloneStatus: 'cloned',
-    docsStatus: 'ready',
-    embeddingStatus: 'embedded',
+    cloneStatus: RepoCloneStatus.CLONED,
+    docsStatus: RepoDocsStatus.READY,
+    embeddingStatus: RepoEmbeddingStatus.EMBEDDED,
     id: 7,
     lastPipelineError: null,
     pipelineUpdatedAt: null,

@@ -1,46 +1,73 @@
 {
   "name": "@workspace/codepath-common",
-  "version": "1.0.0",
-  "main": "index.d.ts",
+  "version": "0.1.0",
   "private": true,
-  "dependencies": {
-    "typescript": "^5.8.3"
-  },
-  "scripts": {
-    "build": "tsc"
-  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    "./user": {
-      "types": "./user.ts",
-      "default": "./dist/user.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./api-explorer": {
+      "types": "./dist/api-explorer.d.ts",
+      "import": "./dist/api-explorer.js",
+      "require": "./dist/api-explorer.js",
+      "default": "./dist/api-explorer.js"
+    },
+    "./chat": {
+      "types": "./dist/chat.d.ts",
+      "import": "./dist/chat.js",
+      "require": "./dist/chat.js",
+      "default": "./dist/chat.js"
     },
     "./globals": {
-      "types": "./globals.ts",
+      "types": "./dist/globals.d.ts",
+      "import": "./dist/globals.js",
+      "require": "./dist/globals.js",
       "default": "./dist/globals.js"
     },
     "./graph": {
-      "types": "./graph.ts",
+      "types": "./dist/graph.d.ts",
+      "import": "./dist/graph.js",
+      "require": "./dist/graph.js",
       "default": "./dist/graph.js"
     },
-    "./repository": {
-      "types": "./repository.ts",
-      "default": "./dist/repository.js"
-    },
-    "./chat": {
-      "types": "./chat.ts",
-      "default": "./dist/chat.js"
-    },
-    "./telemetry": {
-      "types": "./telemetry.ts",
-      "default": "./dist/telemetry.js"
-    },
     "./ingest": {
-      "types": "./ingest.ts",
+      "types": "./dist/ingest.d.ts",
+      "import": "./dist/ingest.js",
+      "require": "./dist/ingest.js",
       "default": "./dist/ingest.js"
     },
-    "./api-explorer": {
-      "types": "./api-explorer.ts",
-      "default": "./dist/api-explorer.js"
+    "./repository": {
+      "types": "./dist/repository.d.ts",
+      "import": "./dist/repository.js",
+      "require": "./dist/repository.js",
+      "default": "./dist/repository.js"
+    },
+    "./telemetry": {
+      "types": "./dist/telemetry.d.ts",
+      "import": "./dist/telemetry.js",
+      "require": "./dist/telemetry.js",
+      "default": "./dist/telemetry.js"
+    },
+    "./user": {
+      "types": "./dist/user.d.ts",
+      "import": "./dist/user.js",
+      "require": "./dist/user.js",
+      "default": "./dist/user.js"
     }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
   }
 }

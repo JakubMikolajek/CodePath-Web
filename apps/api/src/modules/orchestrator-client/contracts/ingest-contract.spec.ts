@@ -16,7 +16,7 @@ import {
   validateIngestConsumerMessageV2,
   validateIngestProducerMessageV1,
   validateIngestProducerMessageV2
-} from '../../../../../../packages/codepath-common/ingest'
+} from '@workspace/codepath-common/ingest'
 
 describe('ingest.v1 contract', () => {
   it('exposes stable version and enum sets', () => {

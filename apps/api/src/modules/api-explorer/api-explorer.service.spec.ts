@@ -1,4 +1,9 @@
 import { NotFoundException } from '@nestjs/common'
+import {
+  OpenApiVersion,
+  RepoOpenApiParameterIn,
+  RepoOpenApiSourceMode
+} from '@workspace/codepath-common/api-explorer'
 
 import { ApiExplorerService } from './services/api-explorer.service'
 import { ApiRunnerService } from './services/api-runner.service'
@@ -225,11 +230,11 @@ describe('ApiExplorerService', () => {
 
     const spec = await service.getRepoOpenApiSpec(1, 30, {})
 
-    expect(spec.openapi).toBe('3.1.0')
+    expect(spec.openapi).toBe(OpenApiVersion.V3_1_0)
     expect(spec.info.title).toContain('repo-gamma')
     expect(spec.paths['/users/{id}']?.get).toBeDefined()
     expect(spec.paths['/users']?.post?.requestBody).toBeDefined()
-    expect(spec.paths['/users/{id}']?.get?.parameters?.some(param => param.in === 'path' && param.name === 'id')).toBe(true)
+    expect(spec.paths['/users/{id}']?.get?.parameters?.some(param => param.in === RepoOpenApiParameterIn.PATH && param.name === 'id')).toBe(true)
     expect(spec['x-codepath-metrics']).toMatchObject({
       codeSourceCoverage: 1,
       mergedOperationCount: 2,
@@ -238,7 +243,7 @@ describe('ApiExplorerService', () => {
       operationsWithCodeSource: 2,
       runtimeOperationCount: 0,
       schemaComponentCount: 0,
-      sourceMode: 'static',
+      sourceMode: RepoOpenApiSourceMode.STATIC,
       staticOperationCount: 2
     })
   })
@@ -280,7 +285,7 @@ describe('ApiExplorerService', () => {
     expect(spec.components?.schemas?.CreateUserDto).toBeDefined()
     expect(requestBodySchema).toEqual({ $ref: '#/components/schemas/CreateUserDto' })
     expect(spec['x-codepath-metrics']?.schemaComponentCount).toBeGreaterThanOrEqual(1)
-    expect(spec['x-codepath-metrics']?.sourceMode).toBe('static')
+    expect(spec['x-codepath-metrics']?.sourceMode).toBe(RepoOpenApiSourceMode.STATIC)
   })
 
   it('infers request DTO for Optional/union Nest body type', async () => {
@@ -322,7 +327,7 @@ describe('ApiExplorerService', () => {
       mergedOperationCount: 1,
       operationCount: 1,
       operationsWithCodeSource: 1,
-      sourceMode: 'static',
+      sourceMode: RepoOpenApiSourceMode.STATIC,
       staticOperationCount: 1
     })
   })
@@ -406,7 +411,7 @@ describe('ApiExplorerService', () => {
       operationCount: 1,
       operationsWithCodeSource: 1,
       runtimeOperationCount: 1,
-      sourceMode: 'hybrid',
+      sourceMode: RepoOpenApiSourceMode.HYBRID,
       staticOperationCount: 1
     })
     expect(spec['x-codepath-metrics']?.runtimeResolvedUrl).toContain('/openapi.json')
@@ -447,7 +452,7 @@ describe('ApiExplorerService', () => {
     expect(spec.paths['/users/{id}']?.get).toBeDefined()
     expect(spec['x-codepath-metrics']).toMatchObject({
       runtimeOperationCount: 0,
-      sourceMode: 'static',
+      sourceMode: RepoOpenApiSourceMode.STATIC,
       staticOperationCount: 1
     })
   })

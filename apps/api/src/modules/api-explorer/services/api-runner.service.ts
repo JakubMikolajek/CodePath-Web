@@ -1,8 +1,11 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common'
-import type {
+import {
   RepoApiHttpMethod,
+  RepoApiRunnerApiKeyPlacement,
+  RepoApiRunnerAuthMode
+} from '@workspace/codepath-common/api-explorer'
+import type {
   RepoApiRunnerAuthConfig,
-  RepoApiRunnerAuthMode,
   RepoApiRunnerAuthPreset,
   RepoApiRunnerCollection,
   RepoApiRunnerCollectionConfig,
@@ -18,13 +21,13 @@ import { ApiRunnerAuthPresetsRepository } from '../repositories/api-runner-auth-
 import { ApiRunnerCollectionsRepository } from '../repositories/api-runner-collections.repository'
 
 const SUPPORTED_METHODS: RepoApiHttpMethod[] = [
-  'DELETE',
-  'GET',
-  'HEAD',
-  'OPTIONS',
-  'PATCH',
-  'POST',
-  'PUT'
+  RepoApiHttpMethod.DELETE,
+  RepoApiHttpMethod.GET,
+  RepoApiHttpMethod.HEAD,
+  RepoApiHttpMethod.OPTIONS,
+  RepoApiHttpMethod.PATCH,
+  RepoApiHttpMethod.POST,
+  RepoApiHttpMethod.PUT
 ]
 
 const RUNNER_DEFAULT_TIMEOUT_MS = 10_000
@@ -32,7 +35,12 @@ const RUNNER_MAX_TIMEOUT_MS = 30_000
 const RUNNER_MAX_RESPONSE_BYTES = 1_000_000
 const RUNNER_COLLECTION_NAME_MAX_LENGTH = 120
 const RUNNER_AUTH_PRESET_NAME_MAX_LENGTH = 120
-const RUNNER_AUTH_MODES: RepoApiRunnerAuthMode[] = ['none', 'bearer', 'basic', 'apiKey']
+const RUNNER_AUTH_MODES: RepoApiRunnerAuthMode[] = [
+  RepoApiRunnerAuthMode.NONE,
+  RepoApiRunnerAuthMode.BEARER,
+  RepoApiRunnerAuthMode.BASIC,
+  RepoApiRunnerAuthMode.API_KEY
+]
 
 @Injectable()
 export class ApiRunnerService {
@@ -73,7 +81,7 @@ export class ApiRunnerService {
 
     const timeoutMs = this.normalizeRunnerTimeout(input.timeoutMs)
     const headers = this.normalizeRunnerHeaders(input.headers)
-    if (['POST', 'PUT', 'PATCH'].includes(method) && !headers['content-type']) {
+    if ([RepoApiHttpMethod.POST, RepoApiHttpMethod.PUT, RepoApiHttpMethod.PATCH].includes(method) && !headers['content-type']) {
       headers['content-type'] = 'application/json'
     }
     if (!headers.accept) {
@@ -84,7 +92,7 @@ export class ApiRunnerService {
 
     try {
       const response = await this.httpClient.request<ArrayBuffer>({
-        data: ['GET', 'HEAD'].includes(method) ? undefined : input.body,
+        data: [RepoApiHttpMethod.GET, RepoApiHttpMethod.HEAD].includes(method) ? undefined : input.body,
         headers,
         maxBodyLength: RUNNER_MAX_RESPONSE_BYTES,
         maxContentLength: RUNNER_MAX_RESPONSE_BYTES,
@@ -274,11 +282,13 @@ export class ApiRunnerService {
     const rawMode = String(safeAuth.mode ?? '')
     const mode: RepoApiRunnerAuthMode = RUNNER_AUTH_MODES.includes(rawMode as RepoApiRunnerAuthMode)
       ? (rawMode as RepoApiRunnerAuthMode)
-      : 'none'
+      : RepoApiRunnerAuthMode.NONE
 
     return {
       apiKeyName: String(safeAuth.apiKeyName ?? 'x-api-key'),
-      apiKeyPlacement: safeAuth.apiKeyPlacement === 'query' ? 'query' : 'header',
+      apiKeyPlacement: safeAuth.apiKeyPlacement === RepoApiRunnerApiKeyPlacement.QUERY
+        ? RepoApiRunnerApiKeyPlacement.QUERY
+        : RepoApiRunnerApiKeyPlacement.HEADER,
       apiKeyValue: String(safeAuth.apiKeyValue ?? ''),
       basicPassword: String(safeAuth.basicPassword ?? ''),
       basicUsername: String(safeAuth.basicUsername ?? ''),

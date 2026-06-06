@@ -1,22 +1,25 @@
 import type {
   RepoApiEndpoint,
   RepoApiEndpointParameter,
+  RepoOpenApiSchema
+} from '@workspace/codepath-common/api-explorer'
+import {
   RepoApiFramework,
   RepoApiHttpMethod,
-  RepoOpenApiSchema
+  RepoApiParameterLocation
 } from '@workspace/codepath-common/api-explorer'
 
 import { ApiSchemaExtractor } from '../extractors/api-schema.extractor'
 import type { CanonicalApiFile, SourceContext } from '../types/api-explorer-internal.types'
 
 const SUPPORTED_METHODS: RepoApiHttpMethod[] = [
-  'DELETE',
-  'GET',
-  'HEAD',
-  'OPTIONS',
-  'PATCH',
-  'POST',
-  'PUT'
+  RepoApiHttpMethod.DELETE,
+  RepoApiHttpMethod.GET,
+  RepoApiHttpMethod.HEAD,
+  RepoApiHttpMethod.OPTIONS,
+  RepoApiHttpMethod.PATCH,
+  RepoApiHttpMethod.POST,
+  RepoApiHttpMethod.PUT
 ]
 
 function parsePathParamNames(path: string) {
@@ -65,7 +68,7 @@ export class ApiEndpointDetector {
   private addPathParameters(params: RepoApiEndpointParameter[], path: string) {
     for (const name of parsePathParamNames(path)) {
       this.pushParam(params, {
-        location: 'path',
+        location: RepoApiParameterLocation.PATH,
         name,
         required: true
       })
@@ -115,7 +118,7 @@ export class ApiEndpointDetector {
       const params: RepoApiEndpointParameter[] = []
       const sourceContext = this.readSourceContext(file.content, match.index ?? 0, 360)
       this.addPathParameters(params, path)
-      endpoints.push(this.createEndpoint(file, 'django', 'GET', path, params, { sourceContext }))
+      endpoints.push(this.createEndpoint(file, RepoApiFramework.DJANGO, RepoApiHttpMethod.GET, path, params, { sourceContext }))
     }
 
     return endpoints
@@ -142,7 +145,7 @@ export class ApiEndpointDetector {
       const sourceContext = this.readSourceContext(file.content, match.index ?? 0, 450)
       for (const reqParamMatch of sourceContext.snippet.matchAll(/\breq\.params\.([A-Za-z0-9_]+)/g)) {
         this.pushParam(params, {
-          location: 'path',
+          location: RepoApiParameterLocation.PATH,
           name: reqParamMatch[1] ?? 'param',
           required: true
         })
@@ -150,7 +153,7 @@ export class ApiEndpointDetector {
 
       for (const reqParamMatch of sourceContext.snippet.matchAll(/\breq\.query\.([A-Za-z0-9_]+)/g)) {
         this.pushParam(params, {
-          location: 'query',
+          location: RepoApiParameterLocation.QUERY,
           name: reqParamMatch[1] ?? 'query',
           required: false
         })
@@ -158,13 +161,13 @@ export class ApiEndpointDetector {
 
       for (const reqParamMatch of sourceContext.snippet.matchAll(/\breq\.body\.([A-Za-z0-9_]+)/g)) {
         this.pushParam(params, {
-          location: 'body',
+          location: RepoApiParameterLocation.BODY,
           name: reqParamMatch[1] ?? 'body',
           required: false
         })
       }
 
-      endpoints.push(this.createEndpoint(file, 'express', method, path, params, { sourceContext }))
+      endpoints.push(this.createEndpoint(file, RepoApiFramework.EXPRESS, method, path, params, { sourceContext }))
     }
 
     return endpoints
@@ -205,22 +208,22 @@ export class ApiEndpointDetector {
       for (const paramMatch of sourceContext.snippet.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*[^=,\n)]+\s*=\s*(Query|Path|Body|Header)\(/g)) {
         const locationToken = (paramMatch[2] ?? '').toLowerCase()
         const location = locationToken === 'query'
-          ? 'query'
+          ? RepoApiParameterLocation.QUERY
           : locationToken === 'path'
-            ? 'path'
+            ? RepoApiParameterLocation.PATH
             : locationToken === 'header'
-              ? 'header'
-              : 'body'
+              ? RepoApiParameterLocation.HEADER
+              : RepoApiParameterLocation.BODY
 
         this.pushParam(params, {
           location,
           name: paramMatch[1] ?? 'param',
-          required: location === 'path'
+          required: location === RepoApiParameterLocation.PATH
         })
       }
 
       const requestBodyTypeName = this.extractFastApiBodyTypeFromSnippet(sourceContext.snippet, path)
-      endpoints.push(this.createEndpoint(file, 'fastapi', method, path, params, {
+      endpoints.push(this.createEndpoint(file, RepoApiFramework.FASTAPI, method, path, params, {
         requestBodyTypeName,
         sourceContext
       }))
@@ -258,7 +261,7 @@ export class ApiEndpointDetector {
       const params: RepoApiEndpointParameter[] = []
       const sourceContext = this.readSourceContext(file.content, match.index ?? 0, 420)
       this.addPathParameters(params, path)
-      endpoints.push(this.createEndpoint(file, 'flask', method, path, params, { sourceContext }))
+      endpoints.push(this.createEndpoint(file, RepoApiFramework.FLASK, method, path, params, { sourceContext }))
     }
 
     const routePattern = /@([A-Za-z_][A-Za-z0-9_]*)\.route\(\s*['"`]([^'"`]+)['"`]\s*(?:,\s*methods\s*=\s*\[([^\]]+)])?/gi
@@ -275,9 +278,9 @@ export class ApiEndpointDetector {
         .map(value => this.assertMethod(value[1] ?? ''))
         .filter((value): value is RepoApiHttpMethod => value !== null)
 
-      const methods: RepoApiHttpMethod[] = methodsFromLiteral.length > 0 ? methodsFromLiteral : ['GET']
+      const methods: RepoApiHttpMethod[] = methodsFromLiteral.length > 0 ? methodsFromLiteral : [RepoApiHttpMethod.GET]
       for (const method of methods) {
-        endpoints.push(this.createEndpoint(file, 'flask', method, path, params, { sourceContext }))
+        endpoints.push(this.createEndpoint(file, RepoApiFramework.FLASK, method, path, params, { sourceContext }))
       }
     }
 
@@ -313,7 +316,7 @@ export class ApiEndpointDetector {
 
       for (const paramMatch of sourceContext.snippet.matchAll(/@Param\s*\(\s*['"`]([A-Za-z0-9_:-]+)['"`]/g)) {
         this.pushParam(params, {
-          location: 'path',
+          location: RepoApiParameterLocation.PATH,
           name: paramMatch[1] ?? 'param',
           required: true
         })
@@ -321,7 +324,7 @@ export class ApiEndpointDetector {
 
       for (const paramMatch of sourceContext.snippet.matchAll(/@Query\s*\(\s*['"`]([A-Za-z0-9_.-]+)['"`]/g)) {
         this.pushParam(params, {
-          location: 'query',
+          location: RepoApiParameterLocation.QUERY,
           name: paramMatch[1] ?? 'query',
           required: false
         })
@@ -329,7 +332,7 @@ export class ApiEndpointDetector {
 
       for (const paramMatch of sourceContext.snippet.matchAll(/@Headers\s*\(\s*['"`]([A-Za-z0-9_.-]+)['"`]/g)) {
         this.pushParam(params, {
-          location: 'header',
+          location: RepoApiParameterLocation.HEADER,
           name: paramMatch[1] ?? 'header',
           required: false
         })
@@ -338,7 +341,7 @@ export class ApiEndpointDetector {
       if (/@Body\s*\(/.test(sourceContext.snippet)) {
         const namedBodyMatch = sourceContext.snippet.match(/@Body\s*\(\s*['"`]([A-Za-z0-9_.-]+)['"`]/)
         this.pushParam(params, {
-          location: 'body',
+          location: RepoApiParameterLocation.BODY,
           name: namedBodyMatch?.[1] ?? 'body',
           required: false
         })
@@ -347,7 +350,7 @@ export class ApiEndpointDetector {
       const requestBodyTypeName = this.extractNestBodyTypeFromSnippet(sourceContext.snippet)
       for (const controllerPrefix of uniqueControllerPrefixes) {
         const path = this.joinHttpPath(controllerPrefix, routePath)
-        endpoints.push(this.createEndpoint(file, 'nestjs', method, path, params, {
+        endpoints.push(this.createEndpoint(file, RepoApiFramework.NESTJS, method, path, params, {
           requestBodyTypeName,
           sourceContext,
           symbolName

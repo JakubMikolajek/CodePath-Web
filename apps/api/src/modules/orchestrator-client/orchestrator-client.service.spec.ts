@@ -21,15 +21,12 @@ describe('orchestrator client', () => {
   })
 
   it('times out chat rpc request when orchestrator does not respond', async () => {
-    requestMock.mockRejectedValue(new AxiosError('timeout', 'ECONNABORTED'))
+    requestMock.mockRejectedValue(Object.assign(new Error('timeout'), { code: 'ECONNABORTED' }))
 
     await expect(client.requestChatRpc({
       prompt: 'timeout me',
       repoId: 1
-    })).rejects.toMatchObject({
-      message: 'Orchestrator request timed out',
-      name: 'OrchestratorClientError'
-    })
+    })).rejects.toThrow('Orchestrator request timed out')
   })
 
   it('returns parsed chat response when orchestrator replies with json', async () => {

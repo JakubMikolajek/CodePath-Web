@@ -7,13 +7,17 @@ import {
   verifyQueueTopologies
 } from '../modules/rabbitmq/topology'
 
-const SUPPORTED_MODES = new Set(['verify', 'migrate'])
+export enum RabbitTopologyMode {
+  MIGRATE = 'migrate',
+  VERIFY = 'verify'
+}
 
-function readMode(): 'migrate' | 'verify' {
-  const mode = process.argv[2] ?? 'verify'
-  if (SUPPORTED_MODES.has(mode)) {
-    return mode as 'migrate' | 'verify'
-  }
+const SUPPORTED_MODES = new Set([RabbitTopologyMode.VERIFY, RabbitTopologyMode.MIGRATE])
+
+function readMode(): RabbitTopologyMode {
+  const mode = process.argv[2] as RabbitTopologyMode ?? RabbitTopologyMode.VERIFY
+
+  if (SUPPORTED_MODES.has(mode)) return mode
 
   throw new Error(`Unsupported mode '${mode}'. Use 'verify' or 'migrate'.`)
 }
@@ -35,7 +39,7 @@ async function run(): Promise<void> {
   const configs = topologyConfigs()
 
   try {
-    if (mode === 'migrate') {
+    if (mode === RabbitTopologyMode.MIGRATE) {
       await migrateQueueTopologies(channel, configs)
       console.log('RabbitMQ topology migration completed.')
       return

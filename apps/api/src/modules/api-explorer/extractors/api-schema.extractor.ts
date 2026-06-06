@@ -1,3 +1,4 @@
+import { RepoOpenApiSchemaType } from '@workspace/codepath-common/api-explorer'
 import type { RepoOpenApiSchema } from '@workspace/codepath-common/api-explorer'
 
 export class ApiSchemaExtractor {
@@ -73,7 +74,7 @@ export class ApiSchemaExtractor {
       schemas[typeName] = {
         properties,
         required: required.length > 0 ? required : undefined,
-        type: 'object'
+        type: RepoOpenApiSchemaType.OBJECT
       }
     }
 
@@ -125,7 +126,7 @@ export class ApiSchemaExtractor {
       schemas[typeName] = {
         properties,
         required: required.length > 0 ? required : undefined,
-        type: 'object'
+        type: RepoOpenApiSchemaType.OBJECT
       }
     }
 
@@ -141,36 +142,36 @@ export class ApiSchemaExtractor {
     const lower = normalized.toLowerCase()
 
     if (!normalized) {
-      return { type: 'string' }
+      return { type: RepoOpenApiSchemaType.STRING }
     }
 
     if (lower.startsWith('array<') || /\[\]$/.test(normalized) || lower.startsWith('list[') || lower.startsWith('sequence[')) {
       return {
-        items: { type: 'string' },
-        type: 'array'
+        items: { type: RepoOpenApiSchemaType.STRING },
+        type: RepoOpenApiSchemaType.ARRAY
       }
     }
 
     if (/\b(boolean|bool)\b/i.test(normalized)) {
-      return { type: 'boolean' }
+      return { type: RepoOpenApiSchemaType.BOOLEAN }
     }
 
     if (/\b(number|float|double|decimal)\b/i.test(normalized)) {
-      return { type: 'number' }
+      return { type: RepoOpenApiSchemaType.NUMBER }
     }
 
     if (/\b(integer|int)\b/i.test(normalized)) {
-      return { type: 'integer' }
+      return { type: RepoOpenApiSchemaType.INTEGER }
     }
 
     if (/\b(object|dict|record)\b/i.test(normalized)) {
       return {
         additionalProperties: true,
-        type: 'object'
+        type: RepoOpenApiSchemaType.OBJECT
       }
     }
 
-    return { type: 'string' }
+    return { type: RepoOpenApiSchemaType.STRING }
   }
 
   private normalizeTypeName(value: unknown): string | undefined {

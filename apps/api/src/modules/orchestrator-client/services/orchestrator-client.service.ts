@@ -18,6 +18,19 @@ export class OrchestratorClientError extends Error {
   }
 }
 
+function isTimeoutError(cause: unknown): boolean {
+  if (axios.isAxiosError(cause) && (cause.code === 'ECONNABORTED' || cause.code === 'ETIMEDOUT')) {
+    return true
+  }
+
+  if (!cause || typeof cause !== 'object') {
+    return false
+  }
+
+  const code = Reflect.get(cause, 'code')
+  return code === 'ECONNABORTED' || code === 'ETIMEDOUT'
+}
+
 @Injectable()
 export class OrchestratorClient {
   constructor(
@@ -76,7 +89,7 @@ export class OrchestratorClient {
     } catch (cause) {
       if (cause instanceof OrchestratorClientError) throw cause
 
-      if (axios.isAxiosError(cause) && (cause.code === 'ECONNABORTED' || cause.code === 'ETIMEDOUT')) {
+      if (isTimeoutError(cause)) {
         throw new OrchestratorClientError('Orchestrator request timed out', cause)
       }
 

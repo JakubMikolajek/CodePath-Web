@@ -1,3 +1,7 @@
+import {
+  RepoApiRunnerApiKeyPlacement,
+  RepoApiRunnerAuthMode
+} from '@workspace/codepath-common/api-explorer'
 import type {
   RepoApiFramework,
   RepoApiHttpMethod,
@@ -83,11 +87,11 @@ export async function deleteRepoRunnerAuthPreset(repoId: number, presetId: numbe
 export function createDefaultRunnerAuthConfig(): RepoApiRunnerCollectionConfig['auth'] {
   return {
     apiKeyName: 'x-api-key',
-    apiKeyPlacement: 'header',
+    apiKeyPlacement: RepoApiRunnerApiKeyPlacement.HEADER,
     apiKeyValue: '',
     basicPassword: '',
     basicUsername: '',
     bearerToken: '',
-    mode: 'none'
+    mode: RepoApiRunnerAuthMode.NONE
   }
 }
