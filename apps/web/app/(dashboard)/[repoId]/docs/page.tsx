@@ -268,7 +268,7 @@ export default function Page() {
           </div>
 
           <nav aria-label="Documentation sections" className="space-y-2 text-sm">
-            {['Introduction', 'Architecture', 'Core Modules', 'API Surface', 'Deployment', 'Examples'].map((item, index) => (
+            {DOCUMENTATION_SECTIONS.map((item, index) => (
               // FIXME create button component for that
               <button
                 className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left transition ${index === 0 ? 'bg-primary/20 text-white shadow-[0_0_22px_oklch(0.62_0.24_270/0.2)]' : 'text-muted-foreground hover:bg-white/5 hover:text-white'}`}

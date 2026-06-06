@@ -1,6 +1,7 @@
+import type { Undefinable } from '@workspace/codepath-common/globals'
 import type { TelemetryEventV1 } from '@workspace/codepath-common/telemetry'
 
-type LabelValues = Record<string, string | undefined>
+type LabelValues = Record<string, Undefinable<string>>
 
 interface CounterDefinition {
   help: string
@@ -72,71 +73,53 @@ function escapeLabel(value: string): string {
     .replaceAll('"', '\\"')
 }
 
-function normalizeLabelValue(value: string | undefined): string {
-  if (!value) {
-    return 'unknown'
-  }
+function normalizeLabelValue(value: Undefinable<string>): string {
+  if (!value) return 'unknown'
 
   const normalized = value.trim()
   return normalized.length > 0 ? normalized : 'unknown'
 }
 
 function normalizeLabels(labelNames: readonly string[], values: LabelValues): Record<string, string> {
-  return Object.fromEntries(
-    // eslint-disable-next-line security/detect-object-injection -- label names are statically defined in metric declarations.
-    labelNames.map(labelName => [labelName, normalizeLabelValue(values[labelName])])
-  ) as Record<string, string>
+  return Object.fromEntries(labelNames.map(labelName => [labelName, normalizeLabelValue(values[labelName])]))
 }
 
 function seriesKey(labelNames: readonly string[], labels: Record<string, string>): string {
-  // eslint-disable-next-line security/detect-object-injection -- label names are static and validated by normalizeLabels.
   return labelNames.map(labelName => `${labelName}:${labels[labelName]}`).join('|')
 }
 
-function getCounterDefinition(name: string): CounterDefinition | undefined {
+function getCounterDefinition(name: string): Undefinable<CounterDefinition> {
   return COUNTER_DEFINITIONS.find(definition => definition.name === name)
 }
 
-function getHistogramDefinition(name: string): HistogramDefinition | undefined {
+function getHistogramDefinition(name: string): Undefinable<HistogramDefinition> {
   return HISTOGRAM_DEFINITIONS.find(definition => definition.name === name)
 }
 
 function incrementCounter(name: string, values: LabelValues, amount = 1): void {
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return
-  }
+  if (!Number.isFinite(amount) || amount <= 0) return
 
   const definition = getCounterDefinition(name)
-  if (!definition) {
-    return
-  }
+
+  if (!definition) return
 
   const labels = normalizeLabels(definition.labelNames, values)
   const key = seriesKey(definition.labelNames, labels)
   const metricSeries = counters.get(name) ?? new Map<string, CounterSeries>()
   const existing = metricSeries.get(key)
 
-  if (existing) {
-    existing.value += amount
-  } else {
-    metricSeries.set(key, {
-      labels,
-      value: amount
-    })
-  }
+  if (existing) existing.value += amount
+  else metricSeries.set(key, { labels, value: amount })
 
   counters.set(name, metricSeries)
 }
 
 function observeHistogram(name: string, values: LabelValues, rawValue: number): void {
-  if (!Number.isFinite(rawValue) || rawValue < 0) {
-    return
-  }
+  if (!Number.isFinite(rawValue) || rawValue < 0) return
 
   const definition = getHistogramDefinition(name)
-  if (!definition) {
-    return
-  }
+
+  if (!definition) return
 
   const labels = normalizeLabels(definition.labelNames, values)
   const key = seriesKey(definition.labelNames, labels)
@@ -150,7 +133,6 @@ function observeHistogram(name: string, values: LabelValues, rawValue: number): 
 
   for (const [index, bucket] of definition.buckets.entries()) {
     if (rawValue <= bucket) {
-      // eslint-disable-next-line security/detect-object-injection -- index comes from iterating known bucket array.
       existing.bucketCounts[index] += 1
       break
     }
@@ -164,62 +146,53 @@ function observeHistogram(name: string, values: LabelValues, rawValue: number): 
 
 function renderLabelSet(labels: Record<string, string>): string {
   const entries = Object.entries(labels)
-  if (entries.length === 0) {
-    return ''
-  }
 
-  const formatted = entries
-    .map(([label, value]) => `${label}="${escapeLabel(value)}"`)
-    .join(',')
+  if (entries.length === 0) return ''
+
+  const formatted = entries.map(([label, value]) => `${label}="${escapeLabel(value)}"`).join(',')
 
   return `{${formatted}}`
 }
 
 function renderCounterSamples(definition: CounterDefinition): string[] {
   const metricSeries = counters.get(definition.name)
-  if (!metricSeries) {
-    return []
-  }
 
-  return Array.from(metricSeries.values())
-    .map(sample => `${definition.name}${renderLabelSet(sample.labels)} ${sample.value}`)
-    .sort()
+  if (!metricSeries) return []
+
+  return Array.from(metricSeries.values()).map(sample => `${definition.name}${renderLabelSet(sample.labels)} ${sample.value}`).sort()
 }
 
 function renderHistogramSamples(definition: HistogramDefinition): string[] {
   const metricSeries = histograms.get(definition.name)
-  if (!metricSeries) {
-    return []
-  }
 
-  return Array.from(metricSeries.values())
-    .flatMap(sample => {
-      const baseLabels = sample.labels
-      const lines: string[] = []
-      let cumulative = 0
+  if (!metricSeries) return []
 
-      for (const [index, bucket] of definition.buckets.entries()) {
-        // eslint-disable-next-line security/detect-object-injection -- index comes from iterating known bucket array.
-        cumulative += sample.bucketCounts[index]
-        lines.push(
-          `${definition.name}_bucket${renderLabelSet({
-            ...baseLabels,
-            le: String(bucket)
-          })} ${cumulative}`
-        )
-      }
+  return Array.from(metricSeries.values()).flatMap(sample => {
+    const baseLabels = sample.labels
+    const lines: string[] = []
+    let cumulative = 0
 
+    for (const [index, bucket] of definition.buckets.entries()) {
+      cumulative += sample.bucketCounts[index]
       lines.push(
         `${definition.name}_bucket${renderLabelSet({
           ...baseLabels,
-          le: '+Inf'
-        })} ${sample.count}`
+          le: String(bucket)
+        })} ${cumulative}`
       )
-      lines.push(`${definition.name}_sum${renderLabelSet(baseLabels)} ${sample.sum}`)
-      lines.push(`${definition.name}_count${renderLabelSet(baseLabels)} ${sample.count}`)
-      return lines
-    })
-    .sort()
+    }
+
+    lines.push(
+      `${definition.name}_bucket${renderLabelSet({
+        ...baseLabels,
+        le: '+Inf'
+      })} ${sample.count}`
+    )
+    lines.push(`${definition.name}_sum${renderLabelSet(baseLabels)} ${sample.sum}`)
+    lines.push(`${definition.name}_count${renderLabelSet(baseLabels)} ${sample.count}`)
+
+    return lines
+  }).sort()
 }
 
 export function recordTelemetryMetric(event: TelemetryEventV1): void {

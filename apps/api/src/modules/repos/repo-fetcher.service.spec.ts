@@ -26,7 +26,8 @@ type RepoFetcherPrivateApi = {
 function createService() {
   return new RepoFetcherService(
     { dbClient: {} } as never,
-    {} as never
+    {} as never,
+    { enqueueIngestJob: jest.fn() } as never
   )
 }
 
@@ -141,7 +142,8 @@ describe('RepoFetcherService', () => {
     const dbMocks = createStaleDbMocks([[{ id: 1 }], [{ id: 2 }], [{ id: 3 }]])
     const service = new RepoFetcherService(
       { dbClient: dbMocks.dbClient } as never,
-      {} as never
+      {} as never,
+      { enqueueIngestJob: jest.fn() } as never
     )
 
     await service.markStalePipelineStages()

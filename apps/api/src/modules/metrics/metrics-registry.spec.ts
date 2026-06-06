@@ -1,19 +1,24 @@
 import type { TelemetryEventV1 } from '@workspace/codepath-common/telemetry'
+import {
+  TelemetryLevel,
+  TelemetryRuntimeFamily,
+  TelemetryService
+} from '@workspace/codepath-common/telemetry'
 
 import {
   recordTelemetryMetric,
   renderPrometheusMetrics,
   resetPrometheusMetricsForTests
-} from './metrics'
+} from './services/metrics-registry'
 
 function makeEvent(overrides: Partial<TelemetryEventV1>): TelemetryEventV1 {
   return {
     component: 'test.component',
     event: 'test_event',
-    level: 'info',
-    runtimeFamily: 'pipeline',
+    level: TelemetryLevel.INFO,
+    runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
     schema: 'codepath.telemetry.v1',
-    service: 'web-api',
+    service: TelemetryService.WEB_API,
     timestamp: '2026-03-20T12:00:00.000Z',
     ...overrides
   }

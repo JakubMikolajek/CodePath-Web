@@ -1,6 +1,6 @@
 import { Controller, Get, Header } from '@nestjs/common'
 
-import { renderPrometheusMetrics } from '../../lib/metrics'
+import { renderPrometheusMetrics } from './services/metrics-registry'
 
 @Controller('metrics')
 export class MetricsController {

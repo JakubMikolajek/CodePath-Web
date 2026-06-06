@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable } from '@nestjs/common'
 import type {
   RepoApiHttpMethod,
   RepoApiRunnerAuthConfig,
@@ -11,8 +11,9 @@ import type {
   RepoApiRunnerSaveAuthPresetRequest,
   RepoApiRunnerSaveCollectionRequest
 } from '@workspace/codepath-common/api-explorer'
-import axios from 'axios'
+import type { AxiosInstance } from 'axios'
 
+import { HTTP_CLIENT } from '../../http-client/http-client.tokens'
 import { ApiRunnerAuthPresetsRepository } from '../repositories/api-runner-auth-presets.repository'
 import { ApiRunnerCollectionsRepository } from '../repositories/api-runner-collections.repository'
 
@@ -37,7 +38,8 @@ const RUNNER_AUTH_MODES: RepoApiRunnerAuthMode[] = ['none', 'bearer', 'basic', '
 export class ApiRunnerService {
   constructor(
     private readonly runnerAuthPresetsRepository: ApiRunnerAuthPresetsRepository,
-    private readonly runnerCollectionsRepository: ApiRunnerCollectionsRepository
+    private readonly runnerCollectionsRepository: ApiRunnerCollectionsRepository,
+    @Inject(HTTP_CLIENT) private readonly httpClient: AxiosInstance
   ) {}
 
   async deleteRunnerAuthPreset(userId: number, repoId: number, presetId: number) {
@@ -81,7 +83,7 @@ export class ApiRunnerService {
     const startedAt = Date.now()
 
     try {
-      const response = await axios.request<ArrayBuffer>({
+      const response = await this.httpClient.request<ArrayBuffer>({
         data: ['GET', 'HEAD'].includes(method) ? undefined : input.body,
         headers,
         maxBodyLength: RUNNER_MAX_RESPONSE_BYTES,

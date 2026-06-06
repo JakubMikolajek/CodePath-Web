@@ -1,6 +1,6 @@
 import type { InferInsertModel, InferSelectModel } from 'drizzle-orm'
-import { relations } from 'drizzle-orm'
-import { pgTable, serial, text, timestamp, unique } from 'drizzle-orm/pg-core'
+import { relations, sql } from 'drizzle-orm'
+import { pgTable, serial, text, timestamp, unique, uniqueIndex } from 'drizzle-orm/pg-core'
 
 import { apiRunnerAuthPresets, apiRunnerCollections, chatHistory, chatSessions, repos } from './index'
 
@@ -14,7 +14,9 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash').notNull(),
   updatedAt: timestamp('updated_at', { mode: 'string' }).defaultNow()
 }, table => [
-  unique('users_auth_provider_subject_key').on(table.authProvider, table.authSubject),
+  uniqueIndex('users_auth_provider_subject_key')
+    .on(table.authProvider, table.authSubject)
+    .where(sql`${table.authSubject} IS NOT NULL`),
   unique('users_email_key').on(table.email)
 ])
 

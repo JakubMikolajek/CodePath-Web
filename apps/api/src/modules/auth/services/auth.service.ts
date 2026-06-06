@@ -6,15 +6,16 @@ import {
   randomUUID
 } from 'node:crypto'
 
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common'
+import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common'
 import { Nullable } from '@workspace/codepath-common/globals'
-import axios from 'axios'
+import type { AxiosInstance } from 'axios'
 import * as bcrypt from 'bcrypt'
 import { eq, or } from 'drizzle-orm'
 
 import { env } from '../../../config/env'
 import { InserUser, SelectUser, users } from '../../db/schema'
 import { DbService } from '../../db/services/db.service'
+import { HTTP_CLIENT } from '../../http-client/http-client.tokens'
 
 const JWT_ALGORITHM = 'RS256'
 
@@ -52,6 +53,7 @@ export class AuthService {
 
   constructor(
     private readonly dbService: DbService,
+    @Inject(HTTP_CLIENT) private readonly httpClient: AxiosInstance
   ) { }
 
   async validateKeycloakAccessToken(accessToken: string): Promise<Nullable<SelectUser>> {
@@ -82,7 +84,7 @@ export class AuthService {
 
     if (this.jwksCache && this.jwksCache.expiresAt > now) return this.jwksCache.keys
 
-    const { data } = await axios.get<KeycloakJwksResponse>(this.keycloakJwksUrl(), { timeout: 10_000 })
+    const { data } = await this.httpClient.get<KeycloakJwksResponse>(this.keycloakJwksUrl(), { timeout: 10_000 })
     const keys = data.keys ?? []
 
     this.jwksCache = { expiresAt: now + 10 * 60 * 1000, keys }

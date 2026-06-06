@@ -1,10 +1,16 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import {
+  TelemetryLevel,
+  TelemetryRuntimeFamily,
+  TelemetryService,
+  TelemetryStatus
+} from '@workspace/codepath-common/telemetry'
 import { and, desc, eq } from 'drizzle-orm'
 import { map } from 'lodash'
 import { v4 as uuidv4 } from 'uuid'
 
-import { OrchestratorClientError, requestChatRpc } from '../../../lib/orchestrator-client'
-import { emitTelemetry } from '../../../lib/telemetry'
+import { OrchestratorClient, OrchestratorClientError } from '../../orchestrator-client/services/orchestrator-client.service'
+import { emitTelemetry } from '../../telemetry/services/telemetry'
 import { chatHistory, chatSessions, repos } from '../../db/schema'
 import { DbService } from '../../db/services/db.service'
 import { AskDto } from '../dto/ask.dto'
@@ -14,7 +20,8 @@ export class ChatService {
   private logger: Logger = new Logger(ChatService.name)
 
   constructor(
-    private readonly dbService: DbService
+    private readonly dbService: DbService,
+    private readonly orchestratorClient: OrchestratorClient
   ) { }
 
   async askAboutRepo(userId: number, repoId: number, body: AskDto) {
@@ -25,11 +32,11 @@ export class ChatService {
     emitTelemetry({
       component: 'chat.service',
       event: 'chat_request_received',
-      level: 'info',
+      level: TelemetryLevel.INFO,
       repoId,
-      runtimeFamily: 'pipeline',
-      service: 'web-api',
-      status: 'ok'
+      runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+      service: TelemetryService.WEB_API,
+      status: TelemetryStatus.OK
     })
 
     await this.dbService.dbClient.insert(chatHistory).values({
@@ -144,27 +151,27 @@ export class ChatService {
         component: 'chat.rpc',
         correlationId,
         event: 'chat_rpc_request_published',
-        level: 'info',
+        level: TelemetryLevel.INFO,
         queueName: 'chat',
         repoId: segments.repoId,
-        runtimeFamily: 'pipeline',
-        service: 'web-api',
-        status: 'ok'
+        runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+        service: TelemetryService.WEB_API,
+        status: TelemetryStatus.OK
       })
 
-      const answer = await requestChatRpc(segments)
+      const answer = await this.orchestratorClient.requestChatRpc(segments)
 
       emitTelemetry({
         component: 'chat.rpc',
         correlationId,
         durationMs: Date.now() - startedAt,
         event: 'chat_rpc_response_received',
-        level: 'info',
+        level: TelemetryLevel.INFO,
         queueName: 'chat',
         repoId: segments.repoId,
-        runtimeFamily: 'pipeline',
-        service: 'web-api',
-        status: 'ok'
+        runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+        service: TelemetryService.WEB_API,
+        status: TelemetryStatus.OK
       })
 
       return answer
@@ -175,36 +182,36 @@ export class ChatService {
           correlationId,
           durationMs: Date.now() - startedAt,
           event: 'chat_rpc_timeout',
-          level: 'error',
+          level: TelemetryLevel.ERROR,
           queueName: 'chat',
           repoId: segments.repoId,
-          runtimeFamily: 'pipeline',
-          service: 'web-api',
-          status: 'timeout'
+          runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+          service: TelemetryService.WEB_API,
+          status: TelemetryStatus.TIMEOUT
         })
       } else if (cause instanceof OrchestratorClientError && cause.message === 'Orchestrator chat response payload was invalid') {
         emitTelemetry({
           component: 'chat.rpc',
           correlationId,
           event: 'chat_rpc_invalid_payload',
-          level: 'error',
+          level: TelemetryLevel.ERROR,
           queueName: 'chat',
           repoId: segments.repoId,
-          runtimeFamily: 'pipeline',
-          service: 'web-api',
-          status: 'error'
+          runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+          service: TelemetryService.WEB_API,
+          status: TelemetryStatus.ERROR
         })
       } else if (cause instanceof OrchestratorClientError && cause.message === 'Orchestrator response body was not valid JSON') {
         emitTelemetry({
           component: 'chat.rpc',
           correlationId,
           event: 'chat_rpc_response_parse_failed',
-          level: 'error',
+          level: TelemetryLevel.ERROR,
           queueName: 'chat',
           repoId: segments.repoId,
-          runtimeFamily: 'pipeline',
-          service: 'web-api',
-          status: 'error'
+          runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+          service: TelemetryService.WEB_API,
+          status: TelemetryStatus.ERROR
         })
       } else {
         emitTelemetry({
@@ -215,12 +222,12 @@ export class ChatService {
             errorName: cause instanceof Error ? cause.name : 'UnknownError'
           },
           event: 'chat_rpc_request_failed',
-          level: 'error',
+          level: TelemetryLevel.ERROR,
           queueName: 'chat',
           repoId: segments.repoId,
-          runtimeFamily: 'pipeline',
-          service: 'web-api',
-          status: 'error'
+          runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+          service: TelemetryService.WEB_API,
+          status: TelemetryStatus.ERROR
         })
       }
 

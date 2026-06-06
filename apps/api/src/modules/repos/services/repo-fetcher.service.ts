@@ -3,7 +3,13 @@ import { URL } from 'node:url'
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import type { Nullable } from '@workspace/codepath-common/globals'
-import type { IngestJobRequestV2 } from '@workspace/codepath-common/ingest'
+import { type IngestJobRequestV2, StorageProvider } from '@workspace/codepath-common/ingest'
+import {
+  TelemetryLevel,
+  TelemetryRuntimeFamily,
+  TelemetryService,
+  TelemetryStatus
+} from '@workspace/codepath-common/telemetry'
 import crypto from 'crypto'
 import { and, eq, lt } from 'drizzle-orm'
 import { readdir, readFile, rm, stat, unlink, writeFile } from 'fs/promises'
@@ -13,8 +19,8 @@ import path from 'path'
 import simpleGit, { type SimpleGit } from 'simple-git'
 
 import { env } from '../../../config/env'
-import { enqueueIngestJob } from '../../../lib/orchestrator-client'
-import { emitTelemetry } from '../../../lib/telemetry'
+import { OrchestratorClient } from '../../orchestrator-client/services/orchestrator-client.service'
+import { emitTelemetry } from '../../telemetry/services/telemetry'
 import { IGNORED_DIRS, IGNORED_EXTENSIONS, IGNORED_FILES } from '../../../utils/ignores'
 import { files, InsertFile, repos, SelectRepo } from '../../db/schema'
 import { DbService } from '../../db/services/db.service'
@@ -42,6 +48,7 @@ export class RepoFetcherService {
   constructor(
     private readonly dbService: DbService,
     private readonly repoStorageService: RepoStorageService,
+    private readonly orchestratorClient: OrchestratorClient,
   ) { }
 
   @Cron(CronExpression.EVERY_10_SECONDS)
@@ -104,11 +111,11 @@ export class RepoFetcherService {
           staleAfterMs: env.pipelineStaleAfterMs
         },
         event: 'pipeline_stage_marked_stale',
-        level: 'warn',
+        level: TelemetryLevel.WARN,
         repoId: repo.id,
-        runtimeFamily: 'pipeline',
-        service: 'web-api',
-        status: 'error'
+        runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+        service: TelemetryService.WEB_API,
+        status: TelemetryStatus.ERROR
       })
     }
   }
@@ -179,7 +186,7 @@ export class RepoFetcherService {
         snapshot: {
           bucket: snapshot.bucket,
           key: snapshot.key,
-          provider: 'minio',
+          provider: StorageProvider.MINIO,
           sourceCommitSha: commitSha
         }
       },
@@ -196,7 +203,7 @@ export class RepoFetcherService {
       provider: repo.storageProvider
     })
 
-    await enqueueIngestJob(ingestMessage)
+    await this.orchestratorClient.enqueueIngestJob(ingestMessage)
 
     emitTelemetry({
       component: 'repo-fetcher.service',
@@ -205,12 +212,12 @@ export class RepoFetcherService {
         key: ingestMessage.payload.snapshot.key
       },
       event: 'ingest_job_request_republished',
-      level: 'info',
+      level: TelemetryLevel.INFO,
       queueName: 'ingest',
       repoId: repo.id,
-      runtimeFamily: 'pipeline',
-      service: 'web-api',
-      status: 'ok'
+      runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+      service: TelemetryService.WEB_API,
+      status: TelemetryStatus.OK
     })
   }
 
@@ -291,7 +298,7 @@ export class RepoFetcherService {
 
       try {
         const ingestMessage = this.buildIngestJobRequest(repo.id, commitSha, snapshot)
-        await enqueueIngestJob(ingestMessage)
+        await this.orchestratorClient.enqueueIngestJob(ingestMessage)
 
         emitTelemetry({
           component: 'repo-fetcher.service',
@@ -300,12 +307,12 @@ export class RepoFetcherService {
             key: ingestMessage.payload.snapshot.key
           },
           event: 'ingest_job_request_published',
-          level: 'info',
+          level: TelemetryLevel.INFO,
           queueName: 'ingest',
           repoId: repo.id,
-          runtimeFamily: 'pipeline',
-          service: 'web-api',
-          status: 'ok'
+          runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+          service: TelemetryService.WEB_API,
+          status: TelemetryStatus.OK
         })
 
         this.logger.log(`✓ Cloned, indexed, and queued ingest for ${repo.name}`)
@@ -326,12 +333,12 @@ export class RepoFetcherService {
             errorName: cause instanceof Error ? cause.name : 'UnknownError'
           },
           event: 'ingest_job_request_publish_failed',
-          level: 'error',
+          level: TelemetryLevel.ERROR,
           queueName: 'ingest',
           repoId: repo.id,
-          runtimeFamily: 'pipeline',
-          service: 'web-api',
-          status: 'error'
+          runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+          service: TelemetryService.WEB_API,
+          status: TelemetryStatus.ERROR
         })
 
         this.logger.error(`✗ Failed to enqueue ingest for ${repo.name}: ${safeCauseMessage}`)

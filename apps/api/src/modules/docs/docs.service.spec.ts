@@ -1,13 +1,8 @@
 import { ConflictException, NotFoundException } from '@nestjs/common'
 
-import { enqueueDocsJob } from '../../lib/orchestrator-client'
 import { DocsService } from './services/docs.service'
 
-jest.mock('../../lib/orchestrator-client', () => ({
-  enqueueDocsJob: jest.fn()
-}))
-
-jest.mock('../../lib/telemetry', () => ({
+jest.mock('../telemetry/services/telemetry', () => ({
   emitTelemetry: jest.fn()
 }))
 
@@ -64,11 +59,13 @@ function createDbMocks(selectResults: unknown[], updateReturningRows: unknown[] 
 }
 
 describe('DocsService', () => {
-  const enqueueDocsJobMock = jest.mocked(enqueueDocsJob)
+  const orchestratorClient = {
+    enqueueDocsJob: jest.fn()
+  }
 
   beforeEach(() => {
     jest.restoreAllMocks()
-    enqueueDocsJobMock.mockReset()
+    orchestratorClient.enqueueDocsJob.mockReset()
   })
 
   it('throws when repository clone is not ready', async () => {
@@ -79,10 +76,10 @@ describe('DocsService', () => {
       id: 10
     }
     const { dbService } = createDbMocks([[repoState]])
-    const service = new DocsService(dbService as never)
+    const service = new DocsService(dbService as never, orchestratorClient as never)
 
     await expect(service.generateDocumentation(1, 10)).rejects.toBeInstanceOf(ConflictException)
-    expect(enqueueDocsJobMock).not.toHaveBeenCalled()
+    expect(orchestratorClient.enqueueDocsJob).not.toHaveBeenCalled()
   })
 
   it('returns already processing response when docs job is in progress', async () => {
@@ -93,14 +90,14 @@ describe('DocsService', () => {
       id: 20
     }
     const { dbService, mocks } = createDbMocks([[repoState]])
-    const service = new DocsService(dbService as never)
+    const service = new DocsService(dbService as never, orchestratorClient as never)
 
     await expect(service.generateDocumentation(2, 20)).resolves.toEqual({
       message: 'Documentation generation already in progress',
       status: 'processing'
     })
     expect(mocks.updateMock).not.toHaveBeenCalled()
-    expect(enqueueDocsJobMock).not.toHaveBeenCalled()
+    expect(orchestratorClient.enqueueDocsJob).not.toHaveBeenCalled()
   })
 
   it('throws actionable message when embeddings are still processing', async () => {
@@ -111,12 +108,12 @@ describe('DocsService', () => {
       id: 25
     }
     const { dbService } = createDbMocks([[repoState]])
-    const service = new DocsService(dbService as never)
+    const service = new DocsService(dbService as never, orchestratorClient as never)
 
     await expect(service.generateDocumentation(2, 25)).rejects.toThrow(
       'Embeddings are still processing. Wait for completion before generating documentation.'
     )
-    expect(enqueueDocsJobMock).not.toHaveBeenCalled()
+    expect(orchestratorClient.enqueueDocsJob).not.toHaveBeenCalled()
   })
 
   it('throws actionable message when embeddings failed', async () => {
@@ -127,12 +124,12 @@ describe('DocsService', () => {
       id: 26
     }
     const { dbService } = createDbMocks([[repoState]])
-    const service = new DocsService(dbService as never)
+    const service = new DocsService(dbService as never, orchestratorClient as never)
 
     await expect(service.generateDocumentation(2, 26)).rejects.toThrow(
       'Embeddings failed. Re-run embedding before generating documentation.'
     )
-    expect(enqueueDocsJobMock).not.toHaveBeenCalled()
+    expect(orchestratorClient.enqueueDocsJob).not.toHaveBeenCalled()
   })
 
   it('claims docs processing and publishes docs job', async () => {
@@ -143,15 +140,15 @@ describe('DocsService', () => {
       id: 30
     }
     const { dbService } = createDbMocks([[repoState]], [{ id: 30 }])
-    const service = new DocsService(dbService as never)
+    const service = new DocsService(dbService as never, orchestratorClient as never)
 
-    enqueueDocsJobMock.mockResolvedValue(undefined)
+    orchestratorClient.enqueueDocsJob.mockResolvedValue(undefined)
 
     await expect(service.generateDocumentation(3, 30)).resolves.toEqual({
       message: 'Documentation generation started',
       status: 'processing'
     })
-    expect(enqueueDocsJobMock).toHaveBeenCalledWith({ repoId: 30 })
+    expect(orchestratorClient.enqueueDocsJob).toHaveBeenCalledWith({ repoId: 30 })
   })
 
   it('marks docs as failed when publish throws', async () => {
@@ -162,9 +159,9 @@ describe('DocsService', () => {
       id: 40
     }
     const { dbService, mocks } = createDbMocks([[repoState]], [{ id: 40 }])
-    const service = new DocsService(dbService as never)
+    const service = new DocsService(dbService as never, orchestratorClient as never)
 
-    enqueueDocsJobMock.mockRejectedValue(new Error('publish failed'))
+    orchestratorClient.enqueueDocsJob.mockRejectedValue(new Error('publish failed'))
 
     await expect(service.generateDocumentation(4, 40)).rejects.toThrow('publish failed')
     expect(mocks.updateMock).toHaveBeenCalledTimes(2)
@@ -172,7 +169,7 @@ describe('DocsService', () => {
 
   it('throws not found when docs status is requested for missing repo', async () => {
     const { dbService } = createDbMocks([[]])
-    const service = new DocsService(dbService as never)
+    const service = new DocsService(dbService as never, orchestratorClient as never)
 
     await expect(service.getDocumentationStatus(5, 50)).rejects.toBeInstanceOf(NotFoundException)
   })

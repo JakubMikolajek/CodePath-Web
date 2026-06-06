@@ -1,8 +1,14 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
+import {
+  TelemetryLevel,
+  TelemetryRuntimeFamily,
+  TelemetryService,
+  TelemetryStatus
+} from '@workspace/codepath-common/telemetry'
 import { and, eq, ne } from 'drizzle-orm'
 
-import { enqueueDocsJob } from '../../../lib/orchestrator-client'
-import { emitTelemetry } from '../../../lib/telemetry'
+import { OrchestratorClient } from '../../orchestrator-client/services/orchestrator-client.service'
+import { emitTelemetry } from '../../telemetry/services/telemetry'
 import { repos } from '../../db/schema'
 import { DbService } from '../../db/services/db.service'
 
@@ -11,7 +17,8 @@ const nowIso = () => new Date().toISOString()
 @Injectable()
 export class DocsService {
   constructor(
-    private readonly dbService: DbService
+    private readonly dbService: DbService,
+    private readonly orchestratorClient: OrchestratorClient
   ) { }
 
   async generateDocumentation(userId: number, repoId: number) {
@@ -30,11 +37,11 @@ export class DocsService {
           embeddingStatus: repo.embeddingStatus
         },
         event: 'docs_job_blocked_embedding_not_ready',
-        level: 'warn',
+        level: TelemetryLevel.WARN,
         repoId: repoId,
-        runtimeFamily: 'pipeline',
-        service: 'web-api',
-        status: 'error'
+        runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+        service: TelemetryService.WEB_API,
+        status: TelemetryStatus.ERROR
       })
       throw new ConflictException(this.embeddingStatusGateMessage(repo.embeddingStatus))
     }
@@ -69,16 +76,16 @@ export class DocsService {
     }
 
     try {
-      await enqueueDocsJob({ repoId })
+      await this.orchestratorClient.enqueueDocsJob({ repoId })
       emitTelemetry({
         component: 'docs.service',
         event: 'docs_job_published',
-        level: 'info',
+        level: TelemetryLevel.INFO,
         queueName: 'docs',
         repoId,
-        runtimeFamily: 'pipeline',
-        service: 'web-api',
-        status: 'ok'
+        runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+        service: TelemetryService.WEB_API,
+        status: TelemetryStatus.OK
       })
     } catch (cause) {
       await this.dbService.dbClient.update(repos).set({
@@ -93,12 +100,12 @@ export class DocsService {
           errorName: cause instanceof Error ? cause.name : 'UnknownError'
         },
         event: 'docs_job_publish_failed',
-        level: 'error',
+        level: TelemetryLevel.ERROR,
         queueName: 'docs',
         repoId,
-        runtimeFamily: 'pipeline',
-        service: 'web-api',
-        status: 'error'
+        runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+        service: TelemetryService.WEB_API,
+        status: TelemetryStatus.ERROR
       })
       throw cause
     }

@@ -1,61 +1,46 @@
-import { enqueueIngestJob, requestChatRpc } from './orchestrator-client'
+import axios, { AxiosError } from 'axios'
+
+import { OrchestratorClient } from './services/orchestrator-client.service'
+
+jest.mock('axios')
 
 describe('orchestrator client', () => {
-  const originalFetch = global.fetch
+  const axiosIsAxiosErrorMock = jest.mocked(axios.isAxiosError)
+  const requestMock = jest.fn()
+  const client = new OrchestratorClient({
+    request: requestMock
+  } as never)
+
+  beforeEach(() => {
+    axiosIsAxiosErrorMock.mockImplementation((error): error is AxiosError => error instanceof AxiosError)
+    requestMock.mockReset()
+  })
 
   afterEach(() => {
-    jest.useRealTimers()
     jest.restoreAllMocks()
-    if (originalFetch) {
-      global.fetch = originalFetch
-    }
   })
 
   it('times out chat rpc request when orchestrator does not respond', async () => {
-    jest.useFakeTimers()
+    requestMock.mockRejectedValue(new AxiosError('timeout', 'ECONNABORTED'))
 
-    const fetchMock = jest.fn((_url: URL, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
-      const signal = init?.signal
-      if (!signal) {
-        return
-      }
-
-      if (signal.aborted) {
-        reject(signal.reason ?? new Error('aborted'))
-        return
-      }
-
-      signal.addEventListener('abort', () => {
-        reject(signal.reason ?? new Error('aborted'))
-      }, { once: true })
-    }))
-
-    global.fetch = fetchMock as typeof fetch
-
-    const pending = requestChatRpc({
+    await expect(client.requestChatRpc({
       prompt: 'timeout me',
       repoId: 1
-    })
-
-    const timeoutAssertion = expect(pending).rejects.toMatchObject({
+    })).rejects.toMatchObject({
       message: 'Orchestrator request timed out',
       name: 'OrchestratorClientError'
     })
-
-    await jest.advanceTimersByTimeAsync(60_000)
-
-    await timeoutAssertion
   })
 
   it('returns parsed chat response when orchestrator replies with json', async () => {
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
+    requestMock.mockResolvedValue({
+      data: JSON.stringify({ response: 'ok' }),
       status: 200,
-      text: async () => JSON.stringify({ response: 'ok' })
-    } as Response) as typeof fetch
+      statusText: 'OK'
+    })
 
     await expect(
-      requestChatRpc({
+      client.requestChatRpc({
         prompt: 'hello',
         repoId: 2
       })
@@ -63,10 +48,7 @@ describe('orchestrator client', () => {
   })
 
   it('rejects ingest publish when producer payload is invalid', async () => {
-    const fetchMock = jest.fn()
-    global.fetch = fetchMock as typeof fetch
-
-    await expect(enqueueIngestJob({
+    await expect(client.enqueueIngestJob({
       contractVersion: 'ingest.v2',
       correlationId: '',
       messageType: 'ingest.job.request',
@@ -92,18 +74,17 @@ describe('orchestrator client', () => {
       name: 'OrchestratorClientError'
     })
 
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(requestMock).not.toHaveBeenCalled()
   })
 
   it('publishes ingest job when producer payload is valid', async () => {
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
+    requestMock.mockResolvedValue({
+      data: '',
       status: 202,
-      text: async () => ''
-    } as Response)
-    global.fetch = fetchMock as typeof fetch
+      statusText: 'Accepted'
+    })
 
-    await expect(enqueueIngestJob({
+    await expect(client.enqueueIngestJob({
       contractVersion: 'ingest.v2',
       correlationId: 'corr-1',
       messageType: 'ingest.job.request',
@@ -126,8 +107,12 @@ describe('orchestrator client', () => {
       repoId: 1
     } as never)).resolves.toBeUndefined()
 
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    const [url] = fetchMock.mock.calls[0]
-    expect(String(url)).toContain('/v1/jobs/ingest')
+    expect(requestMock).toHaveBeenCalledTimes(1)
+    expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ repoId: 1 }),
+      method: 'POST',
+      url: expect.stringContaining('/v1/jobs/ingest'),
+      validateStatus: expect.any(Function)
+    }))
   })
 })

@@ -1,3 +1,5 @@
+import type { Undefinable } from '@workspace/codepath-common/globals'
+
 const DEFAULTS = {
   corsAllowedOrigins: '*',
   databaseUrl: 'postgres://postgres:postgres@127.0.0.1:5432/codepath',
@@ -32,7 +34,7 @@ const DEFAULTS = {
   systemStatusTimeoutMs: 2500
 } as const
 
-function parseInteger(value: string | undefined, fallback: number): number {
+function parseInteger(value: Undefinable<string>, fallback: number): number {
   if (!value) return fallback
 
   const parsed = Number.parseInt(value, 10)
@@ -42,7 +44,7 @@ function parseInteger(value: string | undefined, fallback: number): number {
   return parsed
 }
 
-function parseBoolean(value: string | undefined, fallback: boolean): boolean {
+function parseBoolean(value: Undefinable<string>, fallback: boolean): boolean {
   if (!value) return fallback
 
   const normalized = value.trim().toLowerCase()
@@ -53,12 +55,12 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   return fallback
 }
 
-function parseList(value: string | undefined, fallback: string): string[] {
+function parseList(value: Undefinable<string>, fallback: string): string[] {
   const source = value ?? fallback
   return source.split(',').map(item => item.trim()).filter(Boolean)
 }
 
-function parseStorageProvider(value: string | undefined): 'local' | 'minio' {
+function parseStorageProvider(value: Undefinable<string>): 'local' | 'minio' {
   const normalized = (value ?? DEFAULTS.repoStorageProvider).trim().toLowerCase()
 
   if (normalized === 'minio') return 'minio'

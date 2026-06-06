@@ -1,36 +1,43 @@
+import {Nullable, Undefinable} from "./globals";
+
 export const INGEST_CONTRACT_VERSION_V1 = 'ingest.v1' as const
 export const INGEST_CONTRACT_VERSION_V2 = 'ingest.v2' as const
 
+export enum StorageProvider {
+  MINIO = 'minio'
+}
+
 export enum IngestMessageType {
-  JobRequest = 'ingest.job.request',
-  BatchReady = 'ingest.batch.ready',
-  JobFailed = 'ingest.job.failed'
+  JOB_REQUEST = 'ingest.job.request',
+  BATCH_READY = 'ingest.batch.ready',
+  JOB_FAILED = 'ingest.job.failed'
 }
 
 export const INGEST_MESSAGE_TYPES = Object.values(IngestMessageType) as IngestMessageType[]
 
 export enum IngestProducer {
-  WebApi = 'web-api',
-  Orchestrator = 'orchestrator',
-  IngestService = 'ingest-service'
+  WEB_API = 'web-api',
+  ORCHESTRATOR = 'orchestrator',
+  INGEST_SERVICE = 'ingest-service'
 }
 
 export const INGEST_PRODUCERS = Object.values(IngestProducer) as IngestProducer[]
 
 export enum IngestErrorCode {
-  InvalidPayload = 'INVALID_PAYLOAD',
-  MinioNotFound = 'MINIO_NOT_FOUND',
-  MinioAccessDenied = 'MINIO_ACCESS_DENIED',
-  SnapshotDownloadFailed = 'SNAPSHOT_DOWNLOAD_FAILED',
-  SnapshotExtractFailed = 'SNAPSHOT_EXTRACT_FAILED',
-  FileDiscoveryFailed = 'FILE_DISCOVERY_FAILED',
-  ParserFailed = 'PARSER_FAILED',
-  BatchPublishFailed = 'BATCH_PUBLISH_FAILED',
-  Unknown = 'UNKNOWN'
+  INVALID_PAYLOAD = 'INVALID_PAYLOAD',
+  MINIO_NOT_FOUND = 'MINIO_NOT_FOUND',
+  MINIO_ACCESS_DENIED = 'MINIO_ACCESS_DENIED',
+  SNAPSHOT_DOWNLOAD_FAILED = 'SNAPSHOT_DOWNLOAD_FAILED',
+  SNAPSHOT_EXTRACT_FAILED = 'SNAPSHOT_EXTRACT_FAILED',
+  FILE_DISCOVERY_FAILED = 'FILE_DISCOVERY_FAILED',
+  PARSER_FAILED = 'PARSER_FAILED',
+  BATCH_PUBLISH_FAILED = 'BATCH_PUBLISH_FAILED',
+  UNKNOWN = 'UNKNOWN'
 }
 
 export const INGEST_ERROR_CODES = Object.values(IngestErrorCode) as IngestErrorCode[]
 
+// TODO maybe enum will be better
 export const INGEST_JOB_FAILED_STAGES = [
   'batch_publish',
   'file_discovery',
@@ -39,6 +46,7 @@ export const INGEST_JOB_FAILED_STAGES = [
   'snapshot_extract',
   'unknown'
 ] as const
+
 export type IngestJobFailedStageV1 = (typeof INGEST_JOB_FAILED_STAGES)[number]
 export type IngestJobFailedStageV2 = (typeof INGEST_JOB_FAILED_STAGES)[number]
 
@@ -52,13 +60,13 @@ export interface IngestErrorEnvelopeV1 {
   code: IngestErrorCode
   message: string
   retryable: boolean
-  details?: Record<string, boolean | null | number | string>
+  details?: Record<string, Nullable<boolean| number | string>>
 }
 
 export interface IngestSnapshotRefV1 {
   bucket: string
   key: string
-  provider: 'minio'
+  provider: StorageProvider
   sourceCommitSha: string
 }
 
@@ -193,15 +201,15 @@ interface IngestEnvelopeBaseV2<TType extends IngestMessageType, TPayload> {
   repoId: number
 }
 
-export type IngestJobRequestV1 = IngestEnvelopeBaseV1<IngestMessageType.JobRequest, IngestJobRequestPayloadV1>
-export type IngestBatchReadyV1 = IngestEnvelopeBaseV1<IngestMessageType.BatchReady, IngestBatchReadyPayloadV1>
-export type IngestJobFailedV1 = IngestEnvelopeBaseV1<IngestMessageType.JobFailed, IngestJobFailedPayloadV1>
+export type IngestJobRequestV1 = IngestEnvelopeBaseV1<IngestMessageType.JOB_REQUEST, IngestJobRequestPayloadV1>
+export type IngestBatchReadyV1 = IngestEnvelopeBaseV1<IngestMessageType.BATCH_READY, IngestBatchReadyPayloadV1>
+export type IngestJobFailedV1 = IngestEnvelopeBaseV1<IngestMessageType.JOB_FAILED, IngestJobFailedPayloadV1>
 
 export type IngestMessageV1 = IngestBatchReadyV1 | IngestJobFailedV1 | IngestJobRequestV1
 
-export type IngestJobRequestV2 = IngestEnvelopeBaseV2<IngestMessageType.JobRequest, IngestJobRequestPayloadV2>
-export type IngestBatchReadyV2 = IngestEnvelopeBaseV2<IngestMessageType.BatchReady, IngestBatchReadyPayloadV2>
-export type IngestJobFailedV2 = IngestEnvelopeBaseV2<IngestMessageType.JobFailed, IngestJobFailedPayloadV2>
+export type IngestJobRequestV2 = IngestEnvelopeBaseV2<IngestMessageType.JOB_REQUEST, IngestJobRequestPayloadV2>
+export type IngestBatchReadyV2 = IngestEnvelopeBaseV2<IngestMessageType.BATCH_READY, IngestBatchReadyPayloadV2>
+export type IngestJobFailedV2 = IngestEnvelopeBaseV2<IngestMessageType.JOB_FAILED, IngestJobFailedPayloadV2>
 
 export type IngestMessageV2 = IngestBatchReadyV2 | IngestJobFailedV2 | IngestJobRequestV2
 
@@ -456,7 +464,7 @@ const INGEST_JOB_REQUEST_SCHEMA_V1: JsonSchemaObject = {
     {
       properties: {
         messageType: {
-          const: IngestMessageType.JobRequest
+          const: IngestMessageType.JOB_REQUEST
         },
         payload: {
           additionalProperties: false,
@@ -478,7 +486,7 @@ const INGEST_JOB_REQUEST_SCHEMA_V2: JsonSchemaObject = {
     {
       properties: {
         messageType: {
-          const: IngestMessageType.JobRequest
+          const: IngestMessageType.JOB_REQUEST
         },
         payload: {
           additionalProperties: false,
@@ -500,7 +508,7 @@ const INGEST_BATCH_READY_SCHEMA_V1: JsonSchemaObject = {
     {
       properties: {
         messageType: {
-          const: IngestMessageType.BatchReady
+          const: IngestMessageType.BATCH_READY
         },
         payload: {
           additionalProperties: false,
@@ -548,7 +556,7 @@ const INGEST_BATCH_READY_SCHEMA_V2: JsonSchemaObject = {
     {
       properties: {
         messageType: {
-          const: IngestMessageType.BatchReady
+          const: IngestMessageType.BATCH_READY
         },
         payload: {
           additionalProperties: false,
@@ -596,7 +604,7 @@ const INGEST_JOB_FAILED_SCHEMA_V1: JsonSchemaObject = {
     {
       properties: {
         messageType: {
-          const: IngestMessageType.JobFailed
+          const: IngestMessageType.JOB_FAILED
         },
         payload: {
           additionalProperties: false,
@@ -621,7 +629,7 @@ const INGEST_JOB_FAILED_SCHEMA_V2: JsonSchemaObject = {
     {
       properties: {
         messageType: {
-          const: IngestMessageType.JobFailed
+          const: IngestMessageType.JOB_FAILED
         },
         payload: {
           additionalProperties: false,
@@ -660,13 +668,9 @@ export const INGEST_MESSAGE_JSON_SCHEMA_V2: JsonSchemaObject = {
   ]
 }
 
-export type IngestMessageValidationV1 =
-  | { message: IngestMessageV1, ok: true }
-  | { errors: string[], ok: false }
+export type IngestMessageValidationV1 = { message: IngestMessageV1, ok: true } | { errors: string[], ok: false }
 
-export type IngestMessageValidationV2 =
-  | { message: IngestMessageV2, ok: true }
-  | { errors: string[], ok: false }
+export type IngestMessageValidationV2 = { message: IngestMessageV2, ok: true } | { errors: string[], ok: false }
 
 export interface IngestProducerValidationOptionsV1 {
   allowedMessageTypes?: IngestMessageType[]
@@ -697,11 +701,9 @@ function isIsoDateString(value: unknown): boolean {
 }
 
 function isSnapshotRefV1(value: unknown): value is IngestSnapshotRefV1 {
-  if (!isRecord(value)) {
-    return false
-  }
+  if (!isRecord(value)) return false
 
-  return value.provider === 'minio'
+  return value.provider === StorageProvider.MINIO
     && typeof value.bucket === 'string'
     && value.bucket.trim().length > 0
     && typeof value.key === 'string'
@@ -711,9 +713,7 @@ function isSnapshotRefV1(value: unknown): value is IngestSnapshotRefV1 {
 }
 
 function isParseOptionsV1(value: unknown): value is IngestParseOptionsV1 {
-  if (!isRecord(value)) {
-    return false
-  }
+  if (!isRecord(value)) return false
 
   return typeof value.includeConfigFiles === 'boolean'
     && typeof value.includeDocumentationFiles === 'boolean'
@@ -726,9 +726,7 @@ function isParseOptionsV1(value: unknown): value is IngestParseOptionsV1 {
 }
 
 function isIngestSegmentV1(value: unknown): value is IngestSegmentV1 {
-  if (!isRecord(value)) {
-    return false
-  }
+  if (!isRecord(value)) return false
 
   return typeof value.filePath === 'string'
     && value.filePath.trim().length > 0
@@ -843,31 +841,16 @@ function isMessageBaseV2(value: unknown): value is Omit<IngestEnvelopeBaseV2<Ing
 export function isIngestMessageV1(value: unknown): value is IngestMessageV1 {
   if (!isMessageBaseV1(value)) return false
 
-  if (value.messageType === IngestMessageType.JobRequest) {
+  if (value.messageType === IngestMessageType.JOB_REQUEST) {
     if (!isRecord(value.payload)) return false
 
     return isParseOptionsV1(value.payload.parseOptions) && isSnapshotRefV1(value.payload.snapshot)
   }
 
-  if (value.messageType === IngestMessageType.BatchReady) {
+  if (value.messageType === IngestMessageType.BATCH_READY) {
     if (!isRecord(value.payload)) return false
 
-    return typeof value.payload.batchId === 'string'
-      && value.payload.batchId.trim().length > 0
-      && typeof value.payload.batchIndex === 'number'
-      && Number.isInteger(value.payload.batchIndex)
-      && value.payload.batchIndex >= 0
-      && typeof value.payload.batchCount === 'number'
-      && Number.isInteger(value.payload.batchCount)
-      && value.payload.batchCount > 0
-      && typeof value.payload.isLastBatch === 'boolean'
-      && isSnapshotRefV1(value.payload.snapshot)
-      && isRecord(value.payload.stats)
-      && typeof value.payload.stats.filesDiscovered === 'number'
-      && typeof value.payload.stats.filesParsed === 'number'
-      && typeof value.payload.stats.segmentsInBatch === 'number'
-      && Array.isArray(value.payload.segments)
-      && value.payload.segments.every(isIngestSegmentV1)
+    return isBatchReadyPayload(value.payload, isIngestSegmentV1)
   }
 
   if (!isRecord(value.payload)) {
@@ -883,31 +866,16 @@ export function isIngestMessageV1(value: unknown): value is IngestMessageV1 {
 export function isIngestMessageV2(value: unknown): value is IngestMessageV2 {
   if (!isMessageBaseV2(value)) return false
 
-  if (value.messageType === IngestMessageType.JobRequest) {
+  if (value.messageType === IngestMessageType.JOB_REQUEST) {
     if (!isRecord(value.payload)) return false
 
     return isParseOptionsV1(value.payload.parseOptions) && isSnapshotRefV1(value.payload.snapshot)
   }
 
-  if (value.messageType === IngestMessageType.BatchReady) {
+  if (value.messageType === IngestMessageType.BATCH_READY) {
     if (!isRecord(value.payload)) return false
 
-    return typeof value.payload.batchId === 'string'
-      && value.payload.batchId.trim().length > 0
-      && typeof value.payload.batchIndex === 'number'
-      && Number.isInteger(value.payload.batchIndex)
-      && value.payload.batchIndex >= 0
-      && typeof value.payload.batchCount === 'number'
-      && Number.isInteger(value.payload.batchCount)
-      && value.payload.batchCount > 0
-      && typeof value.payload.isLastBatch === 'boolean'
-      && isSnapshotRefV1(value.payload.snapshot)
-      && isRecord(value.payload.stats)
-      && typeof value.payload.stats.filesDiscovered === 'number'
-      && typeof value.payload.stats.filesParsed === 'number'
-      && typeof value.payload.stats.segmentsInBatch === 'number'
-      && Array.isArray(value.payload.segments)
-      && value.payload.segments.every(isIngestSegmentV2)
+    return isBatchReadyPayload(value.payload, isIngestSegmentV2)
   }
 
   if (!isRecord(value.payload)) return false
@@ -915,11 +883,12 @@ export function isIngestMessageV2(value: unknown): value is IngestMessageV2 {
   return isSnapshotRefV1(value.payload.snapshot) && typeof value.payload.stage === 'string' && INGEST_JOB_FAILED_STAGES.includes(value.payload.stage as IngestJobFailedStageV2) && isIngestErrorEnvelopeV1(value.payload.error)
 }
 
-function normalizeValidationList<T extends string>(values: T[] | undefined, defaults: T[]): T[] {
+function normalizeValidationList<T extends string>(values: Undefinable<T[]>, defaults: T[]): T[] {
   const effectiveValues = values ?? defaults
   return [...new Set(effectiveValues)]
 }
 
+// FIXME
 export function validateIngestProducerMessageV1(value: unknown, options: IngestProducerValidationOptionsV1): IngestMessageValidationV1 {
   if (!isIngestMessageV1(value)) return { errors: ['Message does not match ingest.v1 contract schema'], ok: false }
 
@@ -933,6 +902,7 @@ export function validateIngestProducerMessageV1(value: unknown, options: IngestP
   return { message: value, ok: true }
 }
 
+// FIXME
 export function validateIngestProducerMessageV2(value: unknown, options: IngestProducerValidationOptionsV2): IngestMessageValidationV2 {
   if (!isIngestMessageV2(value)) return { errors: ['Message does not match ingest.v2 contract schema'], ok: false }
 
@@ -946,6 +916,7 @@ export function validateIngestProducerMessageV2(value: unknown, options: IngestP
   return { message: value, ok: true }
 }
 
+// FIXME
 export function validateIngestConsumerMessageV1(value: unknown, options: IngestConsumerValidationOptionsV1 = {}): IngestMessageValidationV1 {
   if (!isIngestMessageV1(value)) return { errors: ['Message does not match ingest.v1 contract schema'], ok: false }
 
@@ -960,6 +931,7 @@ export function validateIngestConsumerMessageV1(value: unknown, options: IngestC
   return { message: value, ok: true }
 }
 
+// FIXME
 export function validateIngestConsumerMessageV2(value: unknown, options: IngestConsumerValidationOptionsV2 = {}): IngestMessageValidationV2 {
   if (!isIngestMessageV2(value)) return { errors: ['Message does not match ingest.v2 contract schema'], ok: false }
 
@@ -972,4 +944,25 @@ export function validateIngestConsumerMessageV2(value: unknown, options: IngestC
   if (errors.length > 0) return { errors, ok: false }
 
   return { message: value, ok: true }
+}
+
+export function isBatchReadyPayload(payload: unknown, segmentValidator: (value: unknown) => boolean): boolean {
+  if (!isRecord(payload)) return false
+
+  return typeof payload.batchId === 'string'
+    && payload.batchId.trim().length > 0
+    && typeof payload.batchIndex === 'number'
+    && Number.isInteger(payload.batchIndex)
+    && payload.batchIndex >= 0
+    && typeof payload.batchCount === 'number'
+    && Number.isInteger(payload.batchCount)
+    && payload.batchCount > 0
+    && typeof payload.isLastBatch === 'boolean'
+    && isSnapshotRefV1(payload.snapshot)
+    && isRecord(payload.stats)
+    && typeof payload.stats.filesDiscovered === 'number'
+    && typeof payload.stats.filesParsed === 'number'
+    && typeof payload.stats.segmentsInBatch === 'number'
+    && Array.isArray(payload.segments)
+    && payload.segments.every(segmentValidator)
 }

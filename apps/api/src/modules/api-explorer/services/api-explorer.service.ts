@@ -1,6 +1,6 @@
 import { posix as pathPosix } from 'node:path'
 
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import type {
   RepoApiEndpoint,
   RepoApiEndpointParameter,
@@ -16,12 +16,13 @@ import type {
   RepoOpenApiDocument,
   RepoOpenApiSchema
 } from '@workspace/codepath-common/api-explorer'
-import axios from 'axios'
+import type { AxiosInstance } from 'axios'
 import { and, eq } from 'drizzle-orm'
 
 import { env } from '../../../config/env'
 import { repos } from '../../db/schema'
 import { DbService } from '../../db/services/db.service'
+import { HTTP_CLIENT } from '../../http-client/http-client.tokens'
 import { QdrantService } from '../../qdrant/services/qdrant.service'
 import { OpenApiDocumentBuilder } from '../builders/openapi-document.builder'
 import { ApiEndpointDetector } from '../detectors/api-endpoint.detector'
@@ -75,7 +76,8 @@ export class ApiExplorerService {
   constructor(
     private readonly dbService: DbService,
     private readonly qdrantService: QdrantService,
-    private readonly apiRunnerService: ApiRunnerService
+    private readonly apiRunnerService: ApiRunnerService,
+    @Inject(HTTP_CLIENT) private readonly httpClient: AxiosInstance
   ) {}
 
   async deleteRunnerAuthPreset(userId: number, repoId: number, presetId: number) {
@@ -590,7 +592,7 @@ export class ApiExplorerService {
     for (const candidatePath of RUNTIME_OPENAPI_CANDIDATE_PATHS) {
       const candidateUrl = new URL(candidatePath, runtimeBaseUrl).toString()
       try {
-        const response = await axios.request<unknown>({
+        const response = await this.httpClient.request<unknown>({
           maxContentLength: RUNNER_MAX_RESPONSE_BYTES,
           method: 'GET',
           timeout: RUNTIME_OPENAPI_TIMEOUT_MS,

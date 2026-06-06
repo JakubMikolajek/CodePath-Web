@@ -16,6 +16,8 @@ export enum DepentencyTypes {
 // TYPES
 export type Nullable<T> = T | null
 
+export type Undefinable<T> = T | undefined
+
 export type SegmentKind = `${SegmentKinds}`
 
 export type DependencyType = `${DepentencyTypes}` 

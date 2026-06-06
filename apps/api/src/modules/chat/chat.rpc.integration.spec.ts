@@ -1,18 +1,10 @@
 import { v4 as uuidv4 } from 'uuid'
 
-import { OrchestratorClientError, requestChatRpc } from '../../lib/orchestrator-client'
-import { emitTelemetry } from '../../lib/telemetry'
+import { OrchestratorClientError } from '../orchestrator-client/services/orchestrator-client.service'
+import { emitTelemetry } from '../telemetry/services/telemetry'
 import { ChatService } from './services/chat.service'
 
-jest.mock('../../lib/orchestrator-client', () => {
-  const actual = jest.requireActual('../../lib/orchestrator-client')
-  return {
-    ...actual,
-    requestChatRpc: jest.fn()
-  }
-})
-
-jest.mock('../../lib/telemetry', () => ({
+jest.mock('../telemetry/services/telemetry', () => ({
   emitTelemetry: jest.fn()
 }))
 
@@ -21,17 +13,20 @@ jest.mock('uuid', () => ({
 }))
 
 describe('chat rpc integration', () => {
-  const requestChatRpcMock = jest.mocked(requestChatRpc)
   const emitTelemetryMock = jest.mocked(emitTelemetry)
+  const orchestratorClient = {
+    requestChatRpc: jest.fn()
+  }
   const uuidV4Mock = uuidv4 as unknown as jest.MockedFunction<() => string>
 
   const service = new ChatService(
-    { dbClient: {} } as never
+    { dbClient: {} } as never,
+    orchestratorClient as never
   )
 
   beforeEach(() => {
     jest.restoreAllMocks()
-    requestChatRpcMock.mockReset()
+    orchestratorClient.requestChatRpc.mockReset()
     emitTelemetryMock.mockReset()
     uuidV4Mock.mockReset()
     uuidV4Mock.mockReturnValue('corr-test-001')
@@ -39,7 +34,7 @@ describe('chat rpc integration', () => {
 
   it('keeps correlation id between request and timeout telemetry events', async () => {
     const timeoutError = new OrchestratorClientError('Orchestrator request timed out')
-    requestChatRpcMock.mockRejectedValue(timeoutError)
+    orchestratorClient.requestChatRpc.mockRejectedValue(timeoutError)
     jest.spyOn(Date, 'now')
       .mockReturnValueOnce(1_000)
       .mockReturnValueOnce(1_450)
@@ -49,7 +44,7 @@ describe('chat rpc integration', () => {
         .publishChatJob({ prompt: 'hello', repoId: 42 })
     ).rejects.toBe(timeoutError)
 
-    expect(requestChatRpcMock).toHaveBeenCalledWith({ prompt: 'hello', repoId: 42 })
+    expect(orchestratorClient.requestChatRpc).toHaveBeenCalledWith({ prompt: 'hello', repoId: 42 })
     expect(emitTelemetryMock).toHaveBeenCalledTimes(2)
 
     const [requestEvent, timeoutEvent] = emitTelemetryMock.mock.calls.map(([payload]) => payload)
@@ -76,7 +71,7 @@ describe('chat rpc integration', () => {
   })
 
   it('keeps correlation id between request and response telemetry events', async () => {
-    requestChatRpcMock.mockResolvedValue('answer')
+    orchestratorClient.requestChatRpc.mockResolvedValue('answer')
     jest.spyOn(Date, 'now')
       .mockReturnValueOnce(2_000)
       .mockReturnValueOnce(2_320)

@@ -1,18 +1,33 @@
+import { Nullable } from './globals'
+
 export const TELEMETRY_SCHEMA_V1 = 'codepath.telemetry.v1' as const
 
-export const TELEMETRY_LEVELS = ['info', 'warn', 'error'] as const
-export type TelemetryLevel = (typeof TELEMETRY_LEVELS)[number]
+export enum TelemetryLevel {
+  INFO = 'info',
+  WARN = 'warn',
+  ERROR = 'error'
+}
 
-export const TELEMETRY_RUNTIME_FAMILIES = ['pipeline', 'semantic'] as const
-export type TelemetryRuntimeFamily = (typeof TELEMETRY_RUNTIME_FAMILIES)[number]
+export enum TelemetryRuntimeFamily {
+  PIPELINE = 'pipeline',
+  SEMANTIC = 'semantic'
+}
 
-export const TELEMETRY_SERVICES = ['web-api', 'ai-worker', 'desktop'] as const
-export type TelemetryService = (typeof TELEMETRY_SERVICES)[number]
+export enum TelemetryService {
+  WEB_API = 'web-api',
+  AI_WORKER = 'ai-worker',
+  DESKTOP = 'desktop'
+}
 
-export const TELEMETRY_STATUSES = ['ok', 'retry', 'dlq', 'timeout', 'error'] as const
-export type TelemetryStatus = (typeof TELEMETRY_STATUSES)[number]
+export enum TelemetryStatus {
+  OK = 'ok',
+  RETRY = 'retry',
+  DLQ = 'dlq',
+  TIMEOUT = 'timeout',
+  ERROR = 'error'
+}
 
-export type TelemetryDetailValue = boolean | null | number | string
+export type TelemetryDetailValue = Nullable<boolean | number | string>
 
 export interface TelemetryEventV1 {
   component: string

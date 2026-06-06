@@ -1,14 +1,14 @@
-import { HttpModule } from '@nestjs/axios'
 import { Module } from '@nestjs/common'
 
 import { AuthModule } from '../auth/auth.module'
+import { OrchestratorClientModule } from '../orchestrator-client/orchestrator-client.module'
 import { ChatController } from './chat.controller'
 import { ChatService } from './services/chat.service'
 
 @Module({
   controllers: [ChatController],
   imports: [
-    HttpModule,
+    OrchestratorClientModule,
     AuthModule
   ],
   providers: [ChatService]

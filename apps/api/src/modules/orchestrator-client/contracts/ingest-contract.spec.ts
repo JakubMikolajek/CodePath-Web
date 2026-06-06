@@ -16,7 +16,7 @@ import {
   validateIngestConsumerMessageV2,
   validateIngestProducerMessageV1,
   validateIngestProducerMessageV2
-} from '../../../../packages/codepath-common/ingest'
+} from '../../../../../../packages/codepath-common/ingest'
 
 describe('ingest.v1 contract', () => {
   it('exposes stable version and enum sets', () => {
@@ -168,14 +168,14 @@ describe('ingest.v1 contract', () => {
     }
 
     const validResult = validateIngestProducerMessageV1(message, {
-      allowedMessageTypes: [IngestMessageType.JobRequest],
-      expectedProducer: IngestProducer.WebApi
+      allowedMessageTypes: [IngestMessageType.JOB_REQUEST],
+      expectedProducer: IngestProducer.WEB_API
     })
     expect(validResult.ok).toBe(true)
 
     const invalidResult = validateIngestProducerMessageV1(message, {
-      allowedMessageTypes: [IngestMessageType.BatchReady],
-      expectedProducer: IngestProducer.IngestService
+      allowedMessageTypes: [IngestMessageType.BATCH_READY],
+      expectedProducer: IngestProducer.INGEST_SERVICE
     })
     expect(invalidResult.ok).toBe(false)
   })
@@ -213,14 +213,14 @@ describe('ingest.v1 contract', () => {
     }
 
     const validResult = validateIngestConsumerMessageV1(message, {
-      allowedMessageTypes: [IngestMessageType.BatchReady],
-      allowedProducers: [IngestProducer.IngestService]
+      allowedMessageTypes: [IngestMessageType.BATCH_READY],
+      allowedProducers: [IngestProducer.INGEST_SERVICE]
     })
     expect(validResult.ok).toBe(true)
 
     const invalidResult = validateIngestConsumerMessageV1(message, {
-      allowedMessageTypes: [IngestMessageType.JobRequest],
-      allowedProducers: [IngestProducer.Orchestrator]
+      allowedMessageTypes: [IngestMessageType.JOB_REQUEST],
+      allowedProducers: [IngestProducer.ORCHESTRATOR]
     })
     expect(invalidResult.ok).toBe(false)
   })
@@ -371,13 +371,13 @@ describe('ingest.v2 contract', () => {
     }
 
     expect(validateIngestProducerMessageV2(producerMessage, {
-      allowedMessageTypes: [IngestMessageType.JobRequest],
-      expectedProducer: IngestProducer.WebApi
+      allowedMessageTypes: [IngestMessageType.JOB_REQUEST],
+      expectedProducer: IngestProducer.WEB_API
     }).ok).toBe(true)
 
     expect(validateIngestConsumerMessageV2(producerMessage, {
-      allowedMessageTypes: [IngestMessageType.BatchReady],
-      allowedProducers: [IngestProducer.IngestService]
+      allowedMessageTypes: [IngestMessageType.BATCH_READY],
+      allowedProducers: [IngestProducer.INGEST_SERVICE]
     }).ok).toBe(false)
   })
 })

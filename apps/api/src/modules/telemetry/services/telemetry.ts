@@ -2,10 +2,11 @@ import { Logger } from '@nestjs/common'
 import {
   type EmitTelemetryEventInput,
   type TelemetryDetailValue,
-  type TelemetryEventV1
+  type TelemetryEventV1,
+  TelemetryLevel
 } from '@workspace/codepath-common/telemetry'
 
-import { recordTelemetryMetric } from './metrics'
+import { recordTelemetryMetric } from '../../metrics/services/metrics-registry'
 
 const telemetryLogger = new Logger('Telemetry')
 const TELEMETRY_SCHEMA_V1 = 'codepath.telemetry.v1' as const
@@ -41,12 +42,12 @@ export function emitTelemetry(input: EmitTelemetryEventInput): void {
   const payload = JSON.stringify(event)
   recordTelemetryMetric(event)
 
-  if (event.level === 'error') {
+  if (event.level === TelemetryLevel.ERROR) {
     telemetryLogger.error(payload)
     return
   }
 
-  if (event.level === 'warn') {
+  if (event.level === TelemetryLevel.WARN) {
     telemetryLogger.warn(payload)
     return
   }

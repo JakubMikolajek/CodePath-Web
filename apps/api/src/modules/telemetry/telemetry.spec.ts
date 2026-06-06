@@ -1,16 +1,14 @@
 import { Logger } from '@nestjs/common'
 import {
-  type TelemetryEventV1
+  TELEMETRY_SCHEMA_V1,
+  type TelemetryEventV1,
+  TelemetryLevel,
+  TelemetryRuntimeFamily,
+  TelemetryService,
+  TelemetryStatus
 } from '@workspace/codepath-common/telemetry'
 
-import {
-  TELEMETRY_LEVELS,
-  TELEMETRY_RUNTIME_FAMILIES,
-  TELEMETRY_SCHEMA_V1,
-  TELEMETRY_SERVICES,
-  TELEMETRY_STATUSES
-} from '../../../../packages/codepath-common/telemetry'
-import { emitTelemetry } from './telemetry'
+import { emitTelemetry } from './services/telemetry'
 
 function parseSpyPayload(call: unknown[]): TelemetryEventV1 {
   const rawPayload = call[0]
@@ -32,10 +30,10 @@ describe('emitTelemetry', () => {
     emitTelemetry({
       component: 'test.component',
       event: 'test_event',
-      level: 'info',
-      runtimeFamily: 'pipeline',
-      service: 'web-api',
-      status: 'ok'
+      level: TelemetryLevel.INFO,
+      runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+      service: TelemetryService.WEB_API,
+      status: TelemetryStatus.OK
     })
 
     expect(infoSpy).toHaveBeenCalledTimes(1)
@@ -45,15 +43,14 @@ describe('emitTelemetry', () => {
     expect(typeof payload.timestamp).toBe('string')
     expect(payload.component).toBe('test.component')
     expect(payload.event).toBe('test_event')
-    expect(payload.level).toBe('info')
+    expect(payload.level).toBe(TelemetryLevel.INFO)
   })
 
   it('matches telemetry contract enums from codepath-common', () => {
     expect(TELEMETRY_SCHEMA_V1).toBe('codepath.telemetry.v1')
-    expect(TELEMETRY_LEVELS).toEqual(['info', 'warn', 'error'])
-    expect(TELEMETRY_RUNTIME_FAMILIES).toEqual(['pipeline', 'semantic'])
-    expect(TELEMETRY_SERVICES).toEqual(['web-api', 'ai-worker', 'desktop'])
-    expect(TELEMETRY_STATUSES).toEqual(['ok', 'retry', 'dlq', 'timeout', 'error'])
+    expect(Object.values(TelemetryRuntimeFamily)).toEqual(['pipeline', 'semantic'])
+    expect(Object.values(TelemetryService)).toEqual(['web-api', 'ai-worker', 'desktop'])
+    expect(Object.values(TelemetryStatus)).toEqual(['ok', 'retry', 'dlq', 'timeout', 'error'])
   })
 
   it('routes warn and error to proper logger levels', () => {
@@ -63,16 +60,16 @@ describe('emitTelemetry', () => {
     emitTelemetry({
       component: 'test.component',
       event: 'warn_event',
-      level: 'warn',
-      runtimeFamily: 'pipeline',
-      service: 'web-api'
+      level: TelemetryLevel.WARN,
+      runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+      service: TelemetryService.WEB_API
     })
     emitTelemetry({
       component: 'test.component',
       event: 'error_event',
-      level: 'error',
-      runtimeFamily: 'pipeline',
-      service: 'web-api'
+      level: TelemetryLevel.ERROR,
+      runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+      service: TelemetryService.WEB_API
     })
 
     expect(warnSpy).toHaveBeenCalledTimes(1)
@@ -91,9 +88,9 @@ describe('emitTelemetry', () => {
         validText: 'ok'
       },
       event: 'details_event',
-      level: 'info',
-      runtimeFamily: 'pipeline',
-      service: 'web-api'
+      level: TelemetryLevel.INFO,
+      runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+      service: TelemetryService.WEB_API
     })
 
     const payload = parseSpyPayload(infoSpy.mock.calls[0] as unknown[])
@@ -112,12 +109,12 @@ describe('emitTelemetry', () => {
       details: { attempt: 1, reason: 'test' },
       durationMs: 120,
       event: 'contract_event',
-      level: 'info',
+      level: TelemetryLevel.INFO,
       queueName: 'chat',
       repoId: 17,
-      runtimeFamily: 'pipeline',
-      service: 'web-api',
-      status: 'ok'
+      runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+      service: TelemetryService.WEB_API,
+      status: TelemetryStatus.OK
     })
 
     const payload = parseSpyPayload(infoSpy.mock.calls[0] as unknown[])

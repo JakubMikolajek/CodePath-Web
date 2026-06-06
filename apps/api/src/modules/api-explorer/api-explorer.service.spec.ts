@@ -1,10 +1,11 @@
 import { NotFoundException } from '@nestjs/common'
-import axios from 'axios'
 
 import { ApiExplorerService } from './services/api-explorer.service'
 import { ApiRunnerService } from './services/api-runner.service'
 
-jest.mock('axios')
+const httpClient = {
+  request: jest.fn()
+}
 
 function createDbMocks(repo: null | { id: number, name: string }) {
   const limitMock = jest.fn().mockResolvedValue(repo ? [repo] : [])
@@ -44,19 +45,21 @@ function createService(dbService: unknown, qdrantService: unknown) {
 
   const runnerService = new ApiRunnerService(
     runnerAuthPresetsRepository as never,
-    runnerCollectionsRepository as never
+    runnerCollectionsRepository as never,
+    httpClient as never
   )
 
   return new ApiExplorerService(
     dbService as never,
     qdrantService as never,
-    runnerService as never
+    runnerService as never,
+    httpClient as never
   )
 }
 
 describe('ApiExplorerService', () => {
   beforeEach(() => {
-    jest.resetAllMocks()
+    httpClient.request.mockReset()
   })
 
   it('extracts NestJS endpoints from qdrant segments', async () => {
@@ -363,7 +366,7 @@ describe('ApiExplorerService', () => {
     }
     const service = createService(dbService, qdrantService)
 
-    jest.mocked(axios.request).mockResolvedValue({
+    httpClient.request.mockResolvedValue({
       data: {
         info: {
           title: 'Runtime API',
@@ -434,7 +437,7 @@ describe('ApiExplorerService', () => {
     }
     const service = createService(dbService, qdrantService)
 
-    jest.mocked(axios.request).mockRejectedValue(new Error('timeout'))
+    httpClient.request.mockRejectedValue(new Error('timeout'))
 
     const spec = await service.getRepoOpenApiSpec(1, 34, {
       runtimeBaseUrl: 'http://127.0.0.1:3001'
@@ -461,7 +464,7 @@ describe('ApiExplorerService', () => {
       url: 'https://example.com/api/health'
     })).rejects.toThrow('localhost or private LAN')
 
-    expect(axios.request).not.toHaveBeenCalled()
+    expect(httpClient.request).not.toHaveBeenCalled()
   })
 
   it('executes runner call for localhost URL', async () => {
@@ -471,7 +474,7 @@ describe('ApiExplorerService', () => {
     }
     const service = createService(dbService, qdrantService)
 
-    jest.mocked(axios.request).mockResolvedValue({
+    httpClient.request.mockResolvedValue({
       data: Buffer.from(JSON.stringify({ ok: true }), 'utf8'),
       headers: {
         'content-type': 'application/json'
@@ -493,7 +496,7 @@ describe('ApiExplorerService', () => {
     expect(response.ok).toBe(true)
     expect(response.status).toBe(200)
     expect(response.data).toEqual({ ok: true })
-    expect(axios.request).toHaveBeenCalledTimes(1)
+    expect(httpClient.request).toHaveBeenCalledTimes(1)
   })
 
   it('throws not found when repo does not belong to user', async () => {

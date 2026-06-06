@@ -1,6 +1,12 @@
 import type * as amqp from 'amqplib'
+import {
+  TelemetryLevel,
+  TelemetryRuntimeFamily,
+  TelemetryService,
+  TelemetryStatus
+} from '@workspace/codepath-common/telemetry'
 
-import { emitTelemetry } from '../../lib/telemetry'
+import { emitTelemetry } from '../telemetry/services/telemetry'
 
 export interface QueueTopologyConfig {
   queueName: string
@@ -77,11 +83,11 @@ async function declareTopology(
       retryDelayMs
     },
     event: 'queue_topology_verified',
-    level: 'info',
+    level: TelemetryLevel.INFO,
     queueName,
-    runtimeFamily: 'pipeline',
-    service: 'web-api',
-    status: 'ok'
+    runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+    service: TelemetryService.WEB_API,
+    status: TelemetryStatus.OK
   })
 }
 
@@ -107,11 +113,11 @@ async function recreateTopology(
       action: 'recreate'
     },
     event: 'queue_topology_migrated',
-    level: 'warn',
+    level: TelemetryLevel.WARN,
     queueName,
-    runtimeFamily: 'pipeline',
-    service: 'web-api',
-    status: 'ok'
+    runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+    service: TelemetryService.WEB_API,
+    status: TelemetryStatus.OK
   })
 }
 
@@ -135,11 +141,11 @@ export async function ensureQueueTopology(
       emitTelemetry({
         component: 'rabbitmq.topology',
         event: 'queue_topology_verify_failed',
-        level: 'error',
+        level: TelemetryLevel.ERROR,
         queueName: config.queueName,
-        runtimeFamily: 'pipeline',
-        service: 'web-api',
-        status: 'error'
+        runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+        service: TelemetryService.WEB_API,
+        status: TelemetryStatus.ERROR
       })
       throw error
     }
@@ -148,11 +154,11 @@ export async function ensureQueueTopology(
       emitTelemetry({
         component: 'rabbitmq.topology',
         event: 'queue_topology_mismatch',
-        level: 'error',
+        level: TelemetryLevel.ERROR,
         queueName: config.queueName,
-        runtimeFamily: 'pipeline',
-        service: 'web-api',
-        status: 'error'
+        runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+        service: TelemetryService.WEB_API,
+        status: TelemetryStatus.ERROR
       })
       throw new Error(mismatchMessage(config.queueName), { cause: error })
     }
