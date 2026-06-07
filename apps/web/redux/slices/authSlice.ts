@@ -2,7 +2,7 @@ import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/tool
 import type { Nullable } from '@workspace/codepath-common/globals'
 import type { IUser } from '@workspace/codepath-common/user'
 
-import { SliceName } from '@/redux/store'
+import { SliceName } from '@/redux/sliceName'
 
 interface AuthState {
   error: Nullable<string>

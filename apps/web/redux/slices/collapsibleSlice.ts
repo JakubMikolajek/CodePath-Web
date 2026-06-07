@@ -1,7 +1,7 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
 import type { Nullable } from '@workspace/codepath-common/globals'
 
-import { SliceName } from '@/redux/store'
+import { SliceName } from '@/redux/sliceName'
 
 interface CollapsibleState {
   openRepoId: Nullable<number>

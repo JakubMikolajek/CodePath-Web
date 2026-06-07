@@ -5,14 +5,7 @@ import chatReducer from './slices/chatSlice'
 import collapsibleReducer from './slices/collapsibleSlice'
 import graphsReducer from './slices/graphsSlice'
 import reposReducer from './slices/reposSlice'
-
-export enum SliceName {
-  AUTH = 'auth',
-  CHAT = 'chat',
-  COLLAPSIBLE = 'collapsible',
-  GRAPHS = 'graphs',
-  REPOS = 'repos'
-}
+import { SliceName } from './sliceName'
 
 export const store = configureStore({
   reducer: {

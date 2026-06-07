@@ -3,7 +3,7 @@ import type { Nullable } from '@workspace/codepath-common/globals'
 import type { Graph, RepoGraphEdgeType, RepoInteractiveGraph } from '@workspace/codepath-common/graph'
 
 import { getRepoGraphs, getRepoInteractiveGraph } from '@/lib/graphs'
-import { SliceName } from '@/redux/store'
+import { SliceName } from '@/redux/sliceName'
 
 interface GraphsState {
   graphs: Graph[]

@@ -4,7 +4,7 @@ import type { Repository } from '@workspace/codepath-common/repository'
 
 import { getApiErrorMessage } from '@/lib/api/error'
 import { createRepo as createRepoApi, getRepos as getReposApi } from '@/lib/repos/client'
-import { SliceName } from '@/redux/store'
+import { SliceName } from '@/redux/sliceName'
 import type { CreateRepoFormData } from '@/utils/validators/createRepoForm'
 
 interface ReposState {

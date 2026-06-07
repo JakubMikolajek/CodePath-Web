@@ -8,7 +8,7 @@ import {
   getSessionDetails as getSessionDetailsApi,
   sendMessage as sendMessageApi
 } from '@/lib/chat'
-import { SliceName } from '@/redux/store'
+import { SliceName } from '@/redux/sliceName'
 
 interface ChatState {
   chatSessions: ChatSession[]

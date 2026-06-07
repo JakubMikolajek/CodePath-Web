@@ -1,5 +1,4 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
-// @ts-expect-error cjs error
 import { QdrantClient, type Schemas } from '@qdrant/js-client-rest'
 
 import { env } from '../../../config/env'

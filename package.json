@@ -15,7 +15,7 @@
   "engines": {
     "node": ">=20"
   },
-  "packageManager": "bun@1.3.5",
+  "packageManager": "bun@1.3.13",
   "devDependencies": {
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
