@@ -125,6 +125,51 @@ describe('ApiExplorerService', () => {
     expect(response.metadata.modules).toHaveLength(response.metadata.moduleCount)
   })
 
+  it('builds NestJS endpoints from semantic ingest metadata', async () => {
+    const { dbService } = createDbMocks({ id: 12, name: 'repo-semantic-nest' })
+    const qdrantService = {
+      scroll: jest.fn().mockResolvedValue({
+        points: [
+          {
+            payload: {
+              content: 'return this.projectsService.findOne(id)',
+              file_ext: '.ts',
+              file_path: 'src/modules/projects/projects.controller.ts',
+              http_method: 'GET',
+              language: 'typescript',
+              message_type: 'ingest.batch.ready',
+              params: ["@Param('id') id: string", "@Query('includeArchived') includeArchived?: string"],
+              route_path: '/projects/:id',
+              start_line: 24,
+              symbol_kind: 'http_endpoint',
+              symbol_name: 'findOne'
+            }
+          }
+        ]
+      })
+    }
+    const service = createService(dbService, qdrantService)
+
+    const response = await service.getRepoInteractiveApi(1, 12, {})
+    const endpoint = response.endpoints[0]
+
+    expect(response.metadata.endpointCount).toBe(1)
+    expect(endpoint).toMatchObject({
+      filePath: 'src/modules/projects/projects.controller.ts',
+      framework: 'nestjs',
+      method: 'GET',
+      moduleName: 'projects',
+      path: '/projects/:id',
+      sourceLineStart: 24,
+      sourceSnippet: 'return this.projectsService.findOne(id)',
+      symbolName: 'findOne'
+    })
+    expect(endpoint?.params).toEqual([
+      { location: 'path', name: 'id', required: true },
+      { location: 'query', name: 'includeArchived', required: false }
+    ])
+  })
+
   it('does not leak next NestJS route decorator into endpoint snippet', async () => {
     const { dbService } = createDbMocks({ id: 11, name: 'repo-nest-snippet-boundary' })
     const qdrantService = {

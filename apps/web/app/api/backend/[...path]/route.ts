@@ -41,6 +41,7 @@ async function forwardToApi(request: NextRequest, context: { params: Promise<{ p
   headers.delete('content-length')
   headers.delete('cookie')
   headers.delete('host')
+  headers.delete('accept-encoding')
 
   headers.set('authorization', `Bearer ${accessToken}`)
 
@@ -51,8 +52,14 @@ async function forwardToApi(request: NextRequest, context: { params: Promise<{ p
     redirect: 'manual'
   })
 
+  const responseHeaders = new Headers(response.headers)
+
+  responseHeaders.delete('content-encoding')
+  responseHeaders.delete('content-length')
+  responseHeaders.delete('transfer-encoding')
+
   return new NextResponse(response.body, {
-    headers: response.headers,
+    headers: responseHeaders,
     status: response.status,
     statusText: response.statusText
   })

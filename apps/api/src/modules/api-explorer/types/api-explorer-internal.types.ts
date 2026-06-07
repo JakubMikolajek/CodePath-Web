@@ -17,8 +17,15 @@ export interface ApiExplorerIngestSegmentPayload {
   content?: string
   file_ext?: string
   file_path?: string
+  http_method?: string
   language?: string
   message_type?: string
+  params?: string[]
+  return_type?: string
+  route_path?: string
+  start_line?: number
+  symbol_kind?: string
+  symbol_name?: string
 }
 
 export interface ApiExplorerRepoOwnership {

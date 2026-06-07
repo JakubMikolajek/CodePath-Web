@@ -4,6 +4,7 @@ import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common'
 import { Nullable, Undefinable } from '@workspace/codepath-common'
 import type {
   RepoApiEndpoint,
+  RepoApiEndpointParameter,
   RepoApiRunnerAuthPreset,
   RepoApiRunnerCollection,
   RepoApiRunnerRequest,
@@ -14,11 +15,11 @@ import type {
   RepoOpenApiDocument,
   RepoOpenApiSchema
 } from '@workspace/codepath-common/api-explorer'
-import { RepoApiFramework, RepoApiHttpMethod } from '@workspace/codepath-common/api-explorer'
+import { RepoApiFramework, RepoApiHttpMethod, RepoApiParameterLocation } from '@workspace/codepath-common/api-explorer'
 import type { AxiosInstance } from 'axios'
 
 import { env } from '../../../config/env'
-import { assertRepoOwnership, isAllowedRunnerTarget, uniqueParams } from '../../../utils/helpers'
+import { assertRepoOwnership, isAllowedRunnerTarget, normalizeHttpPath, uniqueParams } from '../../../utils/helpers'
 import { DbService } from '../../db/services/db.service'
 import { HTTP_CLIENT } from '../../http-client/http-client.tokens'
 import { QdrantService } from '../../qdrant/services/qdrant.service'
@@ -96,6 +97,12 @@ export class ApiExplorerService {
     const segments = await this.fetchRepoSegmentsFromQdrant(repo.id)
     const files = this.buildCanonicalFiles(segments)
     const endpointsByKey = new Map<string, RepoApiEndpoint>()
+
+    for (const segment of segments) {
+      const endpoint = this.buildEndpointFromSemanticSegment(segment)
+
+      if (endpoint) this.upsertEndpoint(endpointsByKey, endpoint)
+    }
 
     for (const file of files.values()) {
       const fileEndpoints = this.endpointDetector.detectEndpointsForFile(file)
@@ -274,6 +281,34 @@ export class ApiExplorerService {
     return files
   }
 
+  private buildEndpointFromSemanticSegment(segment: IngestSegmentPayload): Nullable<RepoApiEndpoint> {
+    if (segment.symbol_kind !== 'http_endpoint') return null
+
+    const filePath = this.normalizeFilePath(segment.file_path)
+    const method = this.assertMethod(this.safeString(segment.http_method) ?? '')
+    const routePath = this.safeString(segment.route_path)
+
+    if (!filePath || !method || !routePath) return null
+
+    const params = Array.isArray(segment.params)
+      ? segment.params.map(param => this.toEndpointParam(param)).filter((param): param is RepoApiEndpointParameter => param !== null)
+      : []
+
+    return {
+      filePath,
+      framework: this.inferFrameworkFromSemanticSegment(segment),
+      id: `semantic:${method}:${filePath}:${routePath}:${this.safeString(segment.symbol_name) ?? ''}`,
+      method,
+      moduleName: this.inferModuleName(filePath),
+      params: uniqueParams(params),
+      path: normalizeHttpPath(routePath),
+      requestBodyTypeName: this.extractRequestBodyTypeFromParams(segment.params),
+      sourceLineStart: typeof segment.start_line === 'number' ? segment.start_line : undefined,
+      sourceSnippet: this.safeString(segment.content) ?? undefined,
+      symbolName: this.safeString(segment.symbol_name) ?? undefined
+    }
+  }
+
   private async buildOpenApiSchemaRegistry(repoId: number): Promise<Record<string, RepoOpenApiSchema>> {
     const segments = await this.fetchRepoSegmentsFromQdrant(repoId)
     const files = this.buildCanonicalFiles(segments)
@@ -305,6 +340,35 @@ export class ApiExplorerService {
     }
 
     return counts
+  }
+
+  private extractRequestBodyTypeFromParams(params?: string[]): Undefinable<string> {
+    if (!Array.isArray(params)) return undefined
+
+    for (const param of params) {
+      const parsed = this.parseParamSignature(param)
+
+      if (!parsed || parsed.decorator !== 'Body') continue
+
+      const typeName = this.extractTypeName(parsed.typeName)
+
+      if (typeName) return typeName
+    }
+
+    return undefined
+  }
+
+  private extractTypeName(value?: string): Undefinable<string> {
+    if (!value) return undefined
+
+    const normalized = value.trim()
+      .split(/[\s<>\[\],|]/)[0]
+      ?.replace(/^.*\./, '')
+      ?.replace(/[^A-Za-z0-9_]/g, '')
+
+    if (!normalized || ['Array', 'Record', 'boolean', 'number', 'object', 'string', 'unknown', 'void'].includes(normalized)) return undefined
+
+    return normalized
   }
 
   private async fetchRepoSegmentsFromQdrant(repoId: number): Promise<IngestSegmentPayload[]> {
@@ -355,6 +419,31 @@ export class ApiExplorerService {
     return payloads
   }
 
+  private inferFrameworkFromSemanticSegment(segment: IngestSegmentPayload): RepoApiFramework {
+    const language = this.safeString(segment.language)?.toLowerCase() ?? ''
+    const filePath = this.safeString(segment.file_path)?.toLowerCase() ?? ''
+
+    if (language.includes('typescript') || filePath.endsWith('.ts')) return RepoApiFramework.NESTJS
+    if (language.includes('python') || filePath.endsWith('.py')) return RepoApiFramework.FASTAPI
+
+    return RepoApiFramework.UNKNOWN
+  }
+
+  private inferModuleName(filePath: string): string {
+    const segments = filePath.split('/').filter(Boolean)
+    const lowercase = segments.map(segment => segment.toLowerCase())
+
+    for (const marker of ['modules', 'controllers', 'controller', 'routes', 'routers', 'api']) {
+      const markerIndex = lowercase.lastIndexOf(marker)
+      const nextSegment = segments[markerIndex + 1]
+
+      if (markerIndex >= 0 && nextSegment && !nextSegment.includes('.')) return this.normalizeModuleSegment(nextSegment)
+    }
+
+    const fileName = segments[segments.length - 1] ?? 'api'
+    return this.normalizeModuleSegment(fileName)
+  }
+
   private normalizeFilePath(filePath: unknown): Nullable<string> {
     if (typeof filePath !== 'string') return null
 
@@ -366,6 +455,16 @@ export class ApiExplorerService {
     if (!normalized) return null
 
     return normalized
+  }
+
+  private normalizeModuleSegment(segment: string): string {
+    const cleaned = segment
+      .replace(/\.[^.]+$/, '')
+      .replace(/(?:\.|_)?(controller|controllers|route|routes|router|routers|handler|handlers)$/i, '')
+      .replace(/[-_]+/g, ' ')
+      .trim()
+
+    return cleaned.length > 0 ? cleaned : segment
   }
 
   private parseFrameworks(frameworks?: string): RepoApiFramework[] {
@@ -388,6 +487,24 @@ export class ApiExplorerService {
       .filter((value): value is RepoApiHttpMethod => value !== null)
 
     return Array.from(new Set(values))
+  }
+
+  private parseParamSignature(param: string): Nullable<{ decorator?: string, name: string, typeName?: string }> {
+    const trimmed = param.trim()
+
+    if (!trimmed) return null
+
+    const decorator = trimmed.match(/@([A-Za-z_][A-Za-z0-9_]*)\b/)?.[1]
+    const withoutDecorator = trimmed.replace(/@[A-Za-z_][A-Za-z0-9_]*\s*\([^)]*\)\s*/, '').trim()
+    const match = withoutDecorator.match(/(?:readonly\s+)?([A-Za-z_][A-Za-z0-9_]*)\??\s*:\s*([^=,]+)/)
+
+    if (!match?.[1]) return null
+
+    return {
+      decorator,
+      name: match[1],
+      typeName: match[2]?.trim()
+    }
   }
 
   private parseRuntimeBaseUrl(value: unknown): Nullable<string> {
@@ -419,6 +536,30 @@ export class ApiExplorerService {
 
     const normalized = value.trim()
     return normalized.length > 0 ? normalized : null
+  }
+
+  private toEndpointParam(param: string): Nullable<RepoApiEndpointParameter> {
+    const parsed = this.parseParamSignature(param)
+
+    if (!parsed) return null
+
+    const location = parsed.decorator === 'Param'
+      ? RepoApiParameterLocation.PATH
+      : parsed.decorator === 'Query'
+        ? RepoApiParameterLocation.QUERY
+        : parsed.decorator === 'Headers'
+          ? RepoApiParameterLocation.HEADER
+          : parsed.decorator === 'Body'
+            ? RepoApiParameterLocation.BODY
+            : null
+
+    if (!location) return null
+
+    return {
+      location,
+      name: parsed.name,
+      required: location === RepoApiParameterLocation.PATH
+    }
   }
 
   private toRatio(value: number, total: number): number {
