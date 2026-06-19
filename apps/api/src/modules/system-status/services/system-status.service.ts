@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common'
-import * as amqp from 'amqplib'
 import { sql } from 'drizzle-orm'
 
 import { env } from '../../../config/env'
@@ -19,6 +18,7 @@ export interface SystemComponentStatus {
   latencyMs: number
   message: string
   name: string
+  queues?: RabbitQueueGroupStatus[]
   status: ComponentStatus
 }
 
@@ -29,6 +29,38 @@ export interface SystemStatusResponse {
 }
 
 const REQUIRED_QUEUES = ['chat', 'docs', 'embedding', 'ingest', 'ingest-status'] as const
+type RequiredQueueName = (typeof REQUIRED_QUEUES)[number]
+
+interface RabbitQueueLaneStatus {
+  consumers: number
+  messages: number
+  name: string
+  ready: number
+  unacknowledged: number
+}
+
+export interface RabbitQueueGroupStatus {
+  dlq: RabbitQueueLaneStatus
+  main: RabbitQueueLaneStatus
+  name: RequiredQueueName
+  retry: RabbitQueueLaneStatus
+  status: ComponentStatus
+}
+
+interface RabbitManagementQueue {
+  consumers?: number
+  messages?: number
+  messages_ready?: number
+  messages_unacknowledged?: number
+  name?: string
+}
+
+type ComponentCheckResult = string | {
+  details?: Record<string, number | string>
+  message: string
+  queues?: RabbitQueueGroupStatus[]
+  status?: ComponentStatus
+}
 
 @Injectable()
 export class SystemStatusService {
@@ -84,20 +116,97 @@ export class SystemStatusService {
 
   private async checkRabbitMq() {
     return await this.measure('RabbitMQ', async () => {
-      const connection = await this.withTimeout(amqp.connect(env.rabbitUrl), 'RabbitMQ connection timed out')
-      const channel = await connection.createChannel()
+      const queueMetrics = await this.fetchRabbitQueues()
+      const queues: RabbitQueueGroupStatus[] = []
 
-      try {
-        for (const queueName of REQUIRED_QUEUES) {
-          await channel.checkQueue(queueName)
-        }
+      for (const queueName of REQUIRED_QUEUES) queues.push(this.checkRabbitQueueGroup(queueMetrics, queueName))
 
-        return { details: { queues: REQUIRED_QUEUES.length }, message: `Required queues available: ${REQUIRED_QUEUES.length}` }
-      } finally {
-        await channel.close().catch(() => undefined)
-        await connection.close().catch(() => undefined)
+      const degradedQueues = queues.filter(queue => queue.status !== ComponentStatus.OK)
+      const totals = queues.reduce((acc, queue) => ({
+        consumers: acc.consumers + queue.main.consumers,
+        dlqMessages: acc.dlqMessages + queue.dlq.messages,
+        ready: acc.ready + queue.main.ready,
+        retryMessages: acc.retryMessages + queue.retry.messages,
+        unacknowledged: acc.unacknowledged + queue.main.unacknowledged
+      }), { consumers: 0, dlqMessages: 0, ready: 0, retryMessages: 0, unacknowledged: 0 })
+
+      const status = degradedQueues.length > 0 ? ComponentStatus.DEGRADED : ComponentStatus.OK
+      const message = status === ComponentStatus.OK
+        ? `Required queues healthy: ${queues.length}`
+        : `Queue issues: ${degradedQueues.map(queue => queue.name).join(', ')}`
+
+      return {
+        details: {
+          consumers: totals.consumers,
+          dlqMessages: totals.dlqMessages,
+          queues: queues.length,
+          ready: totals.ready,
+          retryMessages: totals.retryMessages,
+          unacknowledged: totals.unacknowledged
+        },
+        message,
+        queues,
+        status
       }
     })
+  }
+
+  private async fetchRabbitQueues(): Promise<Map<string, RabbitManagementQueue>> {
+    const response = await this.withTimeout(
+      fetch(this.rabbitManagementQueuesUrl(), {
+        headers: {
+          authorization: this.rabbitManagementAuthorizationHeader()
+        }
+      }),
+      'RabbitMQ management check timed out'
+    )
+
+    if (!response.ok) throw new Error(`RabbitMQ management returned HTTP ${response.status}`)
+
+    const payload = await response.json() as unknown
+
+    if (!Array.isArray(payload)) throw new Error('RabbitMQ management returned invalid queue payload')
+
+    const queues = new Map<string, RabbitManagementQueue>()
+
+    for (const item of payload) {
+      if (!this.isRabbitManagementQueue(item)) continue
+      queues.set(item.name, item)
+    }
+
+    return queues
+  }
+
+  private checkRabbitQueueGroup(
+    queueMetrics: Map<string, RabbitManagementQueue>,
+    queueName: RequiredQueueName
+  ): RabbitQueueGroupStatus {
+    const main = this.checkRabbitQueueLane(queueMetrics, queueName)
+    const retry = this.checkRabbitQueueLane(queueMetrics, `${queueName}.retry`)
+    const dlq = this.checkRabbitQueueLane(queueMetrics, `${queueName}.dlq`)
+
+    const status = main.consumers < 1 || retry.messages > 0 || dlq.messages > 0
+      ? ComponentStatus.DEGRADED
+      : ComponentStatus.OK
+
+    return { dlq, main, name: queueName, retry, status }
+  }
+
+  private checkRabbitQueueLane(
+    queueMetrics: Map<string, RabbitManagementQueue>,
+    queueName: string
+  ): RabbitQueueLaneStatus {
+    const result = queueMetrics.get(queueName)
+    const ready = this.coerceQueueMetric(result?.messages_ready)
+    const unacknowledged = this.coerceQueueMetric(result?.messages_unacknowledged)
+
+    return {
+      consumers: this.coerceQueueMetric(result?.consumers),
+      messages: this.coerceQueueMetric(result?.messages ?? ready + unacknowledged),
+      name: queueName,
+      ready,
+      unacknowledged
+    }
   }
 
   private async checkRepoStorage() {
@@ -110,7 +219,7 @@ export class SystemStatusService {
 
   private async measure(
     name: string,
-    check: () => Promise<string | { details?: Record<string, number | string>, message: string }>
+    check: () => Promise<ComponentCheckResult>
   ): Promise<SystemComponentStatus> {
     const startedAt = performance.now()
     const checkedAt = new Date().toISOString()
@@ -125,7 +234,8 @@ export class SystemStatusService {
         latencyMs: Math.round(performance.now() - startedAt),
         message: normalized.message,
         name,
-        status: ComponentStatus.OK
+        queues: normalized.queues,
+        status: normalized.status ?? ComponentStatus.OK
       }
     } catch (error) {
       return {
@@ -159,5 +269,35 @@ export class SystemStatusService {
     } finally {
       if (timeout) clearTimeout(timeout)
     }
+  }
+
+  private coerceQueueMetric(value: number | undefined): number {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return 0
+
+    return Math.trunc(value)
+  }
+
+  private isRabbitManagementQueue(value: unknown): value is RabbitManagementQueue & { name: string } {
+    return typeof value === 'object'
+      && value !== null
+      && 'name' in value
+      && typeof (value as { name?: unknown }).name === 'string'
+  }
+
+  private rabbitManagementAuthorizationHeader(): string {
+    const rabbitUrl = new URL(env.rabbitUrl)
+    const username = decodeURIComponent(rabbitUrl.username || 'guest')
+    const password = decodeURIComponent(rabbitUrl.password || 'guest')
+
+    return `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`
+  }
+
+  private rabbitManagementQueuesUrl(): string {
+    const rabbitUrl = new URL(env.rabbitUrl)
+    const vhost = decodeURIComponent(rabbitUrl.pathname.replace(/^\//, '')) || '/'
+    const url = new URL('/api/queues/', env.rabbitManagementUrl)
+    url.pathname = `/api/queues/${encodeURIComponent(vhost)}`
+
+    return url.toString()
   }
 }

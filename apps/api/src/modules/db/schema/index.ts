@@ -15,5 +15,12 @@ export { chatSessions, chatSessionsRelations, type InsertChatSession, type Selec
 export { dependencies, dependenciesRelations, type InsertDependencies, type SelectDependencies } from './dependencies'
 export { docsSegments, docsSegmentsRelations, type InsertDocsSegment, type SelectDocsSegment } from './docsSegments'
 export { files, filesRelations, type InsertFile, type SelectFile } from './files'
+export {
+  type InsertRepoDocsFragment,
+  repoDocsFragments,
+  repoDocsFragmentsRelations,
+  repoDocsFragmentTypeEnum,
+  type SelectRepoDocsFragment
+} from './repoDocsFragments'
 export { type InsertRepo, repos, reposRelations, type SelectRepo } from './repos'
 export { type InserUser, type SelectUser, users, usersRelations } from './users'

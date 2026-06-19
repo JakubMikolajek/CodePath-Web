@@ -6,11 +6,12 @@ import {
   ServiceUnavailableException
 } from '@nestjs/common'
 import { Nullable } from '@workspace/codepath-common/globals'
+import { RepoEmbeddingStatus } from '@workspace/codepath-common/repository'
 import { and, eq } from 'drizzle-orm'
 import { pick } from 'lodash'
 
 import { env } from '../../../config/env'
-import { repos } from '../../db/schema'
+import { repoDocsFragments, repos } from '../../db/schema'
 import { DbService } from '../../db/services/db.service'
 import { RepoAuthType } from '../dto/create-repo.dto'
 import { RepoFetcherService } from './repo-fetcher.service'
@@ -76,9 +77,17 @@ export class RepoService {
 
     const [updatedRepo] = await this.dbService.dbClient.update(repos).set({
       cloneStatus: 'pending',
+      docsProgressCurrent: null,
+      docsProgressMessage: null,
+      docsProgressModuleKey: null,
+      docsProgressScope: null,
+      docsProgressSectionKey: null,
+      docsProgressStage: null,
+      docsProgressTotal: null,
+      docsProgressUpdatedAt: null,
       docsStatus: 'pending',
       documentation: null,
-      embeddingStatus: 'pending',
+      embeddingStatus: RepoEmbeddingStatus.PENDING,
       lastPipelineError: null,
       path: null,
       pipelineUpdatedAt: nowIso(),
@@ -86,6 +95,7 @@ export class RepoService {
       storageBucket: null,
       storageKey: null
     }).where(and(eq(repos.id, repoId), eq(repos.userId, userId))).returning()
+    await this.dbService.dbClient.delete(repoDocsFragments).where(eq(repoDocsFragments.repoId, repoId))
 
     return this.toPipelineStatus(updatedRepo)
   }
@@ -105,12 +115,21 @@ export class RepoService {
     }
 
     await this.dbService.dbClient.update(repos).set({
+      docsProgressCurrent: null,
+      docsProgressMessage: null,
+      docsProgressModuleKey: null,
+      docsProgressScope: null,
+      docsProgressSectionKey: null,
+      docsProgressStage: null,
+      docsProgressTotal: null,
+      docsProgressUpdatedAt: null,
       docsStatus: 'pending',
       documentation: null,
-      embeddingStatus: 'processing',
+      embeddingStatus: RepoEmbeddingStatus.PROCESSING,
       lastPipelineError: null,
       pipelineUpdatedAt: nowIso()
     }).where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
+    await this.dbService.dbClient.delete(repoDocsFragments).where(eq(repoDocsFragments.repoId, repoId))
 
     try {
       if (!this.repoFetcherService) throw new Error('Repo fetcher service is unavailable')
@@ -119,7 +138,7 @@ export class RepoService {
     } catch (error) {
       await this.dbService.dbClient.update(repos).set({
         docsStatus: 'failed',
-        embeddingStatus: 'failed',
+        embeddingStatus: RepoEmbeddingStatus.FAILED,
         lastPipelineError: error instanceof Error ? error.message : 'Failed to enqueue ingest retry',
         pipelineUpdatedAt: nowIso()
       }).where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
@@ -130,7 +149,7 @@ export class RepoService {
     return {
       cloneStatus: repo.cloneStatus,
       docsStatus: 'pending',
-      embeddingStatus: 'processing',
+      embeddingStatus: RepoEmbeddingStatus.PROCESSING,
       id: repo.id,
       lastPipelineError: null,
       pipelineUpdatedAt: nowIso()

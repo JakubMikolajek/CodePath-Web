@@ -1,4 +1,5 @@
 import type { InferInsertModel, InferSelectModel } from 'drizzle-orm'
+import { RepoEmbeddingStatus } from '@workspace/codepath-common/repository'
 import { relations } from 'drizzle-orm'
 import { foreignKey, integer, pgEnum, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core'
 
@@ -14,9 +15,17 @@ export const repos = pgTable('repos', {
   accessKey: text('access_key'),
   cloneStatus: repoCloneStatusEnum('clone_status').default('pending').notNull(),
   defaultBranch: text('default_branch'),
+  docsProgressCurrent: integer('docs_progress_current'),
+  docsProgressMessage: text('docs_progress_message'),
+  docsProgressModuleKey: text('docs_progress_module_key'),
+  docsProgressScope: text('docs_progress_scope'),
+  docsProgressSectionKey: text('docs_progress_section_key'),
+  docsProgressStage: text('docs_progress_stage'),
+  docsProgressTotal: integer('docs_progress_total'),
+  docsProgressUpdatedAt: timestamp('docs_progress_updated_at', { mode: 'string' }),
   docsStatus: repoDocsStatusEnum('docs_status').default('pending').notNull(),
   documentation: text('documentation'),
-  embeddingStatus: repoEmbeddingStatusEnum('embedding_status').default('pending').notNull(),
+  embeddingStatus: repoEmbeddingStatusEnum('embedding_status').$type<RepoEmbeddingStatus>().default(RepoEmbeddingStatus.PENDING).notNull(),
   gitAuthSecret: text('git_auth_secret'),
   gitAuthType: repoGitAuthTypeEnum('git_auth_type').default('none').notNull(),
   gitAuthUsername: text('git_auth_username'),
