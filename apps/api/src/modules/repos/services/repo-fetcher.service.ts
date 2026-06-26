@@ -9,6 +9,7 @@ import {
   IngestMessageType, IngestProducer,
   StorageProvider
 } from '@workspace/codepath-common/ingest'
+import { RepoEmbeddingStatus } from '@workspace/codepath-common/repository'
 import {
   TelemetryLevel,
   TelemetryRuntimeFamily,
@@ -25,7 +26,7 @@ import simpleGit, { type SimpleGit } from 'simple-git'
 
 import { env } from '../../../config/env'
 import { IGNORED_DIRS, IGNORED_EXTENSIONS, IGNORED_FILES } from '../../../utils/ignores'
-import { files, InsertFile, repos, SelectRepo } from '../../db/schema'
+import { files, InsertFile, repoDocsFragments, repos, SelectRepo } from '../../db/schema'
 import { DbService } from '../../db/services/db.service'
 import { OrchestratorClient } from '../../orchestrator-client/services/orchestrator-client.service'
 import { RepoStorageService } from '../../repo-storage/services/repo-storage.service'
@@ -58,19 +59,22 @@ export class RepoFetcherService {
     const staleClones = await this.dbService.dbClient.update(repos).set({
       cloneStatus: 'failed',
       docsStatus: 'failed',
-      embeddingStatus: 'failed',
+      embeddingStatus: RepoEmbeddingStatus.FAILED,
       lastPipelineError: `Clone stage exceeded ${env.pipelineStaleAfterMs}ms without completion`,
       pipelineUpdatedAt: nowIso()
     }).where(and(eq(repos.cloneStatus, 'cloning'), lt(repos.pipelineUpdatedAt, cutoff))).returning({ id: repos.id })
 
     const staleEmbeddings = await this.dbService.dbClient.update(repos).set({
       docsStatus: 'failed',
-      embeddingStatus: 'failed',
+      embeddingStatus: RepoEmbeddingStatus.FAILED,
       lastPipelineError: `Embedding stage exceeded ${env.pipelineStaleAfterMs}ms without completion`,
       pipelineUpdatedAt: nowIso()
-    }).where(and(eq(repos.embeddingStatus, 'processing'), lt(repos.pipelineUpdatedAt, cutoff))).returning({ id: repos.id })
+    }).where(and(eq(repos.embeddingStatus, RepoEmbeddingStatus.PROCESSING), lt(repos.pipelineUpdatedAt, cutoff))).returning({ id: repos.id })
 
     const staleDocs = await this.dbService.dbClient.update(repos).set({
+      docsProgressMessage: `Documentation stage exceeded ${env.pipelineStaleAfterMs}ms without completion`,
+      docsProgressStage: 'failed',
+      docsProgressUpdatedAt: nowIso(),
       docsStatus: 'failed',
       lastPipelineError: `Documentation stage exceeded ${env.pipelineStaleAfterMs}ms without completion`,
       pipelineUpdatedAt: nowIso()
@@ -255,9 +259,17 @@ export class RepoFetcherService {
       await this.dbService.dbClient.update(repos).set({
         cloneStatus: 'cloned',
         defaultBranch: checkedOutBranch,
+        docsProgressCurrent: null,
+        docsProgressMessage: null,
+        docsProgressModuleKey: null,
+        docsProgressScope: null,
+        docsProgressSectionKey: null,
+        docsProgressStage: null,
+        docsProgressTotal: null,
+        docsProgressUpdatedAt: null,
         docsStatus: 'pending',
         documentation: null,
-        embeddingStatus: 'pending',
+        embeddingStatus: RepoEmbeddingStatus.PENDING,
         lastPipelineError: null,
         path: targetPath,
         pipelineUpdatedAt: nowIso(),
@@ -266,6 +278,7 @@ export class RepoFetcherService {
         storageKey: snapshot.key,
         storageProvider: snapshot.provider
       }).where(eq(repos.id, repo.id))
+      await this.dbService.dbClient.delete(repoDocsFragments).where(eq(repoDocsFragments.repoId, repo.id))
 
       const filePaths = await this.getAllFiles(targetPath)
       const filesData = await Promise.all(
@@ -306,7 +319,7 @@ export class RepoFetcherService {
 
         await this.dbService.dbClient.update(repos).set({
           docsStatus: 'failed',
-          embeddingStatus: 'failed',
+          embeddingStatus: RepoEmbeddingStatus.FAILED,
           lastPipelineError: safeCauseMessage,
           pipelineUpdatedAt: nowIso()
         }).where(eq(repos.id, repo.id))
@@ -335,7 +348,7 @@ export class RepoFetcherService {
       await this.dbService.dbClient.update(repos).set({
         cloneStatus: 'failed',
         docsStatus: 'failed',
-        embeddingStatus: 'failed',
+        embeddingStatus: RepoEmbeddingStatus.FAILED,
         lastPipelineError: safeErrorMessage,
         pipelineUpdatedAt: nowIso()
       }).where(eq(repos.id, repo.id))

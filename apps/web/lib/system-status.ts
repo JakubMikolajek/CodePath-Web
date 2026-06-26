@@ -8,6 +8,23 @@ export interface SystemComponentStatus {
   latencyMs: number
   message: string
   name: string
+  queues?: RabbitQueueGroupStatus[]
+  status: SystemComponentStatusValue
+}
+
+export interface RabbitQueueLaneStatus {
+  consumers: number
+  messages: number
+  name: string
+  ready: number
+  unacknowledged: number
+}
+
+export interface RabbitQueueGroupStatus {
+  dlq: RabbitQueueLaneStatus
+  main: RabbitQueueLaneStatus
+  name: string
+  retry: RabbitQueueLaneStatus
   status: SystemComponentStatusValue
 }
 

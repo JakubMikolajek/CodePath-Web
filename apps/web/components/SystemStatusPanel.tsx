@@ -4,7 +4,12 @@ import { Button } from '@workspace/ui/components/button'
 import { Activity, CheckCircle2, Clock3, RefreshCw, TriangleAlert } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { getSystemStatus, type SystemComponentStatus, type SystemStatusResponse } from '@/lib/system-status'
+import {
+  getSystemStatus,
+  type RabbitQueueGroupStatus,
+  type SystemComponentStatus,
+  type SystemStatusResponse
+} from '@/lib/system-status'
 
 const STATUS_REFRESH_INTERVAL_MS = 10_000
 
@@ -30,6 +35,44 @@ function StatusIcon({ status }: Pick<SystemComponentStatus, 'status'>) {
   if (status === 'ok') return <CheckCircle2 className="size-4 text-emerald-300" />
   if (status === 'degraded') return <Clock3 className="size-4 text-amber-300" />
   return <TriangleAlert className="size-4 text-red-300" />
+}
+
+function QueueMetric({ label, value }: { label: string, value: number }) {
+  return (
+    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[11px] leading-none text-muted-foreground">
+      {label}: <span className="font-semibold text-white">{value}</span>
+    </span>
+  )
+}
+
+function RabbitQueueRow({ queue }: { queue: RabbitQueueGroupStatus }) {
+  const hasBlockedMain = queue.main.consumers < 1
+  const hasFailures = queue.retry.messages > 0 || queue.dlq.messages > 0
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-slate-950/25 px-3 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className={`h-2 w-2 shrink-0 rounded-full ${dotTone[queue.status]}`} />
+          <span className="truncate text-xs font-semibold text-white">{queue.name}</span>
+        </div>
+
+        {(hasBlockedMain || hasFailures) && (
+          <span className={`rounded-full border px-2 py-1 text-[10px] font-medium ${statusTone[queue.status]}`}>
+            {hasBlockedMain ? 'No consumer' : 'Needs review'}
+          </span>
+        )}
+      </div>
+
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        <QueueMetric label="cons" value={queue.main.consumers} />
+        <QueueMetric label="ready" value={queue.main.ready} />
+        <QueueMetric label="unack" value={queue.main.unacknowledged} />
+        <QueueMetric label="retry" value={queue.retry.messages} />
+        <QueueMetric label="dlq" value={queue.dlq.messages} />
+      </div>
+    </div>
+  )
 }
 
 export function SystemStatusPanel() {
@@ -126,6 +169,14 @@ export function SystemStatusPanel() {
                 <span>{component.latencyMs}ms</span>
                 <span className="capitalize">{component.status}</span>
               </div>
+
+              {component.queues && component.queues.length > 0 && (
+                <div className="mt-4 grid gap-2">
+                  {component.queues.map(queue => (
+                    <RabbitQueueRow key={queue.name} queue={queue} />
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>

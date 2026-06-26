@@ -41,16 +41,21 @@ function createPipelineDbMocks(repo: null | Record<string, unknown>, updatedRepo
   const updateWhereMock = jest.fn(() => ({ returning: returningMock }))
   const setMock = jest.fn(() => ({ where: updateWhereMock }))
   const updateMock = jest.fn(() => ({ set: setMock }))
+  const deleteWhereMock = jest.fn().mockResolvedValue(undefined)
+  const deleteMock = jest.fn(() => ({ where: deleteWhereMock }))
 
   return {
     dbService: {
       dbClient: {
+        delete: deleteMock,
         select: selectMock,
         update: updateMock
       }
     },
     mocks: {
       returningMock,
+      deleteMock,
+      deleteWhereMock,
       setMock,
       updateWhereMock
     }
@@ -191,6 +196,7 @@ describe('RepoService', () => {
       documentation: null,
       embeddingStatus: 'processing'
     }))
+    expect(mocks.deleteMock).toHaveBeenCalledTimes(1)
     expect(repoFetcherService.requeueIngestJob).toHaveBeenCalledWith(repo)
     expect(result).toEqual({
       cloneStatus: 'cloned',
