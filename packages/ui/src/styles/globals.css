@@ -51,9 +51,9 @@
   --glass-border: oklch(0.64 0.18 258 / 0.34);
   --glow-blue: 0 0 28px oklch(0.62 0.24 258 / 0.28);
   --glow-violet: 0 0 34px oklch(0.65 0.27 292 / 0.34);
-  --font-display: "Space Grotesk", "Satoshi", "Manrope", sans-serif;
-  --font-body: "Manrope", "Satoshi", "Aptos", sans-serif;
-  --font-mono: "JetBrains Mono", "SFMono-Regular", monospace;
+  --font-display: "Geist", "Space Grotesk", sans-serif;
+  --font-body: "Geist", "Manrope", sans-serif;
+  --font-mono: "Geist Mono", "JetBrains Mono", monospace;
 }
 
 .light {
@@ -275,6 +275,54 @@
   .app-aurora-shell::after {
     opacity: 0.46;
     mask-image: linear-gradient(to bottom, black, transparent 84%);
+  }
+
+  .app-aurora {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .app-aurora-blob {
+    position: absolute;
+    border-radius: 999px;
+    filter: blur(110px);
+    opacity: 0.55;
+    will-change: transform;
+  }
+
+  .app-aurora-blob-1 {
+    top: -8%;
+    left: -4%;
+    width: 48rem;
+    height: 38rem;
+    background: radial-gradient(circle, rgba(90, 120, 255, 0.38) 0%, transparent 68%);
+  }
+
+  .app-aurora-blob-2 {
+    top: -6%;
+    right: -6%;
+    width: 44rem;
+    height: 44rem;
+    background: radial-gradient(circle, rgba(160, 90, 255, 0.30) 0%, transparent 70%);
+  }
+
+  .app-aurora-blob-3 {
+    bottom: -10%;
+    left: 20%;
+    width: 56rem;
+    height: 34rem;
+    background: radial-gradient(circle, rgba(80, 110, 255, 0.25) 0%, transparent 72%);
+  }
+
+  .app-aurora-blob-4 {
+    right: 14%;
+    bottom: 10%;
+    width: 36rem;
+    height: 30rem;
+    background: radial-gradient(circle, rgba(140, 100, 255, 0.20) 0%, transparent 68%);
   }
 
   .aurora-login {

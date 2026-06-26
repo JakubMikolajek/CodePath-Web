@@ -4,7 +4,6 @@ import { SidebarInset, SidebarProvider } from '@workspace/ui/components/sidebar'
 import type { ReactNode } from 'react'
 
 import AppSidebar from '@/components/AppSideBar'
-import { GsapAurora } from '@/components/GsapAurora'
 import { getCurrentUser } from '@/lib/auth/server'
 import { getRepos } from '@/lib/repos/server'
 
@@ -19,7 +18,12 @@ export default async function DashboardLayout({ children }: Readonly<DashboardLa
   return (
     <SidebarProvider defaultOpen>
       <div className="aurora-shell app-aurora-shell flex min-h-svh w-full">
-        <GsapAurora className="opacity-70" />
+        <div aria-hidden="true" className="app-aurora">
+          <span className="app-aurora-blob app-aurora-blob-1" />
+          <span className="app-aurora-blob app-aurora-blob-2" />
+          <span className="app-aurora-blob app-aurora-blob-3" />
+          <span className="app-aurora-blob app-aurora-blob-4" />
+        </div>
 
         <AppSidebar fetchedRepos={repos} me={me} />
 
