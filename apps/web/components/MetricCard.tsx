@@ -16,7 +16,7 @@ export function MetricCard({ detail, icon: Icon, label, value }: MetricCardProps
           <p className="mt-3 text-3xl font-bold tracking-[-0.06em] text-white">{value}</p>
           <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
         </div>
-        <div className="grid size-10 place-items-center rounded-xl border border-primary/30 bg-primary/10 text-primary shadow-[0_0_22px_oklch(0.62_0.24_270/0.22)]">
+        <div className="grid size-10 place-items-center rounded-xl border border-primary/30 bg-primary/10 text-primary">
           <Icon className="size-5" />
         </div>
       </div>
