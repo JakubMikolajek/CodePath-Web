@@ -206,6 +206,50 @@
     }
   }
 
+  @keyframes loginAuroraDrift1 {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+
+    50% {
+      transform: translate3d(10%, -7%, 0) scale(1.12);
+    }
+  }
+
+  @keyframes loginAuroraDrift2 {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+    }
+
+    50% {
+      transform: translate3d(-12%, 8%, 0) rotate(7deg) scale(1.08);
+    }
+  }
+
+  @keyframes loginAuroraDrift3 {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+
+    50% {
+      transform: translate3d(8%, 10%, 0) scale(1.15);
+    }
+  }
+
+  @keyframes loginAuroraDrift4 {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+    }
+
+    50% {
+      transform: translate3d(-6%, -10%, 0) rotate(-6deg) scale(1.1);
+    }
+  }
+
   .aurora-shell {
     position: relative;
     isolation: isolate;
@@ -234,16 +278,7 @@
   }
 
   .aurora-login {
-    background:
-      radial-gradient(circle at 50% 42%, oklch(0.22 0.09 254 / 0.28), transparent 32rem),
-      radial-gradient(circle at 18% 46%, oklch(0.42 0.18 282 / 0.2), transparent 34rem),
-      radial-gradient(circle at 84% 48%, oklch(0.4 0.17 226 / 0.18), transparent 36rem),
-      linear-gradient(180deg, #020718 0%, #06142d 48%, #020617 100%);
-  }
-
-  .aurora-login::after {
-    opacity: 0.06;
-    mask-image: radial-gradient(ellipse at center, black 0%, black 38%, transparent 74%);
+    background: radial-gradient(140% 120% at 50% -10%, #10141c 0%, #0a0c11 55%, #07080b 100%);
   }
 
   .login-artboard {
@@ -275,6 +310,65 @@
     background-image: radial-gradient(oklch(0.85 0.05 260 / 0.08) 1px, transparent 1px);
     background-size: 22px 22px;
     mask-image: linear-gradient(to bottom, black, transparent 78%);
+  }
+
+  .aurora-login::before,
+  .aurora-login::after {
+    content: none;
+    animation: none;
+    background: none;
+  }
+
+  .login-aurora {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .login-aurora-blob {
+    position: absolute;
+    border-radius: 999px;
+    filter: blur(92px);
+    opacity: 0.78;
+    will-change: transform;
+  }
+
+  .login-aurora-blob-1 {
+    top: -9rem;
+    left: -11rem;
+    width: 32rem;
+    height: 26rem;
+    background: radial-gradient(circle, rgba(112, 136, 255, 0.48) 0%, transparent 68%);
+    animation: loginAuroraDrift1 32s ease-in-out infinite;
+  }
+
+  .login-aurora-blob-2 {
+    top: -10rem;
+    right: -9rem;
+    width: 30rem;
+    height: 30rem;
+    background: radial-gradient(circle, rgba(176, 124, 255, 0.46) 0%, transparent 70%);
+    animation: loginAuroraDrift2 38s ease-in-out infinite;
+  }
+
+  .login-aurora-blob-3 {
+    bottom: -9rem;
+    left: 18%;
+    width: 36rem;
+    height: 24rem;
+    background: radial-gradient(circle, rgba(112, 136, 255, 0.4) 0%, transparent 72%);
+    animation: loginAuroraDrift3 34s ease-in-out infinite;
+  }
+
+  .login-aurora-blob-4 {
+    right: 18%;
+    bottom: -7rem;
+    width: 24rem;
+    height: 20rem;
+    background: radial-gradient(circle, rgba(112, 136, 255, 0.28) 0%, transparent 70%);
+    animation: loginAuroraDrift4 28s ease-in-out infinite;
   }
 
   .glass-panel {
@@ -388,7 +482,8 @@
 @media (prefers-reduced-motion: reduce) {
   .aurora-shell::before,
   .aurora-blob,
-  .aurora-blob-reverse {
+  .aurora-blob-reverse,
+  .login-aurora-blob {
     animation: none;
   }
 }
