@@ -278,7 +278,9 @@
   }
 
   .aurora-login {
-    background: radial-gradient(140% 120% at 50% -10%, #10141c 0%, #0a0c11 55%, #07080b 100%);
+    background:
+      radial-gradient(ellipse 80% 50% at 50% 0%, oklch(0.28 0.12 270 / 0.5), transparent 70%),
+      linear-gradient(180deg, #06091a 0%, #080c1e 48%, #050810 100%);
   }
 
   .login-artboard {
@@ -330,44 +332,44 @@
   .login-aurora-blob {
     position: absolute;
     border-radius: 999px;
-    filter: blur(92px);
-    opacity: 0.78;
+    filter: blur(72px);
+    opacity: 1;
     will-change: transform;
   }
 
   .login-aurora-blob-1 {
-    top: 8%;
-    left: 7%;
-    width: 38rem;
-    height: 32rem;
-    background: radial-gradient(circle, rgba(112, 136, 255, 0.48) 0%, transparent 68%);
+    top: 4%;
+    left: 4%;
+    width: 44rem;
+    height: 36rem;
+    background: radial-gradient(circle, rgba(90, 120, 255, 0.72) 0%, rgba(70, 90, 220, 0.28) 55%, transparent 72%);
     animation: loginAuroraDrift1 32s ease-in-out infinite;
   }
 
   .login-aurora-blob-2 {
-    top: 6%;
-    right: 2%;
-    width: 36rem;
-    height: 36rem;
-    background: radial-gradient(circle, rgba(176, 124, 255, 0.46) 0%, transparent 70%);
+    top: 2%;
+    right: -2%;
+    width: 40rem;
+    height: 40rem;
+    background: radial-gradient(circle, rgba(160, 90, 255, 0.65) 0%, rgba(120, 60, 220, 0.22) 55%, transparent 72%);
     animation: loginAuroraDrift2 38s ease-in-out infinite;
   }
 
   .login-aurora-blob-3 {
-    bottom: 5%;
-    left: 30%;
-    width: 42rem;
-    height: 28rem;
-    background: radial-gradient(circle, rgba(112, 136, 255, 0.4) 0%, transparent 72%);
+    bottom: 2%;
+    left: 26%;
+    width: 48rem;
+    height: 32rem;
+    background: radial-gradient(circle, rgba(80, 110, 255, 0.58) 0%, rgba(60, 80, 200, 0.2) 55%, transparent 72%);
     animation: loginAuroraDrift3 34s ease-in-out infinite;
   }
 
   .login-aurora-blob-4 {
-    right: 24%;
-    bottom: 18%;
-    width: 28rem;
-    height: 24rem;
-    background: radial-gradient(circle, rgba(112, 136, 255, 0.28) 0%, transparent 70%);
+    right: 20%;
+    bottom: 14%;
+    width: 32rem;
+    height: 28rem;
+    background: radial-gradient(circle, rgba(140, 100, 255, 0.42) 0%, transparent 68%);
     animation: loginAuroraDrift4 28s ease-in-out infinite;
   }
 
