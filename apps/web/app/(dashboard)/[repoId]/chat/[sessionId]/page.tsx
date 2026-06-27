@@ -79,7 +79,7 @@ export default function ChatPage() {
   }, [hasValidRouteParams, repoId, sessionId])
 
   return (
-    <div className="flex min-h-[calc(100svh-4rem)] flex-col gap-6">
+    <div className="flex h-[calc(100svh-70px)] flex-col gap-[18px]">
       <PageHeader
         description="Repository-aware assistant for DTOs, endpoints, documentation and code navigation context."
         eyebrow={`Repo ${Number.isFinite(repoId) ? repoId : 'unknown'}`}
@@ -88,17 +88,17 @@ export default function ChatPage() {
 
       <section
         aria-label="Chat conversation"
-        className="glass-panel-strong flex min-h-155 flex-1 flex-col overflow-hidden rounded-4xl"
+        className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(20,27,40,0.4),rgba(13,17,26,0.25))]"
       >
-        <div className="flex-1 space-y-6 overflow-y-auto p-4 md:p-6">
+        <div className="flex-1 space-y-[18px] overflow-y-auto p-[22px]">
           {sessionDetails.length === 0 && !isLoading && (
-            <Card className="mx-auto mt-12 max-w-2xl border-primary/20 bg-primary/5 py-0">
+            <Card className="mx-auto mt-12 max-w-2xl rounded-[14px] border-primary/25 bg-primary/10 py-0">
               <CardContent className="p-8 text-center">
-                <div className="mx-auto grid size-14 place-items-center rounded-2xl border border-primary/30 bg-primary/15 text-primary shadow-[0_0_28px_oklch(0.62_0.24_270/0.3)]">
+                <div className="mx-auto grid size-14 place-items-center rounded-[14px] border border-white/10 bg-white/[0.02] text-primary">
                   <Sparkles className="size-6" />
                 </div>
 
-                <h2 className="mt-5 text-2xl font-semibold tracking-[-0.04em] text-white">Ask about this repository</h2>
+                <h2 className="mt-5 text-base font-semibold tracking-normal text-foreground">Ask about this repository</h2>
 
                 <p className="mt-2 text-sm text-muted-foreground">
                   Start with a concrete question, for example about DTO shape, endpoint behaviour or module responsibilities.
@@ -111,34 +111,32 @@ export default function ChatPage() {
             <div className="space-y-4" key={detail.id}>
               {detail.role === 'user' ? (
                 <div className="flex justify-end">
-                  <Card className="max-w-[min(760px,88%)] border-cyan-300/25 bg-cyan-400/10 py-0 shadow-[0_0_32px_oklch(0.74_0.17_220/0.12)]">
-                    <CardContent className="p-4 md:p-5">
-                      <div className="mb-3 flex items-center gap-2 text-sm font-medium text-cyan-100">
-                        <span className="grid size-8 place-items-center rounded-full bg-cyan-300/15 text-cyan-200">
-                          <User className="size-4" />
-                        </span>
+                  <Card className="max-w-[520px] overflow-hidden rounded-[14px] border-primary/30 bg-primary/12 py-0">
+                    <CardContent className="p-0">
+                      <div className="flex items-center gap-2 border-b border-white/[0.06] px-[14px] py-[9px] text-[12.5px] font-semibold text-foreground">
+                        <User className="size-[13px] text-primary" />
                         Ty
                       </div>
 
-                      <p className="text-sm leading-relaxed text-foreground/90 md:text-base">{detail.content}</p>
+                      <p className="px-[14px] py-3 text-[13px] leading-relaxed text-foreground">{detail.content}</p>
                     </CardContent>
                   </Card>
                 </div>
               ) : (
                 <div className="flex justify-start">
-                  <Card className="max-w-[min(920px,94%)] border-primary/35 bg-primary/10 py-0 shadow-[0_0_38px_oklch(0.62_0.24_270/0.16)]">
-                    <CardContent className="p-4 md:p-5">
-                      <div className="mb-4 flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 text-sm font-medium text-primary-foreground">
-                          <span className="grid size-8 place-items-center rounded-full bg-primary/20 text-primary">
-                            <Bot className="size-4" />
+                  <Card className="max-w-[680px] overflow-hidden rounded-[14px] border-secondary/30 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--nurt-accent2)_12%,transparent),color-mix(in_oklab,var(--nurt-accent)_5%,transparent))] py-0">
+                    <CardContent className="p-0">
+                      <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-[15px] py-[11px]">
+                        <div className="flex items-center gap-[9px] text-[13px] font-semibold text-foreground">
+                          <span className="grid size-6 place-items-center rounded-[7px] bg-[linear-gradient(135deg,var(--nurt-accent),var(--nurt-accent2))] text-[var(--nurt-ink)]">
+                            <Bot className="size-[13px]" />
                           </span>
                           Asystent AI
                         </div>
 
                         <Button
                           aria-label="Skopiuj odpowiedź"
-                          className="size-9"
+                          className="size-7 text-[var(--nurt-t3)] hover:text-foreground"
                           onClick={() => copyToClipboard(detail.content, detail.id)}
                           size="icon"
                           variant="ghost"
@@ -151,7 +149,7 @@ export default function ChatPage() {
                         </Button>
                       </div>
 
-                      <article className="prose prose-sm max-w-none prose-pre:border prose-pre:border-white/10 prose-pre:bg-slate-950/80 prose-pre:text-gray-100 dark:prose-invert">
+                      <article className="prose prose-sm max-w-none px-4 py-[14px] text-[13px] leading-[1.6] prose-p:my-2 prose-strong:text-foreground prose-code:rounded prose-code:border-0 prose-code:bg-white/[0.06] prose-code:px-1.5 prose-code:py-0.5 prose-code:font-mono prose-code:text-[11.5px] prose-code:text-foreground prose-pre:border prose-pre:border-white/10 prose-pre:bg-[var(--nurt-bg0)] prose-pre:text-gray-100 dark:prose-invert">
                         <Markdown
                           components={{
                             blockquote: ({ children }) => (
@@ -212,7 +210,7 @@ export default function ChatPage() {
 
           {isLoading && (
             <div className="flex justify-start">
-              <Card className="max-w-[min(680px,92%)] border-primary/30 bg-primary/10 py-0">
+              <Card className="max-w-[680px] rounded-[14px] border-secondary/30 bg-secondary/10 py-0">
                 <CardContent className="p-5">
                   <div className="mb-3 flex items-center gap-2 text-sm font-medium">
                     <span className="grid size-8 place-items-center rounded-full bg-primary/20 text-primary">
@@ -237,12 +235,12 @@ export default function ChatPage() {
           )}
         </div>
 
-        <div className="border-t border-white/10 bg-slate-950/55 p-4 backdrop-blur-xl">
-          <form className="glass-panel flex items-end gap-3 rounded-2xl p-2" onSubmit={handleSubmit}>
+        <div className="border-t border-white/[0.06] p-[14px_16px_16px]">
+          <form className="flex items-center gap-[10px] rounded-[13px] border border-white/10 bg-[var(--nurt-bg0)] py-1.5 pl-4 pr-1.5" onSubmit={handleSubmit}>
             <div className="flex-1">
               <Input
                 aria-label="Treść wiadomości"
-                className="min-h-12 border-transparent bg-transparent shadow-none"
+                className="h-[38px] border-transparent bg-transparent px-0 text-[13.5px] shadow-none focus-visible:border-transparent focus-visible:ring-0"
                 disabled={isLoading || !hasValidRouteParams}
                 onChange={e => setInputValue(e.target.value)}
                 onKeyDown={async e => {
@@ -258,7 +256,7 @@ export default function ChatPage() {
 
             <Button
               aria-label="Wyślij wiadomość"
-              className="size-12"
+              className="size-[38px] rounded-[10px] border-primary/35 bg-primary/15 text-primary hover:bg-primary/20"
               disabled={isLoading || !inputValue.trim() || !hasValidRouteParams}
               size="icon"
               type="submit"
@@ -268,7 +266,7 @@ export default function ChatPage() {
             </Button>
           </form>
 
-          <p className="mt-3 text-center text-xs text-muted-foreground">
+          <p className="mt-[10px] text-center font-mono text-[10.5px] text-[var(--nurt-t3)]">
             {hasValidRouteParams
               ? 'Enter wysyła wiadomość, Shift+Enter dodaje nową linię.'
               : 'Nieprawidłowe parametry sesji czatu.'}

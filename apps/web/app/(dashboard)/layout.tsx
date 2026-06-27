@@ -29,7 +29,7 @@ export default async function DashboardLayout({ children }: Readonly<DashboardLa
 
         <SidebarInset className="min-w-0 bg-transparent">
           <main className="min-h-svh w-full">
-            <div className="min-h-svh w-full bg-background/48 p-5 backdrop-blur-2xl md:p-8">
+            <div className="min-h-svh w-full bg-transparent p-[30px_34px_40px]">
               {children}
             </div>
           </main>

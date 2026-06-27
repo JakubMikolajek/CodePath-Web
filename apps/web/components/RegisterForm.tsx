@@ -17,20 +17,20 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
   }
 
   return (
-    <div className={cn('w-full px-4 py-9 md:px-14 md:py-12')}>
+    <div className={cn('w-full px-[34px] py-[34px] pb-[30px]')}>
       <div className="mb-8 flex flex-col items-center text-center">
-        <BrandMark className="justify-center text-2xl md:text-3xl" />
+        <BrandMark className="justify-center text-[18px]" />
 
-        <h1 className="mt-10 text-4xl font-bold text-white md:text-[2.4rem]">
+        <h1 className="mt-[24px] font-mono text-[30px] font-bold leading-tight text-[var(--nurt-title)]">
           Create account
         </h1>
       </div>
 
       <div className="space-y-6">
-        <div className="rounded-2xl border border-primary/25 bg-primary/10 px-4 py-4 text-sm text-primary-foreground">
+        <div className="rounded-[11px] border border-white/[0.06] bg-white/[0.025] px-[13px] py-3">
           <div className="flex items-start gap-3">
-            <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" />
-            <p className="leading-6 text-white/86">
+            <ShieldCheck className="mt-px size-[15px] shrink-0 text-primary" />
+            <p className="text-xs leading-[1.5] text-muted-foreground">
               Account creation is delegated to Keycloak. Use the registration
               option on the identity provider screen.
             </p>
@@ -38,7 +38,7 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
         </div>
 
         <Button
-          className="h-14 w-full rounded-2xl text-base"
+          className="h-auto w-full rounded-[12px] border-primary/35 bg-primary/15 p-[13px] text-sm font-semibold text-primary hover:bg-primary/20 hover:text-primary"
           onClick={startOidcRegistration}
           type="button"
           variant="glow"
@@ -48,7 +48,7 @@ export default function RegisterForm({ handleShowRegisterForm }: RegisterFormPro
         </Button>
 
         <Button
-          className="h-14 w-full rounded-2xl text-base"
+          className="h-auto w-full rounded-[12px] p-[13px] text-sm"
           onClick={() => handleShowRegisterForm(false)}
           type="button"
           variant="outline"

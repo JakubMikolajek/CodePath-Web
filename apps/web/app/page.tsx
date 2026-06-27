@@ -17,9 +17,9 @@ export default function HomePage() {
         <span className="login-aurora-blob login-aurora-blob-4" />
       </div>
 
-      <div className="login-artboard relative z-10 flex items-center justify-center px-5 py-8 md:px-10">
-        <div className="w-full max-w-162">
-          {showRegisterForm ? <RegisterForm handleShowRegisterForm={setShowRegisterForm}/> : <LoginForm handleShowRegisterForm={setShowRegisterForm}/>}
+      <div className="relative z-10 flex w-full items-center justify-center px-5 py-8 md:px-10">
+        <div className="w-full max-w-[430px]">
+          {showRegisterForm ? <RegisterForm handleShowRegisterForm={setShowRegisterForm} /> : <LoginForm handleShowRegisterForm={setShowRegisterForm} />}
         </div>
       </div>
     </main>

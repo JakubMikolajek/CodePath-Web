@@ -80,20 +80,16 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
     <Dialog onOpenChange={handleDialogChange} open={dialogOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
 
-      <DialogContent className="glass-panel-strong overflow-hidden rounded-4xl border-primary/30 p-0 sm:max-w-2xl">
-        <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-20 size-56 rounded-full bg-primary/20 blur-3xl" />
-
-        <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 -left-24 size-64 rounded-full bg-cyan-400/10 blur-3xl" />
-
+      <DialogContent className="overflow-hidden rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,29,44,0.96),rgba(13,17,26,0.98))] p-0 sm:max-w-[560px]">
         <div className="relative p-6 md:p-7">
           <DialogHeader>
-            <div className="mb-2 grid size-12 place-items-center rounded-2xl border border-primary/35 bg-primary/15 text-primary shadow-[0_0_28px_oklch(0.62_0.24_270/0.28)]">
-              <Plus className="size-5" />
+            <div className="mb-3 grid size-10 place-items-center rounded-[11px] bg-[linear-gradient(135deg,var(--nurt-accent),var(--nurt-accent2))] text-[var(--nurt-ink)]">
+              <Plus className="size-5" strokeWidth={2.2} />
             </div>
 
-            <DialogTitle className="text-2xl tracking-[-0.05em] text-white">Add New Repository</DialogTitle>
+            <DialogTitle className="font-body text-xl font-bold tracking-normal text-[var(--nurt-title)]">Add New Repository</DialogTitle>
 
-            <DialogDescription className="text-muted-foreground">
+            <DialogDescription className="text-[12.5px] text-muted-foreground">
               Add a new repository to your workspace. Fill in the repository details below.
             </DialogDescription>
           </DialogHeader>
@@ -109,7 +105,7 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
                       <FormLabel>Repository Name</FormLabel>
 
                       <FormControl>
-                        <Input placeholder="my-awesome-repo" {...field} />
+                        <Input className="border-primary/40 font-mono text-xs" placeholder="my-awesome-repo" {...field} />
                       </FormControl>
 
                       <FormMessage />
@@ -123,12 +119,12 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="flex items-center gap-2">
-                        <GitBranch className="size-4 text-cyan-300" />
+                        <GitBranch className="size-4 text-muted-foreground" />
                         Branch (optional)
                       </FormLabel>
 
                       <FormControl>
-                        <Input placeholder="develop / main / master" {...field} />
+                        <Input className="font-mono text-xs" placeholder="develop / main / master" {...field} />
                       </FormControl>
 
                       <FormMessage />
@@ -145,7 +141,7 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
                     <FormLabel>Git URL</FormLabel>
 
                     <FormControl>
-                      <Input placeholder="https://github.com/organization/repository.git" {...field} />
+                        <Input className="font-mono text-xs" placeholder="https://github.com/organization/repository.git" {...field} />
                     </FormControl>
 
                     <FormMessage />
@@ -162,7 +158,7 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
 
                     <FormControl>
                       <select
-                        className="flex h-11 w-full rounded-xl border border-input bg-input/70 px-4 py-2 text-sm text-foreground shadow-[inset_0_1px_0_oklch(1_0_0/0.05)] outline-none transition-[border-color,box-shadow,background,color] focus-visible:border-ring focus-visible:bg-input focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                        className="flex h-11 w-full rounded-[9px] border border-white/10 bg-input px-4 py-2 text-sm text-foreground outline-none transition-[border-color,box-shadow,background,color] focus-visible:border-primary/40 focus-visible:ring-[2px] focus-visible:ring-primary/20"
                         {...field}
                       >
                         <option value="https_token">HTTPS Token (recommended)</option>
@@ -190,7 +186,7 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
                       </FormLabel>
 
                       <FormControl>
-                        <Input placeholder="oauth2 / x-access-token / your-user" {...field} />
+                        <Input className="font-mono text-xs" placeholder="oauth2 / x-access-token / your-user" {...field} />
                       </FormControl>
 
                       <FormMessage />
@@ -221,11 +217,12 @@ export default function CreateRepoDialog({ children }: CreateRepoDialogProps) {
               )}
 
               <DialogFooter className="border-t border-white/10 pt-5">
-                <Button disabled={isSubmitting} onClick={() => setDialogOpen(false)} type="button" variant="outline">
+                <Button className="rounded-[9px]" disabled={isSubmitting} onClick={() => setDialogOpen(false)} type="button" variant="outline">
                   Cancel
                 </Button>
 
-                <Button disabled={isSubmitting} type="submit" variant="glow">
+                <Button className="rounded-[9px] border-primary/34 bg-primary/14 text-primary hover:bg-primary/20 hover:text-primary" disabled={isSubmitting} type="submit" variant="outline">
+                  <Plus className="size-4" />
                   {isSubmitting ? 'Adding...' : 'Add Repository'}
                 </Button>
               </DialogFooter>
