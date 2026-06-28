@@ -1,15 +1,11 @@
-'use client'
+import LoginPageContent from '@/components/LoginPageContent'
 
-import { useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+interface HomePageProps {
+  searchParams: Promise<{ callbackUrl?: string }>
+}
 
-import LoginForm from '@/components/LoginForm'
-import RegisterForm from '@/components/RegisterForm'
-
-export default function HomePage() {
-  const [showRegisterForm, setShowRegisterForm] = useState<boolean>(false)
-  const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get('callbackUrl') ?? '/dashboard'
+export default async function HomePage({ searchParams }: HomePageProps) {
+  const { callbackUrl = '/dashboard' } = await searchParams
 
   return (
     <main className="aurora-shell aurora-login flex min-h-svh w-full items-center justify-center overflow-hidden">
@@ -22,7 +18,7 @@ export default function HomePage() {
 
       <div className="relative z-10 flex w-full items-center justify-center px-5 py-8 md:px-10">
         <div className="w-full max-w-[430px]">
-          {showRegisterForm ? <RegisterForm handleShowRegisterForm={setShowRegisterForm} /> : <LoginForm callbackUrl={callbackUrl} handleShowRegisterForm={setShowRegisterForm} />}
+          <LoginPageContent callbackUrl={callbackUrl} />
         </div>
       </div>
     </main>
