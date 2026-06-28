@@ -8,12 +8,13 @@ import { signIn } from 'next-auth/react'
 import { BrandMark } from '@/components/BrandMark'
 
 interface LoginFormProps {
+  callbackUrl?: string
   handleShowRegisterForm: (value: boolean) => void
 }
 
-export default function LoginForm({ handleShowRegisterForm }: LoginFormProps) {
+export default function LoginForm({ callbackUrl = '/dashboard', handleShowRegisterForm }: LoginFormProps) {
   const startOidcLogin = () => {
-    void signIn('keycloak', { callbackUrl: '/dashboard' })
+    void signIn('keycloak', { callbackUrl })
   }
 
   return (

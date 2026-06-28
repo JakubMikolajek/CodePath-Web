@@ -99,11 +99,26 @@ function parseCookieHeader(cookieHeader: string): Record<string, string> {
   }, {})
 }
 
+const refreshInFlight = new Map<string, Promise<JWT>>()
+
 async function refreshAccessToken(token: JWT): Promise<JWT> {
   const refreshToken = typeof token.refreshToken === 'string' ? token.refreshToken : null
 
   if (!refreshToken) return { ...token, error: 'RefreshAccessTokenError' }
 
+  const inflight = refreshInFlight.get(refreshToken)
+
+  if (inflight) return inflight
+
+  const promise = doRefreshAccessToken(token, refreshToken).finally(() => {
+    refreshInFlight.delete(refreshToken)
+  })
+
+  refreshInFlight.set(refreshToken, promise)
+  return promise
+}
+
+async function doRefreshAccessToken(token: JWT, refreshToken: string): Promise<JWT> {
   try {
     const response = await fetch(`${normalizedKeycloakIssuer}/protocol/openid-connect/token`, {
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -133,7 +148,7 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
       idToken: refreshed.id_token ?? token.idToken,
       refreshToken: refreshed.refresh_token ?? refreshToken
     }
-  } catch (error) {
+  } catch {
     return { ...token, error: 'RefreshAccessTokenError' }
   }
 }
