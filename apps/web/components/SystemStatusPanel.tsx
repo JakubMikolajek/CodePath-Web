@@ -20,9 +20,9 @@ const statusLabel = {
 } as const
 
 const statusTone = {
-  degraded: 'border-amber-300/25 bg-amber-300/10 text-amber-100',
-  down: 'border-red-400/25 bg-red-400/10 text-red-100',
-  ok: 'border-emerald-300/25 bg-emerald-300/10 text-emerald-100'
+  degraded: 'border-amber-300/30 bg-amber-300/15 text-amber-100',
+  down: 'border-red-400/30 bg-red-400/15 text-red-200',
+  ok: 'border-emerald-300/30 bg-emerald-300/15 text-emerald-100'
 } as const
 
 const dotTone = {
@@ -39,7 +39,7 @@ function StatusIcon({ status }: Pick<SystemComponentStatus, 'status'>) {
 
 function QueueMetric({ label, value }: { label: string, value: number }) {
   return (
-    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[11px] leading-none text-muted-foreground">
+    <span className="rounded-[7px] border border-white/10 bg-white/[0.05] px-2 py-1 text-[11px] leading-none text-muted-foreground">
       {label}: <span className="font-semibold text-white">{value}</span>
     </span>
   )
@@ -50,7 +50,7 @@ function RabbitQueueRow({ queue }: { queue: RabbitQueueGroupStatus }) {
   const hasFailures = queue.retry.messages > 0 || queue.dlq.messages > 0
 
   return (
-    <div className="rounded-xl border border-white/10 bg-slate-950/25 px-3 py-2">
+    <div className="rounded-[11px] border border-white/[0.06] bg-white/[0.015] px-3 py-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <span className={`h-2 w-2 shrink-0 rounded-full ${dotTone[queue.status]}`} />
@@ -58,7 +58,7 @@ function RabbitQueueRow({ queue }: { queue: RabbitQueueGroupStatus }) {
         </div>
 
         {(hasBlockedMain || hasFailures) && (
-          <span className={`rounded-full border px-2 py-1 text-[10px] font-medium ${statusTone[queue.status]}`}>
+          <span className={`rounded-[7px] border px-2 py-1 text-[10px] font-medium ${statusTone[queue.status]}`}>
             {hasBlockedMain ? 'No consumer' : 'Needs review'}
           </span>
         )}
@@ -109,41 +109,41 @@ export function SystemStatusPanel() {
   }, [status?.components])
 
   return (
-    <section aria-label="Service status" className="glass-panel rounded-3xl p-6">
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+    <section aria-label="Service status" className="nurt-panel p-[18px_20px]">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <Activity className="size-5 text-primary" />
-            <h2 className="text-xl font-bold text-white">Service status</h2>
+            <Activity className="size-4 text-secondary" />
+            <h2 className="text-[14.5px] font-semibold text-foreground">Service status</h2>
           </div>
 
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-px text-[11px] text-[var(--nurt-t3)]">
             {status ? `Last check ${new Date(status.checkedAt).toLocaleTimeString()}` : 'Checking runtime dependencies'}
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           {status && (
-            <span className={`rounded-full border px-3 py-1 text-xs font-medium ${statusTone[status.status]}`}>
+            <span className={`rounded-[7px] border px-[9px] py-[3px] font-mono text-[10.5px] ${statusTone[status.status]}`}>
               {statusLabel[status.status]}
             </span>
           )}
 
-          <Button disabled={isLoading} onClick={loadStatus} size="sm" type="button" variant="glass">
-            <RefreshCw className={`size-4 ${isLoading ? 'animate-spin' : ''}`} />
+          <Button className="rounded-[8px] text-xs" disabled={isLoading} onClick={loadStatus} size="sm" type="button" variant="glass">
+            <RefreshCw className={`size-3 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
       </div>
 
       {error && (
-        <div className="rounded-2xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-sm text-red-100" role="alert">
+        <div className="rounded-[11px] border border-red-400/25 bg-red-400/10 px-4 py-3 text-sm text-red-100" role="alert">
           {error}
         </div>
       )}
 
       {!error && sortedComponents.length === 0 && (
-        <div className="rounded-2xl border border-border/35 bg-background/25 px-4 py-4 text-sm text-muted-foreground" role="status">
+        <div className="rounded-[11px] border border-white/[0.06] bg-white/[0.015] px-4 py-4 text-sm text-muted-foreground" role="status">
           Loading service checks...
         </div>
       )}
@@ -151,21 +151,21 @@ export function SystemStatusPanel() {
       {!error && sortedComponents.length > 0 && (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {sortedComponents.map(component => (
-            <div className="rounded-2xl border border-border/35 bg-background/25 px-4 py-4" key={component.name}>
+            <div className="rounded-[11px] border border-white/[0.06] bg-white/[0.015] px-[14px] py-[13px]" key={component.name}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${dotTone[component.status]}`} />
-                    <p className="font-semibold text-white">{component.name}</p>
+                    <span className={`size-[7px] shrink-0 rounded-full ${dotTone[component.status]}`} />
+                    <p className="text-[13px] font-semibold text-foreground">{component.name}</p>
                   </div>
 
-                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">{component.message}</p>
+                  <p className="mt-[7px] line-clamp-2 min-h-[30px] text-[11px] leading-[1.4] text-[var(--nurt-t3)]">{component.message}</p>
                 </div>
 
                 <StatusIcon status={component.status} />
               </div>
 
-              <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+              <div className="mt-[7px] flex items-center justify-between gap-3 font-mono text-[10.5px] text-[var(--nurt-t3)]">
                 <span>{component.latencyMs}ms</span>
                 <span className="capitalize">{component.status}</span>
               </div>

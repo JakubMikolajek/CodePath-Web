@@ -37,10 +37,10 @@ export default function Page() {
   }, [graphId, graphs])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-[18px]">
       <PageHeader
         actions={(
-          <Button asChild variant="glass">
+          <Button asChild className="rounded-[9px] px-[13px] py-2 text-[12.5px]" variant="glass">
             <Link href={`/${repoId}/graphs`}>
               <ArrowLeft className="size-4" />
               Back to graph explorer
@@ -53,26 +53,26 @@ export default function Page() {
       />
 
       {loading && (
-        <div className="glass-panel rounded-3xl p-6 text-sm text-muted-foreground" role="status">
+        <div className="nurt-panel p-6 text-sm text-muted-foreground" role="status">
           Loading graphs...
         </div>
       )}
 
       {!loading && !activeGraph && (
-        <div className="glass-panel rounded-3xl p-8 text-center">
-          <div className="mx-auto grid size-14 place-items-center rounded-2xl border border-amber-300/30 bg-amber-300/10 text-amber-200">
+        <div className="nurt-panel p-8 text-center">
+          <div className="mx-auto grid size-14 place-items-center rounded-[14px] border border-amber-300/30 bg-amber-300/10 text-amber-200">
             <TriangleAlert className="size-6" />
           </div>
 
-          <h2 className="mt-4 text-xl font-semibold tracking-[-0.04em] text-white">Graph not found</h2>
+          <h2 className="mt-4 text-xl font-semibold tracking-normal text-foreground">Graph not found</h2>
 
           <p className="mt-2 text-sm text-muted-foreground">Selected repository does not expose this legacy per-file graph.</p>
         </div>
       )}
 
       {activeGraph && (
-        <section aria-label="Legacy Mermaid graph" className="glass-panel-strong rounded-4xl p-4">
-          <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
+        <section aria-label="Legacy Mermaid graph" className="nurt-panel p-4">
+          <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
             <GitFork className="size-4 text-cyan-300" />
             Mermaid graph preview
           </div>

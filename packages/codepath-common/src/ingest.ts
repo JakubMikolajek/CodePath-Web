@@ -1,5 +1,10 @@
+// Canonical ingest message contract shared across CodePath-Ingest (Rust), CodePath-AI (Python),
+// and CodePath-Orchestrator (Rust). Any shape change here must be coordinated across all three
+// consumers before deploying. v1 is legacy (no segmentId, no category, no parseStrategy);
+// v2 is the active contract. New work must use v2 types and validators.
 import {Nullable, Undefinable} from "./globals";
 
+// v1 is kept for backward-compatibility validation only — do not produce new v1 messages.
 export const INGEST_CONTRACT_VERSION_V1 = 'ingest.v1' as const
 export const INGEST_CONTRACT_VERSION_V2 = 'ingest.v2' as const
 
@@ -138,6 +143,8 @@ export interface IngestSegmentV2 {
   chunkIndex: number
   comment?: string
   content: string
+  // SHA-256 of the raw segment content, used by the embedding worker to skip re-embedding
+  // unchanged segments on incremental ingest passes.
   contentSha256: string
   decorators?: string[]
   endByte?: number
@@ -166,6 +173,9 @@ export interface IngestBatchStatsV2 extends IngestBatchStatsV1 {}
 
 export interface IngestBatchReadyPayloadV2 {
   batchCount: number
+  // Deterministic hash of the full ingest job (request + all segments). Same input always
+  // produces the same batchId, which makes retries idempotent — the embedding worker can
+  // detect and skip already-processed batches. Never generate batchId outside contract.rs.
   batchId: string
   batchIndex: number
   isLastBatch: boolean
@@ -752,7 +762,8 @@ function isOptionalString(value: unknown): boolean {
 function isIngestSegmentV2(value: unknown): value is IngestSegmentV2 {
   if (!isRecord(value)) return false
 
-  // FIXME im confusing :)
+  // Long chain because AJV is not a dependency here — this file is consumed by both
+  // the Node.js API and browser bundles, so we use hand-rolled guards instead.
   return typeof value.segmentId === 'string'
     && value.segmentId.trim().length > 0
     && typeof value.filePath === 'string'
@@ -889,7 +900,8 @@ function normalizeValidationList<T extends string>(values: Undefinable<T[]>, def
   return [...new Set(effectiveValues)]
 }
 
-// FIXME
+// Validates that a message was produced by the expected producer and has an allowed type.
+// Use on the producer side before publishing to guarantee contract compliance.
 export function validateIngestProducerMessageV1(value: unknown, options: IngestProducerValidationOptionsV1): IngestMessageValidationV1 {
   if (!isIngestMessageV1(value)) return { errors: ['Message does not match ingest.v1 contract schema'], ok: false }
 
@@ -903,7 +915,7 @@ export function validateIngestProducerMessageV1(value: unknown, options: IngestP
   return { message: value, ok: true }
 }
 
-// FIXME
+// v2 equivalent of validateIngestProducerMessageV1 — use this for all new producers.
 export function validateIngestProducerMessageV2(value: unknown, options: IngestProducerValidationOptionsV2): IngestMessageValidationV2 {
   if (!isIngestMessageV2(value)) return { errors: ['Message does not match ingest.v2 contract schema'], ok: false }
 
@@ -917,7 +929,8 @@ export function validateIngestProducerMessageV2(value: unknown, options: IngestP
   return { message: value, ok: true }
 }
 
-// FIXME
+// Validates an incoming message on the consumer side — checks shape, allowed producers,
+// and allowed message types. Defaults to permitting all known producers and types.
 export function validateIngestConsumerMessageV1(value: unknown, options: IngestConsumerValidationOptionsV1 = {}): IngestMessageValidationV1 {
   if (!isIngestMessageV1(value)) return { errors: ['Message does not match ingest.v1 contract schema'], ok: false }
 
@@ -932,7 +945,7 @@ export function validateIngestConsumerMessageV1(value: unknown, options: IngestC
   return { message: value, ok: true }
 }
 
-// FIXME
+// v2 equivalent of validateIngestConsumerMessageV1 — use this for all new consumers.
 export function validateIngestConsumerMessageV2(value: unknown, options: IngestConsumerValidationOptionsV2 = {}): IngestMessageValidationV2 {
   if (!isIngestMessageV2(value)) return { errors: ['Message does not match ingest.v2 contract schema'], ok: false }
 

@@ -10,6 +10,9 @@ import { Pool } from 'pg'
 
 import { env } from '../../../config/env'
 
+// Tables that must exist for us to conclude this is a legacy DB (schema present, no Drizzle history).
+// Without this check, calling migrate() on a legacy DB crashes on migration 0000 because
+// the types and tables already exist and Postgres rejects the CREATE statements.
 const LEGACY_REQUIRED_TABLES = ['users', 'repos', 'files', 'dependencies'] as const
 
 type LegacyTableName = (typeof LEGACY_REQUIRED_TABLES)[number]
@@ -51,6 +54,9 @@ export class DbService implements OnModuleDestroy, OnModuleInit {
     this.logger.log('Drizzle migrations completed')
   }
 
+  // Idempotent patch for legacy repos rows that predate the git auth migration.
+  // Copies access_key → git_auth_secret for SSH-key repos so the new auth model works
+  // on existing data without a destructive migration.
   private async applyRepoAuthSchemaCompatPatch(): Promise<void> {
     await this.pool.query(`
       DO $$
@@ -96,6 +102,9 @@ export class DbService implements OnModuleDestroy, OnModuleInit {
     this.logger.log('Applied legacy user identity schema compatibility patch')
   }
 
+  // Inserts the latest migration hash into drizzle.__drizzle_migrations so that Drizzle
+  // treats the existing legacy schema as already applied and only runs genuinely new migrations.
+  // Returns true when a baseline was inserted so the caller can apply compat patches before migrate().
   private async bootstrapLegacyMigrationBaselineIfNeeded(migrationsFolder: string): Promise<boolean> {
     await this.pool.query('CREATE SCHEMA IF NOT EXISTS drizzle')
     await this.pool.query(`

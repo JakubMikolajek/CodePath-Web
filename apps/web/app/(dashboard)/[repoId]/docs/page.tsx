@@ -274,36 +274,36 @@ export default function Page() {
   const docsProgress = status ? formatDocsProgress(status) : null
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-[18px]">
       <PageHeader
         actions={(
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button disabled={!canRetryClone || isPipelineActionRunning || isGenerating} onClick={handleRetryClone} type="button" variant="glass">
+            <Button className="rounded-[8px] px-[11px] py-1.5 text-[11.5px]" disabled={!canRetryClone || isPipelineActionRunning || isGenerating} onClick={handleRetryClone} type="button" variant="glass">
               <RotateCcw className="size-4" />
               {pipelineAction === 'clone' ? 'Restarting...' : 'Restart clone'}
             </Button>
 
-            <Button disabled={!canRetryIngest || isPipelineActionRunning || isGenerating} onClick={handleRetryIngest} type="button" variant="glass">
+            <Button className="rounded-[8px] px-[11px] py-1.5 text-[11.5px]" disabled={!canRetryIngest || isPipelineActionRunning || isGenerating} onClick={handleRetryIngest} type="button" variant="glass">
               <RefreshCw className="size-4" />
               {pipelineAction === 'ingest' ? 'Restarting...' : 'Restart ingest'}
             </Button>
 
-            <Button disabled={!canGenerate || isGenerating || isPipelineActionRunning} onClick={() => handleGenerate('repository')} type="button" variant="glow">
+            <Button className="rounded-[8px] px-[11px] py-1.5 text-[11.5px]" disabled={!canGenerate || isGenerating || isPipelineActionRunning} onClick={() => handleGenerate('repository')} type="button" variant="glow">
               <Sparkles className="size-4" />
               {generationAction === 'repository' ? 'Starting...' : 'Generate docs'}
             </Button>
 
-            <Button disabled={!canGenerate || !activeModule || isGenerating || isPipelineActionRunning} onClick={() => handleGenerate('module')} type="button" variant="glass">
+            <Button className="rounded-[8px] px-[11px] py-1.5 text-[11.5px]" disabled={!canGenerate || !activeModule || isGenerating || isPipelineActionRunning} onClick={() => handleGenerate('module')} type="button" variant="glass">
               <BookOpen className="size-4" />
               {generationAction === 'module' ? 'Starting...' : 'Regenerate module'}
             </Button>
 
-            <Button disabled={!canGenerate || !activeModule || !activeSection || isGenerating || isPipelineActionRunning} onClick={() => handleGenerate('section')} type="button" variant="glass">
+            <Button className="rounded-[8px] px-[11px] py-1.5 text-[11.5px]" disabled={!canGenerate || !activeModule || !activeSection || isGenerating || isPipelineActionRunning} onClick={() => handleGenerate('section')} type="button" variant="glass">
               <FileText className="size-4" />
               {generationAction === 'section' ? 'Starting...' : 'Regenerate section'}
             </Button>
 
-            <Button disabled={loading || isPipelineActionRunning || isGenerating} onClick={loadPageState} type="button" variant="glass">
+            <Button className="rounded-[8px] px-[11px] py-1.5 text-[11.5px]" disabled={loading || isPipelineActionRunning || isGenerating} onClick={loadPageState} type="button" variant="glass">
               <RefreshCw className="size-4" />
               Refresh
             </Button>
@@ -314,17 +314,17 @@ export default function Page() {
         title="Docs"
       />
 
-      <section aria-label="Documentation status" className="grid gap-3 md:grid-cols-3">
+      <section aria-label="Documentation status" className="grid gap-[14px] md:grid-cols-3">
         {statusItems.length > 0 ? statusItems.map(item => (
-          <Card className="py-0" key={item.label}>
-            <CardContent className="flex items-center justify-between gap-4 p-4">
+          <Card className="rounded-[13px] border-white/[0.06] bg-white/[0.012] py-0" key={item.label}>
+            <CardContent className="flex items-center justify-between gap-4 p-[15px_18px]">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{item.label}</p>
+                <p className="nurt-label text-[var(--nurt-t3)]">{item.label}</p>
 
-                <p className="mt-2 text-lg font-semibold capitalize text-white">{formatStatus(item.value)}</p>
+                <p className="mt-1.5 text-[17px] font-semibold capitalize text-foreground">{formatStatus(item.value)}</p>
               </div>
 
-              <span className={`rounded-full border px-3 py-1 text-xs font-medium capitalize ${getStatusTone(item.value)}`}>
+              <span className={`rounded-[7px] border px-2.5 py-[3px] font-mono text-[11px] capitalize ${getStatusTone(item.value)}`}>
                 {formatStatus(item.value)}
               </span>
             </CardContent>
@@ -372,16 +372,16 @@ export default function Page() {
         </section>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
-        <aside aria-label="Documentation navigation" className="glass-panel h-fit rounded-3xl p-4">
-          <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
-            <BookOpen className="size-4 text-primary" />
+      <div className="flex min-h-[480px] gap-4">
+        <aside aria-label="Documentation navigation" className="flex w-[280px] shrink-0 flex-col overflow-hidden rounded-[14px] border border-white/[0.06] bg-white/[0.012]">
+          <div className="flex items-center gap-2 border-b border-white/[0.06] px-4 py-3.5 text-[13px] font-semibold text-foreground">
+            <BookOpen className="size-[15px] text-primary" />
             Documentation
           </div>
 
-          <nav aria-label="Documentation modules" className="space-y-4 text-sm">
+          <nav aria-label="Documentation modules" className="flex-1 space-y-4 overflow-y-auto p-3 text-sm">
             <div className="space-y-2">
-              <p className="px-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Modules</p>
+              <p className="nurt-label px-2 pb-1 text-[var(--nurt-t3)]">MODULES</p>
 
               {modules.map(module => {
                 const isActive = module.key === activeModule?.key
@@ -389,7 +389,7 @@ export default function Page() {
                 return (
                   <button
                     aria-current={isActive ? 'page' : undefined}
-                    className={`flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-2 text-left transition ${isActive ? 'bg-primary/20 text-white shadow-[0_0_22px_oklch(0.62_0.24_270/0.2)]' : 'text-muted-foreground hover:bg-white/5 hover:text-white'}`}
+                    className={`relative flex w-full items-center justify-between gap-3 rounded-[8px] px-2.5 py-2 text-left text-[12.5px] transition ${isActive ? 'border border-primary/30 bg-primary/12 text-foreground' : 'text-muted-foreground hover:bg-white/[0.03] hover:text-foreground'}`}
                     key={module.key}
                     onClick={() => {
                       setSelectedModuleKey(module.key)
@@ -411,7 +411,7 @@ export default function Page() {
 
             {activeModule && (
               <div className="space-y-2 border-t border-white/10 pt-4">
-                <p className="px-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Sections</p>
+                <p className="nurt-label px-2 pb-1 text-[var(--nurt-t3)]">SECTIONS</p>
 
                 {activeSections.map(section => {
                   const isActive = section.key === activeSection?.key
@@ -419,7 +419,7 @@ export default function Page() {
                   return (
                     <button
                       aria-current={isActive ? 'page' : undefined}
-                      className={`flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-2 text-left transition ${isActive ? 'bg-white/10 text-white' : 'text-muted-foreground hover:bg-white/5 hover:text-white'}`}
+                      className={`relative flex w-full items-center justify-between gap-3 rounded-[8px] px-2.5 py-2 text-left text-xs transition ${isActive ? 'bg-primary/15 text-foreground before:absolute before:left-0 before:top-[7px] before:bottom-[7px] before:w-0.5 before:rounded before:bg-primary' : 'text-muted-foreground hover:bg-white/[0.03] hover:text-foreground'}`}
                       key={`${activeModule.key}:${section.key}`}
                       onClick={() => setSelectedSectionKey(section.key)}
                       title={describeDocsNode(section)}
@@ -438,7 +438,7 @@ export default function Page() {
             )}
           </nav>
 
-          <div className="mt-6 rounded-2xl border border-white/10 bg-white/3 p-3 text-xs text-muted-foreground">
+          <div className="border-t border-white/[0.06] p-[11px_14px] text-[11px] leading-[1.4] text-[var(--nurt-t3)]">
             {status?.docsStatus === RepoDocsStatus.READY ? (
               <span className="flex items-center gap-2 text-emerald-200">
                 <CheckCircle2 className="size-4" />
@@ -453,11 +453,11 @@ export default function Page() {
           </div>
         </aside>
 
-        <main className="min-w-0" id="documentation-content">
-          <Card className="min-h-155 py-0">
-            <CardContent className="p-5 md:p-8">
+        <main className="min-w-0 flex-1" id="documentation-content">
+          <Card className="min-h-full overflow-hidden rounded-[14px] border-white/[0.06] bg-white/[0.012] py-0">
+            <CardContent className="p-0">
               <div aria-live="polite">
-                {loading && <p className="text-sm text-muted-foreground">Loading documentation state...</p>}
+                {loading && <p className="border-b border-white/[0.06] px-[18px] py-3.5 text-[12.5px] text-muted-foreground">Loading documentation state...</p>}
 
                 {error && (
                   <p className="flex items-center gap-2 text-sm text-red-300" role="alert">
@@ -467,13 +467,13 @@ export default function Page() {
                 )}
 
                 {!loading && !error && status?.docsStatus === RepoDocsStatus.PENDING && (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="border-b border-white/[0.06] px-[18px] py-3.5 text-[12.5px] text-muted-foreground">
                     Documentation is not generated yet. Start generation when embeddings are ready.
                   </p>
                 )}
 
                 {!loading && !error && status?.docsStatus === RepoDocsStatus.PROCESSING && (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="border-b border-white/[0.06] px-[18px] py-3.5 text-[12.5px] text-muted-foreground">
                     Documentation generation is in progress. This view refreshes automatically every {DOCS_STATUS_POLL_MS / 1000}s.
                   </p>
                 )}
@@ -487,7 +487,7 @@ export default function Page() {
               </div>
 
               {activeModule && activeSection && (
-                <div className="mt-6 rounded-2xl border border-white/10 bg-white/3 px-4 py-3 text-xs text-muted-foreground">
+                <div className="border-b border-white/[0.06] px-[18px] py-3.5 text-xs text-[var(--nurt-t3)]">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={`rounded-full border px-2 py-0.5 capitalize ${getStatusTone(activeSection.status)}`}>
                       {formatStatus(activeSection.status)}
@@ -507,7 +507,7 @@ export default function Page() {
               )}
 
               {activeMarkdown ? (
-                <article className="prose prose-sm mt-6 max-w-none prose-headings:tracking-[-0.04em] prose-pre:border prose-pre:border-white/10 prose-pre:bg-slate-950/80 prose-pre:text-gray-100 dark:prose-invert md:prose-base">
+                <article className="prose prose-sm max-w-none px-[18px] py-5 prose-headings:font-mono prose-headings:tracking-normal prose-pre:border prose-pre:border-white/10 prose-pre:bg-[var(--nurt-bg0)] prose-pre:text-gray-100 dark:prose-invert">
                   <h1 className="sr-only">{activeSection?.title}</h1>
 
                   <Markdown
@@ -562,14 +562,16 @@ export default function Page() {
                   </Markdown>
                 </article>
               ) : !loading && !error && (
-                <div className="mt-8 rounded-3xl border border-dashed border-white/15 bg-white/3 p-10 text-center">
-                  <FileText className="mx-auto size-10 text-muted-foreground" />
+                <div className="flex min-h-[360px] flex-col items-center justify-center gap-[14px] p-10 text-center">
+                  <div className="grid size-[54px] place-items-center rounded-[14px] border border-white/10 bg-white/[0.02] text-[var(--nurt-t3)]">
+                    <FileText className="size-[26px]" />
+                  </div>
 
-                  <h2 className="mt-4 text-xl font-semibold tracking-[-0.04em] text-white">
+                  <h2 className="text-base font-semibold tracking-normal text-foreground">
                     {activeModule && activeSection ? `${activeModule.title} / ${activeSection.title} is not generated yet` : 'No generated document yet'}
                   </h2>
 
-                  <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+                  <p className="mx-auto max-w-[340px] text-[12.5px] leading-[1.5] text-[var(--nurt-t3)]">
                     Generate docs after repository cloning and embedding stages are complete.
                   </p>
                 </div>
