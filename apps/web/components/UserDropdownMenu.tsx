@@ -48,18 +48,38 @@ export default function UserDropdownMenu() {
         side="bottom"
         sideOffset={8}
       >
-        {/* THEME header + dark/light toggle */}
-        <div className="flex items-center justify-between px-[9px] pb-2 pt-[6px]">
+        {/* BASE THEME label */}
+        <div className="px-[9px] pb-[6px] pt-[6px]">
           <span className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-[var(--nurt-t3)]">
-            Theme
+            Base theme
           </span>
+        </div>
+
+        {/* Light / Dark segmented control */}
+        <div className="mx-[9px] mb-[8px] flex rounded-[9px] bg-[var(--nurt-bg1)] p-[3px]">
           <button
-            className="flex items-center justify-center rounded-md p-1 text-[var(--nurt-t3)] transition-colors hover:bg-white/[0.06] hover:text-[var(--nurt-t1)]"
-            onClick={() => setTheme(isDark ? 'light' : 'dark')}
-            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            className={`flex flex-1 items-center justify-center gap-[5px] rounded-[7px] py-[5px] text-[11px] font-medium transition-all ${
+              !isDark
+                ? 'bg-[var(--nurt-bg3)] text-[var(--nurt-t1)] shadow-sm'
+                : 'text-[var(--nurt-t3)] hover:text-[var(--nurt-t2)]'
+            }`}
+            onClick={() => setTheme('light')}
             type="button"
           >
-            {isDark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+            <Sun className="h-3 w-3" />
+            Light
+          </button>
+          <button
+            className={`flex flex-1 items-center justify-center gap-[5px] rounded-[7px] py-[5px] text-[11px] font-medium transition-all ${
+              isDark
+                ? 'bg-[var(--nurt-bg3)] text-[var(--nurt-t1)] shadow-sm'
+                : 'text-[var(--nurt-t3)] hover:text-[var(--nurt-t2)]'
+            }`}
+            onClick={() => setTheme('dark')}
+            type="button"
+          >
+            <Moon className="h-3 w-3" />
+            Dark
           </button>
         </div>
 

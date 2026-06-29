@@ -13,7 +13,7 @@ export function PageHeader({ actions, description, eyebrow, title }: PageHeaderP
       <div>
         {eyebrow && <p className="nurt-label mb-2 text-primary">{eyebrow}</p>}
 
-        <h1 className="bg-[linear-gradient(120deg,#dbe6ff,#9fb6e6)] bg-clip-text font-mono text-[28px] font-bold leading-tight text-transparent md:text-[30px]">{title}</h1>
+        <h1 className="bg-[linear-gradient(120deg,var(--nurt-page-title-a),var(--nurt-page-title-b))] bg-clip-text font-mono text-[28px] font-bold leading-tight text-transparent md:text-[30px]">{title}</h1>
 
         {description && <p className="mt-2 max-w-2xl text-[12.5px] leading-5 text-muted-foreground md:text-[13px]">{description}</p>}
       </div>

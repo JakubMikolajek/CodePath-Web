@@ -49,6 +49,8 @@
   --glass: rgba(255,255,255,0.012);
   --glass-strong: rgba(255,255,255,0.018);
   --glass-border: rgba(255,255,255,0.06);
+  --nurt-page-title-a: #dbe6ff;
+  --nurt-page-title-b: #9fb6e6;
   --nurt-bg0: #090b0f;
   --nurt-bg1: #0d1016;
   --nurt-bg2: #11151d;
@@ -101,11 +103,13 @@
   --nurt-bg3: oklch(0.895 0.032 255);
   --nurt-line: oklch(0.78 0.06 255 / 0.22);
   --nurt-line2: oklch(0.70 0.08 255 / 0.32);
+  --nurt-page-title-a: oklch(0.13 0.06 263);
+  --nurt-page-title-b: oklch(0.22 0.07 263);
   --nurt-t1: oklch(0.15 0.05 263);
   --nurt-title: oklch(0.08 0.04 263);
-  --nurt-t2: oklch(0.38 0.06 263);
-  --nurt-t3: oklch(0.56 0.04 263);
-  --nurt-t4: oklch(0.70 0.03 263);
+  --nurt-t2: oklch(0.35 0.06 263);
+  --nurt-t3: oklch(0.44 0.05 263);
+  --nurt-t4: oklch(0.56 0.04 263);
   --nurt-ink: oklch(0.99 0.005 255);
   --nurt-accent: oklch(0.48 0.22 255);
   --nurt-accent2: oklch(0.50 0.22 290);
@@ -214,6 +218,10 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+
+  [data-slot="sidebar-container"] {
+    border-color: transparent;
   }
 
   html {

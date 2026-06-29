@@ -118,7 +118,7 @@ export default function AppSidebar({ fetchedRepos, me }: AppSideBarProps) {
           </SidebarGroup>
         </SidebarContent>
 
-        <SidebarFooter className="border-t border-white/[0.06] p-3">
+        <SidebarFooter className="p-3">
           <SidebarMenu>
             <SidebarMenuItem>
               <UserDropdownMenu />
