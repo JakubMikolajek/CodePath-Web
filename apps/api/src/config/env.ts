@@ -7,7 +7,7 @@ const DEFAULTS = {
   ingestIncludeConfigFiles: true,
   ingestIncludeDocumentationFiles: true,
   ingestMaxFileBytes: 5_000_000,
-  ingestMaxSegmentChars: 4_000,
+  ingestMaxSegmentChars: 8_000,
   keycloakAllowedAudiences: '',
   keycloakClientId: 'codepath-web',
   keycloakIssuer: 'http://127.0.0.1:8081/realms/codepath-local',
