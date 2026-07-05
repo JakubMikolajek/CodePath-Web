@@ -11,7 +11,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem
 } from '@workspace/ui/components/sidebar'
-import { BotMessageSquare, Braces, CheckCircle2, ChevronRight, CircleDot, Clock3, FileText, GitBranch, GitFork, Plus, TriangleAlert } from 'lucide-react'
+import { BotMessageSquare, Braces, CheckCircle2, ChevronRight, CircleDot, Clock3, FileText, FlaskConical, GitBranch, GitFork, Plus, TriangleAlert } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import React from 'react'
@@ -170,6 +170,12 @@ export default function RepoItem({ item }: RepoItemProps) {
             <SidebarMenuSubItem>
               <SidebarMenuSubButton asChild className="h-8 rounded-[8px] text-[12.5px] text-muted-foreground hover:bg-white/[0.03] hover:text-foreground data-[active=true]:bg-primary/15 data-[active=true]:text-primary" isActive={pathname === `/${item.id}/docs`}>
                 <Link href={`/${item.id}/docs`}><FileText className="size-4" /><span>Docs</span></Link>
+              </SidebarMenuSubButton>
+            </SidebarMenuSubItem>
+
+            <SidebarMenuSubItem>
+              <SidebarMenuSubButton asChild className="h-8 rounded-[8px] text-[12.5px] text-muted-foreground hover:bg-white/[0.03] hover:text-foreground data-[active=true]:bg-primary/15 data-[active=true]:text-primary" isActive={pathname === `/${item.id}/evaluation`}>
+                <Link href={`/${item.id}/evaluation`}><FlaskConical className="size-4" /><span>Evaluation</span></Link>
               </SidebarMenuSubButton>
             </SidebarMenuSubItem>
 

@@ -6,6 +6,7 @@ import { AuthModule } from './modules/auth/auth.module'
 import { ChatModule } from './modules/chat/chat.module'
 import { DbModule } from './modules/db/db.module'
 import { DocsModule } from './modules/docs/docs.module'
+import { EvaluationModule } from './modules/evaluation/evaluation.module'
 import { DependenciesModule } from './modules/graphs/dependencies.module'
 import { MetricsModule } from './modules/metrics/metrics.module'
 import { RepoModule } from './modules/repos/repo.module'
@@ -21,6 +22,7 @@ import { SystemStatusModule } from './modules/system-status/system-status.module
     AuthModule,
     DependenciesModule,
     DocsModule,
+    EvaluationModule,
     MetricsModule,
     SystemStatusModule
   ]
