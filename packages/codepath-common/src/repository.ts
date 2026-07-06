@@ -124,6 +124,11 @@ export interface RepoDocsJobRequest {
   sectionKey?: RepoDocsSectionKey
 }
 
+export interface RepoEvaluationJobRequest {
+  repoId: number
+  runType: string
+}
+
 export interface RepoDocsProgress {
   current: Nullable<number>
   message: Nullable<string>

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
 import type { IngestJobRequestV2 } from '@workspace/codepath-common/ingest'
-import type { RepoDocsJobRequest } from '@workspace/codepath-common/repository'
+import type { RepoDocsJobRequest, RepoEvaluationJobRequest } from '@workspace/codepath-common/repository'
 import axios, { type AxiosInstance } from 'axios'
 
 import { env } from '../../../config/env'
@@ -36,6 +36,10 @@ export class OrchestratorClient {
 
   async enqueueDocsJob(input: RepoDocsJobRequest): Promise<void> {
     await this.postJson<void>('/v1/jobs/docs', input)
+  }
+
+  async enqueueEvaluationJob(input: RepoEvaluationJobRequest): Promise<void> {
+    await this.postJson<void>('/v1/jobs/evaluation', input)
   }
 
   async enqueueIngestJob(input: IngestJobRequestV2): Promise<void> {

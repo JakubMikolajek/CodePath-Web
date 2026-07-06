@@ -112,4 +112,28 @@ describe('orchestrator client', () => {
       validateStatus: expect.any(Function)
     }))
   })
+
+  it('publishes evaluation job to the orchestrator evaluation endpoint', async () => {
+    requestMock.mockResolvedValue({
+      data: '',
+      status: 202,
+      statusText: 'Accepted'
+    })
+
+    await expect(client.enqueueEvaluationJob({
+      repoId: 7,
+      runType: 'docs_quality'
+    })).resolves.toBeUndefined()
+
+    expect(requestMock).toHaveBeenCalledTimes(1)
+    expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: {
+        repoId: 7,
+        runType: 'docs_quality'
+      },
+      method: 'POST',
+      url: expect.stringContaining('/v1/jobs/evaluation'),
+      validateStatus: expect.any(Function)
+    }))
+  })
 })
