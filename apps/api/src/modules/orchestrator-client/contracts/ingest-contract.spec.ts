@@ -234,6 +234,54 @@ describe('ingest.v2 contract', () => {
     expect((INGEST_MESSAGE_JSON_SCHEMA_V2.oneOf as unknown[]).length).toBe(3)
   })
 
+  it('exposes optional delta ingest fields in the JSON schema', () => {
+    const [jobRequestSchema, batchReadySchema] = INGEST_MESSAGE_JSON_SCHEMA_V2.oneOf as unknown[]
+
+    expect(jobRequestSchema).toMatchObject({
+      allOf: [
+        expect.any(Object),
+        {
+          properties: {
+            payload: {
+              properties: {
+                changedFilePaths: {
+                  items: { type: 'string' },
+                  minItems: 1,
+                  type: 'array'
+                },
+                deletedFilePaths: {
+                  items: { type: 'string' },
+                  minItems: 1,
+                  type: 'array'
+                }
+              },
+              required: ['snapshot', 'parseOptions']
+            }
+          }
+        }
+      ]
+    })
+    expect(batchReadySchema).toMatchObject({
+      allOf: [
+        expect.any(Object),
+        {
+          properties: {
+            payload: {
+              properties: {
+                deletedFilePaths: {
+                  items: { type: 'string' },
+                  minItems: 1,
+                  type: 'array'
+                }
+              },
+              required: ['batchId', 'batchIndex', 'batchCount', 'isLastBatch', 'snapshot', 'stats', 'segments']
+            }
+          }
+        }
+      ]
+    })
+  })
+
   it('validates ingest.job.request payload', () => {
     const message = {
       contractVersion: 'ingest.v2',
@@ -259,6 +307,68 @@ describe('ingest.v2 contract', () => {
     }
 
     expect(isIngestMessageV2(message)).toBe(true)
+  })
+
+  it('validates ingest.job.request with changed file paths', () => {
+    const message = {
+      contractVersion: 'ingest.v2',
+      correlationId: 'corr-delta-job-1',
+      messageType: 'ingest.job.request',
+      payload: {
+        changedFilePaths: ['src/a.ts', 'src/new.ts'],
+        parseOptions: {
+          includeConfigFiles: true,
+          includeDocumentationFiles: true,
+          maxFileBytes: 5_000_000,
+          maxSegmentChars: 4_000
+        },
+        snapshot: {
+          bucket: 'codepath-repos',
+          key: 'repos/10/abcdef.tar.gz',
+          provider: 'minio',
+          sourceCommitSha: 'abcdef'
+        }
+      },
+      producedAt: '2026-04-04T20:00:00.000Z',
+      producer: 'web-api',
+      repoId: 10
+    }
+
+    expect(validateIngestProducerMessageV2(message, {
+      allowedMessageTypes: [IngestMessageType.JOB_REQUEST],
+      expectedProducer: IngestProducer.WEB_API
+    }).ok).toBe(true)
+  })
+
+  it('validates ingest.job.request with deleted file paths', () => {
+    const message = {
+      contractVersion: 'ingest.v2',
+      correlationId: 'corr-delta-job-2',
+      messageType: 'ingest.job.request',
+      payload: {
+        deletedFilePaths: ['src/removed.ts'],
+        parseOptions: {
+          includeConfigFiles: true,
+          includeDocumentationFiles: true,
+          maxFileBytes: 5_000_000,
+          maxSegmentChars: 4_000
+        },
+        snapshot: {
+          bucket: 'codepath-repos',
+          key: 'repos/10/abcdef.tar.gz',
+          provider: 'minio',
+          sourceCommitSha: 'abcdef'
+        }
+      },
+      producedAt: '2026-04-04T20:00:00.000Z',
+      producer: 'web-api',
+      repoId: 10
+    }
+
+    expect(validateIngestProducerMessageV2(message, {
+      allowedMessageTypes: [IngestMessageType.JOB_REQUEST],
+      expectedProducer: IngestProducer.WEB_API
+    }).ok).toBe(true)
   })
 
   it('validates ingest.batch.ready semantic segment payload', () => {
@@ -317,6 +427,101 @@ describe('ingest.v2 contract', () => {
     }
 
     expect(isIngestMessageV2(message)).toBe(true)
+  })
+
+  it('validates ingest.batch.ready with deleted file paths', () => {
+    const message = {
+      contractVersion: 'ingest.v2',
+      correlationId: 'corr-delta-batch-1',
+      messageType: 'ingest.batch.ready',
+      payload: {
+        batchCount: 1,
+        batchId: 'batch-delta-1',
+        batchIndex: 0,
+        deletedFilePaths: ['src/deleted.ts'],
+        isLastBatch: true,
+        segments: [],
+        snapshot: {
+          bucket: 'codepath-repos',
+          key: 'repos/10/abcdef.tar.gz',
+          provider: 'minio',
+          sourceCommitSha: 'abcdef'
+        },
+        stats: {
+          filesDiscovered: 0,
+          filesParsed: 0,
+          segmentsInBatch: 0
+        }
+      },
+      producedAt: '2026-04-04T20:00:00.000Z',
+      producer: 'ingest-service',
+      repoId: 10
+    }
+
+    expect(validateIngestConsumerMessageV2(message, {
+      allowedMessageTypes: [IngestMessageType.BATCH_READY],
+      allowedProducers: [IngestProducer.INGEST_SERVICE]
+    }).ok).toBe(true)
+  })
+
+  it('keeps delta ingest fields optional for existing v2 messages', () => {
+    const jobRequest = {
+      contractVersion: 'ingest.v2',
+      correlationId: 'corr-full-job-1',
+      messageType: 'ingest.job.request',
+      payload: {
+        parseOptions: {
+          includeConfigFiles: true,
+          includeDocumentationFiles: true,
+          maxFileBytes: 5_000_000,
+          maxSegmentChars: 4_000
+        },
+        snapshot: {
+          bucket: 'codepath-repos',
+          key: 'repos/10/abcdef.tar.gz',
+          provider: 'minio',
+          sourceCommitSha: 'abcdef'
+        }
+      },
+      producedAt: '2026-04-04T20:00:00.000Z',
+      producer: 'web-api',
+      repoId: 10
+    }
+    const batchReady = {
+      contractVersion: 'ingest.v2',
+      correlationId: 'corr-full-batch-1',
+      messageType: 'ingest.batch.ready',
+      payload: {
+        batchCount: 1,
+        batchId: 'batch-full-1',
+        batchIndex: 0,
+        isLastBatch: true,
+        segments: [],
+        snapshot: {
+          bucket: 'codepath-repos',
+          key: 'repos/10/abcdef.tar.gz',
+          provider: 'minio',
+          sourceCommitSha: 'abcdef'
+        },
+        stats: {
+          filesDiscovered: 0,
+          filesParsed: 0,
+          segmentsInBatch: 0
+        }
+      },
+      producedAt: '2026-04-04T20:00:00.000Z',
+      producer: 'ingest-service',
+      repoId: 10
+    }
+
+    expect(validateIngestProducerMessageV2(jobRequest, {
+      allowedMessageTypes: [IngestMessageType.JOB_REQUEST],
+      expectedProducer: IngestProducer.WEB_API
+    }).ok).toBe(true)
+    expect(validateIngestConsumerMessageV2(batchReady, {
+      allowedMessageTypes: [IngestMessageType.BATCH_READY],
+      allowedProducers: [IngestProducer.INGEST_SERVICE]
+    }).ok).toBe(true)
   })
 
   it('rejects legacy v1 messages for v2 validators', () => {

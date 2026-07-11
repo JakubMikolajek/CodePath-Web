@@ -132,6 +132,12 @@ export interface IngestSnapshotRefV2 extends IngestSnapshotRefV1 {}
 export interface IngestParseOptionsV2 extends IngestParseOptionsV1 {}
 
 export interface IngestJobRequestPayloadV2 {
+  changedFilePaths?: string[]
+  // File paths present in the previous ingest but absent from the current snapshot.
+  // CodePath-Ingest does not interpret this value — it passes it through unchanged
+  // into the final (isLastBatch: true) ingest.batch.ready message so the AI embedding
+  // worker can delete the corresponding orphaned Qdrant points.
+  deletedFilePaths?: string[]
   parseOptions: IngestParseOptionsV2
   snapshot: IngestSnapshotRefV2
 }
@@ -178,6 +184,7 @@ export interface IngestBatchReadyPayloadV2 {
   // detect and skip already-processed batches. Never generate batchId outside contract.rs.
   batchId: string
   batchIndex: number
+  deletedFilePaths?: string[]
   isLastBatch: boolean
   segments: IngestSegmentV2[]
   snapshot: IngestSnapshotRefV2
@@ -502,6 +509,16 @@ const INGEST_JOB_REQUEST_SCHEMA_V2: JsonSchemaObject = {
         payload: {
           additionalProperties: false,
           properties: {
+            changedFilePaths: {
+              items: { type: 'string' },
+              minItems: 1,
+              type: 'array'
+            },
+            deletedFilePaths: {
+              items: { type: 'string' },
+              minItems: 1,
+              type: 'array'
+            },
             parseOptions: INGEST_PARSE_OPTIONS_SCHEMA_V1,
             snapshot: INGEST_SNAPSHOT_REF_SCHEMA_V1
           },
@@ -583,6 +600,11 @@ const INGEST_BATCH_READY_SCHEMA_V2: JsonSchemaObject = {
             batchIndex: {
               minimum: 0,
               type: 'integer'
+            },
+            deletedFilePaths: {
+              items: { type: 'string' },
+              minItems: 1,
+              type: 'array'
             },
             isLastBatch: { type: 'boolean' },
             segments: {
