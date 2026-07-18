@@ -40,6 +40,16 @@ interface CloneConfig {
   sshPrivateKey: Nullable<string>
 }
 
+interface IngestFileDelta {
+  changedFilePaths: string[]
+  deletedFilePaths: string[]
+}
+
+interface TrackedFile {
+  hash: Nullable<Undefinable<string>>
+  path: string
+}
+
 const nowIso = () => new Date().toISOString()
 
 @Injectable()
@@ -187,7 +197,8 @@ export class RepoFetcherService {
   private buildIngestJobRequest(
     repoId: number,
     commitSha: string,
-    snapshot: { bucket: Nullable<string>, key: Nullable<string>, provider: 'local' | 'minio' }
+    snapshot: { bucket: Nullable<string>, key: Nullable<string>, provider: 'local' | 'minio' },
+    delta?: IngestFileDelta
   ): IngestJobRequestV2 {
     if (snapshot.provider !== 'minio' || !snapshot.bucket || !snapshot.key) throw new Error('Ingest contract requires MinIO snapshot location. Configure REPO_STORAGE_PROVIDER=minio and ensure snapshot upload succeeded.')
 
@@ -196,6 +207,8 @@ export class RepoFetcherService {
       correlationId: `ingest-${repoId}-${crypto.randomUUID()}`,
       messageType: IngestMessageType.JOB_REQUEST,
       payload: {
+        ...(delta?.changedFilePaths.length ? { changedFilePaths: delta.changedFilePaths } : {}),
+        ...(delta?.deletedFilePaths.length ? { deletedFilePaths: delta.deletedFilePaths } : {}),
         parseOptions: {
           includeConfigFiles: env.ingestIncludeConfigFiles,
           includeDocumentationFiles: env.ingestIncludeDocumentationFiles,
@@ -212,6 +225,20 @@ export class RepoFetcherService {
       producedAt: new Date().toISOString(),
       producer: IngestProducer.WEB_API,
       repoId
+    }
+  }
+
+  private calculateIngestDelta(previousFiles: TrackedFile[], currentFiles: TrackedFile[]): IngestFileDelta {
+    const previousFilesByPath = new Map(previousFiles.map(file => [file.path, file.hash]))
+    const currentFilePaths = new Set(currentFiles.map(file => file.path))
+
+    return {
+      changedFilePaths: currentFiles
+        .filter(file => !previousFilesByPath.has(file.path) || previousFilesByPath.get(file.path) !== file.hash)
+        .map(file => file.path),
+      deletedFilePaths: previousFiles
+        .filter(file => !currentFilePaths.has(file.path))
+        .map(file => file.path)
     }
   }
 
@@ -280,9 +307,14 @@ export class RepoFetcherService {
       }).where(eq(repos.id, repo.id))
       await this.dbService.dbClient.delete(repoDocsFragments).where(eq(repoDocsFragments.repoId, repo.id))
 
+      const previousFiles = await this.dbService.dbClient.select({
+        hash: files.hash,
+        path: files.path
+      }).from(files).where(eq(files.repoId, repo.id))
+
       const filePaths = await this.getAllFiles(targetPath)
       const filesData = await Promise.all(
-        map(filePaths, async (filePath): Promise<InsertFile> => {
+        map(filePaths, async (filePath): Promise<InsertFile & TrackedFile> => {
           const relPath = path.relative(targetPath, filePath)
           const stats = await stat(filePath)
           const hash = await this.hashFile(filePath)
@@ -290,12 +322,14 @@ export class RepoFetcherService {
           return { hash, lastModified: stats.mtime.toISOString(), path: relPath, repoId: repo.id }
         })
       )
+      const ingestDelta = this.calculateIngestDelta(previousFiles, filesData)
+      const deltaForIngest = previousFiles.length > 0 ? ingestDelta : undefined
 
       await this.dbService.dbClient.delete(files).where(eq(files.repoId, repo.id))
       await this.dbService.dbClient.insert(files).values(filesData)
 
       try {
-        const ingestMessage = this.buildIngestJobRequest(repo.id, commitSha, snapshot)
+        const ingestMessage = this.buildIngestJobRequest(repo.id, commitSha, snapshot, deltaForIngest)
         await this.orchestratorClient.enqueueIngestJob(ingestMessage)
 
         emitTelemetry({
