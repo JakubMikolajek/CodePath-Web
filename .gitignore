@@ -44,3 +44,12 @@ npm-debug.log*
 CodePath-Web.iml
 
 .codex
+
+# Claude/Codex local delegation tooling — not shipped to GitHub
+.claude/
+.codex-handoff.md
+CLAUDE.md
+.ai/runs/
+scripts/log-run-start.sh
+scripts/log-run-hook.sh
+scripts/run-log-summary.sh
