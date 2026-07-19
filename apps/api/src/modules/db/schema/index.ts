@@ -14,6 +14,12 @@ export { chatHistory, chatHistoryRelations, type InsertChatHistory, type SelectC
 export { chatSessions, chatSessionsRelations, type InsertChatSession, type SelectChatSession } from './chatSessions'
 export { dependencies, dependenciesRelations, type InsertDependencies, type SelectDependencies } from './dependencies'
 export { docsSegments, docsSegmentsRelations, type InsertDocsSegment, type SelectDocsSegment } from './docsSegments'
+export {
+  docsSummaryCache,
+  docsSummaryCacheRelations,
+  type InsertDocsSummaryCache,
+  type SelectDocsSummaryCache
+} from './docsSummaryCache'
 export { evaluationMetrics, evaluationMetricsRelations, type InsertEvaluationMetric, type SelectEvaluationMetric } from './evaluationMetrics'
 export {
   evaluationRuns,
