@@ -1,6 +1,11 @@
 import * as crypto from 'node:crypto'
 
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import {
+  Injectable,
+  Logger,
+  type MessageEvent,
+  NotFoundException
+} from '@nestjs/common'
 import {
   TelemetryLevel,
   TelemetryRuntimeFamily,
@@ -9,10 +14,15 @@ import {
 } from '@workspace/codepath-common/telemetry'
 import { and, desc, eq } from 'drizzle-orm'
 import { map } from 'lodash'
+import { from, type Observable } from 'rxjs'
 
 import { chatHistory, chatSessions, repos } from '../../db/schema'
 import { DbService } from '../../db/services/db.service'
-import { OrchestratorClient, OrchestratorClientError } from '../../orchestrator-client/services/orchestrator-client.service'
+import {
+  type OrchestratorChatStreamEvent,
+  OrchestratorClient,
+  OrchestratorClientError
+} from '../../orchestrator-client/services/orchestrator-client.service'
 import { emitTelemetry } from '../../telemetry/services/telemetry'
 import { AskDto } from '../dto/ask.dto'
 
@@ -27,7 +37,7 @@ export class ChatService {
     private readonly orchestratorClient: OrchestratorClient
   ) { }
 
-  async askAboutRepo(userId: number, repoId: number, body: AskDto) {
+  async askAboutRepo(userId: number, repoId: number, body: AskDto): Promise<Observable<MessageEvent>> {
     const { question, sessionId } = body
     await this.assertSessionOwnership(userId, repoId, sessionId)
 
@@ -49,16 +59,7 @@ export class ChatService {
       userId
     })
 
-    const answer = await this.publishChatJob({ prompt: question, repoId })
-
-    await this.dbService.dbClient.insert(chatHistory).values({
-      content: answer,
-      role: 'assistant',
-      sessionId,
-      userId
-    })
-
-    return answer
+    return from(this.streamChatJob({ prompt: question, repoId }, { sessionId, userId }))
   }
 
   async createSession(userId: number, repoId: number) {
@@ -124,12 +125,40 @@ export class ChatService {
     if (!session) throw new NotFoundException('Session not found')
   }
 
-  private async publishChatJob(segments: {
+  private emitStreamFailureTelemetry(
+    correlationId: string,
+    repoId: number,
+    startedAt: number,
+    event: Extract<OrchestratorChatStreamEvent, { type: 'error' }>
+  ): void {
+    emitTelemetry({
+      component: 'chat.rpc',
+      correlationId,
+      details: {
+        errorCode: event.code,
+        errorMessage: event.message
+      },
+      durationMs: Date.now() - startedAt,
+      event: 'chat_rpc_stream_error_received',
+      level: TelemetryLevel.ERROR,
+      queueName: 'chat',
+      repoId,
+      runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+      service: TelemetryService.WEB_API,
+      status: TelemetryStatus.ERROR
+    })
+  }
+
+  private async *streamChatJob(segments: {
     prompt: string
     repoId: number
-  }): Promise<string> {
+  }, persistence: {
+    sessionId: string
+    userId: number
+  }): AsyncGenerator<MessageEvent> {
     const correlationId = crypto.randomUUID()
     const startedAt = Date.now()
+    let answer = ''
 
     try {
       emitTelemetry({
@@ -144,22 +173,45 @@ export class ChatService {
         status: TelemetryStatus.OK
       })
 
-      const answer = await this.orchestratorClient.requestChatRpc(segments)
+      for await (const event of this.orchestratorClient.streamChatRpc(segments)) {
+        if (event.type === 'chunk') {
+          answer += event.delta
+          yield this.toMessageEvent(event)
+          continue
+        }
 
-      emitTelemetry({
-        component: 'chat.rpc',
-        correlationId,
-        durationMs: Date.now() - startedAt,
-        event: 'chat_rpc_response_received',
-        level: TelemetryLevel.INFO,
-        queueName: 'chat',
-        repoId: segments.repoId,
-        runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
-        service: TelemetryService.WEB_API,
-        status: TelemetryStatus.OK
-      })
+        if (event.type === 'error') {
+          this.logger.error(`Chat stream failed for repo ${segments.repoId}: [${event.code}] ${event.message}`)
+          this.emitStreamFailureTelemetry(correlationId, segments.repoId, startedAt, event)
+          yield this.toMessageEvent(event)
+          return
+        }
 
-      return answer
+        answer += event.delta
+
+        await this.dbService.dbClient.insert(chatHistory).values({
+          content: answer,
+          role: 'assistant',
+          sessionId: persistence.sessionId,
+          userId: persistence.userId
+        })
+
+        emitTelemetry({
+          component: 'chat.rpc',
+          correlationId,
+          durationMs: Date.now() - startedAt,
+          event: 'chat_rpc_response_received',
+          level: TelemetryLevel.INFO,
+          queueName: 'chat',
+          repoId: segments.repoId,
+          runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
+          service: TelemetryService.WEB_API,
+          status: TelemetryStatus.OK
+        })
+
+        yield this.toMessageEvent(event)
+        return
+      }
     } catch (cause) {
       if (cause instanceof OrchestratorClientError && cause.message === 'Orchestrator request timed out') {
         emitTelemetry({
@@ -173,30 +225,6 @@ export class ChatService {
           runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
           service: TelemetryService.WEB_API,
           status: TelemetryStatus.TIMEOUT
-        })
-      } else if (cause instanceof OrchestratorClientError && cause.message === 'Orchestrator chat response payload was invalid') {
-        emitTelemetry({
-          component: 'chat.rpc',
-          correlationId,
-          event: 'chat_rpc_invalid_payload',
-          level: TelemetryLevel.ERROR,
-          queueName: 'chat',
-          repoId: segments.repoId,
-          runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
-          service: TelemetryService.WEB_API,
-          status: TelemetryStatus.ERROR
-        })
-      } else if (cause instanceof OrchestratorClientError && cause.message === 'Orchestrator response body was not valid JSON') {
-        emitTelemetry({
-          component: 'chat.rpc',
-          correlationId,
-          event: 'chat_rpc_response_parse_failed',
-          level: TelemetryLevel.ERROR,
-          queueName: 'chat',
-          repoId: segments.repoId,
-          runtimeFamily: TelemetryRuntimeFamily.PIPELINE,
-          service: TelemetryService.WEB_API,
-          status: TelemetryStatus.ERROR
         })
       } else {
         emitTelemetry({
@@ -216,7 +244,29 @@ export class ChatService {
         })
       }
 
-      throw cause
+      const timeout = cause instanceof OrchestratorClientError && cause.message === 'Orchestrator request timed out'
+      const errorEvent: OrchestratorChatStreamEvent = {
+        code: timeout ? 'CHAT_STREAM_UPSTREAM_TIMEOUT' : 'CHAT_STREAM_UPSTREAM_FAILURE',
+        message: timeout ? 'The chat response stream timed out.' : 'The chat response stream failed.',
+        type: 'error'
+      }
+
+      this.logger.error(`Chat stream failed for repo ${segments.repoId}: ${cause instanceof Error ? cause.message : String(cause)}`)
+      yield this.toMessageEvent(errorEvent)
+    }
+  }
+
+  private toMessageEvent(event: OrchestratorChatStreamEvent): MessageEvent {
+    if (event.type === 'error') {
+      return {
+        data: { code: event.code, message: event.message },
+        type: event.type
+      }
+    }
+
+    return {
+      data: { delta: event.delta, done: event.done },
+      type: event.type
     }
   }
 }

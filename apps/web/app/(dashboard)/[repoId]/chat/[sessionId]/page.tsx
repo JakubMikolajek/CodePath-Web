@@ -9,20 +9,70 @@ import { Bot, Check, Copy, Send, Sparkles, User } from 'lucide-react'
 import { useParams } from 'next/navigation'
 import type { FormEvent } from 'react'
 import { useEffect, useMemo, useState } from 'react'
-import Markdown from 'react-markdown'
+import Markdown, { type Components } from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 
 import { PageHeader } from '@/components/PageHeader'
 import { getFirstRouteParam } from '@/lib/route-params'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
-import { getSessionDetails, sendMessage } from '@/redux/slices/chatSlice'
+import { getSessionDetails, resetChatStream, sendMessage } from '@/redux/slices/chatSlice'
+
+const markdownComponents: Components = {
+  blockquote: ({ children }) => (
+    <blockquote className="my-4 border-l-4 border-primary bg-primary/10 py-2 pl-4 italic">
+      {children}
+    </blockquote>
+  ),
+  code: ({ children, className, ...props }) => {
+    const match = /language-(\w+)/.exec(className || '')
+
+    return match ? (
+      <div className="relative">
+        <div className="absolute right-2 top-2 rounded bg-slate-950/90 px-2 py-1 text-xs text-cyan-200">
+          {match[1]}
+        </div>
+
+        <code className={className} {...props}>
+          {children}
+        </code>
+      </div>
+    ) : (
+      <code
+        className="rounded border border-white/10 bg-white/10 px-1 py-0.5 text-sm text-cyan-100"
+        {...props}
+      >
+        {children}
+      </code>
+    )
+  },
+  table: ({ children }) => (
+    <div className="overflow-x-auto rounded-xl border border-white/10">
+      <table className="min-w-full border-collapse">
+        {children}
+      </table>
+    </div>
+  ),
+  td: ({ children }) => (
+    <td className="border border-white/10 px-4 py-2">{children}</td>
+  ),
+  th: ({ children }) => (
+    <th className="border border-white/10 bg-white/10 px-4 py-2 text-left font-semibold">
+      {children}
+    </th>
+  )
+}
 
 export default function ChatPage() {
   const params = useParams()
   const dispatch = useAppDispatch()
 
-  const sessionDetails = useAppSelector(state => state.chat.sessionDetails)
+  const {
+    isStreaming,
+    sessionDetails,
+    streamError,
+    streamingAssistantText
+  } = useAppSelector(state => state.chat)
 
   const repoId = useMemo(() => Number(getFirstRouteParam(params.repoId)), [params.repoId])
   const sessionId = useMemo(() => getFirstRouteParam(params.sessionId) ?? '', [params.sessionId])
@@ -70,13 +120,15 @@ export default function ChatPage() {
   }
 
   useEffect(() => {
+    dispatch(resetChatStream())
+
     if (!hasValidRouteParams) return
 
     void dispatch(getSessionDetails({
       repoId,
       sessionId
     }))
-  }, [hasValidRouteParams, repoId, sessionId])
+  }, [dispatch, hasValidRouteParams, repoId, sessionId])
 
   return (
     <div className="flex h-[calc(100svh-70px)] flex-col gap-[18px]">
@@ -91,7 +143,7 @@ export default function ChatPage() {
         className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(20,27,40,0.4),rgba(13,17,26,0.25))]"
       >
         <div className="flex-1 space-y-[18px] overflow-y-auto p-[22px]">
-          {sessionDetails.length === 0 && !isLoading && (
+          {sessionDetails.length === 0 && streamingAssistantText === null && !isLoading && (
             <Card className="mx-auto mt-12 max-w-2xl rounded-[14px] border-primary/25 bg-primary/10 py-0">
               <CardContent className="p-8 text-center">
                 <div className="mx-auto grid size-14 place-items-center rounded-[14px] border border-white/10 bg-white/[0.02] text-primary">
@@ -151,50 +203,7 @@ export default function ChatPage() {
 
                       <article className="prose prose-sm max-w-none px-4 py-[14px] text-[13px] leading-[1.6] prose-p:my-2 prose-strong:text-foreground prose-code:rounded prose-code:border-0 prose-code:bg-white/[0.06] prose-code:px-1.5 prose-code:py-0.5 prose-code:font-mono prose-code:text-[11.5px] prose-code:text-foreground prose-pre:border prose-pre:border-white/10 prose-pre:bg-[var(--nurt-bg0)] prose-pre:text-gray-100 dark:prose-invert">
                         <Markdown
-                          components={{
-                            blockquote: ({ children }) => (
-                              <blockquote className="my-4 border-l-4 border-primary bg-primary/10 py-2 pl-4 italic">
-                                {children}
-                              </blockquote>
-                            ),
-                            code: ({ children, className, ...props }) => {
-                              const match = /language-(\w+)/.exec(className || '')
-
-                              return match ? (
-                                <div className="relative">
-                                  <div className="absolute right-2 top-2 rounded bg-slate-950/90 px-2 py-1 text-xs text-cyan-200">
-                                    {match[1]}
-                                  </div>
-
-                                  <code className={className} {...props}>
-                                    {children}
-                                  </code>
-                                </div>
-                              ) : (
-                                <code
-                                  className="rounded border border-white/10 bg-white/10 px-1 py-0.5 text-sm text-cyan-100"
-                                  {...props}
-                                >
-                                  {children}
-                                </code>
-                              )
-                            },
-                            table: ({ children }) => (
-                              <div className="overflow-x-auto rounded-xl border border-white/10">
-                                <table className="min-w-full border-collapse">
-                                  {children}
-                                </table>
-                              </div>
-                            ),
-                            td: ({ children }) => (
-                              <td className="border border-white/10 px-4 py-2">{children}</td>
-                            ),
-                            th: ({ children }) => (
-                              <th className="border border-white/10 bg-white/10 px-4 py-2 text-left font-semibold">
-                                {children}
-                              </th>
-                            )
-                          }}
+                          components={markdownComponents}
                           rehypePlugins={[rehypeHighlight]}
                           remarkPlugins={[remarkGfm]}
                         >
@@ -208,27 +217,37 @@ export default function ChatPage() {
             </div>
           ))}
 
-          {isLoading && (
-            <div className="flex justify-start">
-              <Card className="max-w-[680px] rounded-[14px] border-secondary/30 bg-secondary/10 py-0">
-                <CardContent className="p-5">
-                  <div className="mb-3 flex items-center gap-2 text-sm font-medium">
-                    <span className="grid size-8 place-items-center rounded-full bg-primary/20 text-primary">
-                      <Bot className="size-4" />
+          {streamingAssistantText !== null && (
+            <div aria-busy={isStreaming} aria-live="polite" className="flex justify-start">
+              <Card className="max-w-[680px] overflow-hidden rounded-[14px] border-secondary/30 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--nurt-accent2)_12%,transparent),color-mix(in_oklab,var(--nurt-accent)_5%,transparent))] py-0">
+                <CardContent className="p-0">
+                  <div className="flex items-center gap-[9px] border-b border-white/[0.06] px-[15px] py-[11px] text-[13px] font-semibold text-foreground">
+                    <span className="grid size-6 place-items-center rounded-[7px] bg-[linear-gradient(135deg,var(--nurt-accent),var(--nurt-accent2))] text-[var(--nurt-ink)]">
+                      <Bot className="size-[13px]" />
                     </span>
                     Asystent AI
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div aria-hidden="true" className="flex gap-1">
-                      <span className="size-2 animate-bounce rounded-full bg-primary" />
 
-                      <span className="size-2 animate-bounce rounded-full bg-primary [animation-delay:120ms]" />
-
-                      <span className="size-2 animate-bounce rounded-full bg-primary [animation-delay:240ms]" />
+                  {streamingAssistantText ? (
+                    <article className="prose prose-sm max-w-none px-4 py-[14px] text-[13px] leading-[1.6] prose-p:my-2 prose-strong:text-foreground prose-code:rounded prose-code:border-0 prose-code:bg-white/[0.06] prose-code:px-1.5 prose-code:py-0.5 prose-code:font-mono prose-code:text-[11.5px] prose-code:text-foreground prose-pre:border prose-pre:border-white/10 prose-pre:bg-[var(--nurt-bg0)] prose-pre:text-gray-100 dark:prose-invert">
+                      <Markdown
+                        components={markdownComponents}
+                        rehypePlugins={[rehypeHighlight]}
+                        remarkPlugins={[remarkGfm]}
+                      >
+                        {streamingAssistantText}
+                      </Markdown>
+                    </article>
+                  ) : (
+                    <div className="flex items-center gap-3 px-4 py-[14px]">
+                      <div aria-hidden="true" className="flex gap-1">
+                        <span className="size-2 animate-bounce rounded-full bg-primary" />
+                        <span className="size-2 animate-bounce rounded-full bg-primary [animation-delay:120ms]" />
+                        <span className="size-2 animate-bounce rounded-full bg-primary [animation-delay:240ms]" />
+                      </div>
+                      <span className="text-sm text-muted-foreground">Rozpoczynam odpowiedź...</span>
                     </div>
-
-                    <span className="text-sm text-muted-foreground">Pisze odpowiedź...</span>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -265,6 +284,12 @@ export default function ChatPage() {
               <Send className="size-5" />
             </Button>
           </form>
+
+          {streamError && (
+            <p className="mt-3 text-center text-sm text-destructive" role="alert">
+              {streamError}
+            </p>
+          )}
 
           <p className="mt-[10px] text-center font-mono text-[10.5px] text-[var(--nurt-t3)]">
             {hasValidRouteParams
