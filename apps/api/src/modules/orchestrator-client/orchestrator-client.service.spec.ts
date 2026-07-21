@@ -1,6 +1,19 @@
+import { Readable } from 'node:stream'
+
 import axios, { AxiosError } from 'axios'
 
-import { OrchestratorClient } from './services/orchestrator-client.service'
+import {
+  type OrchestratorChatStreamEvent,
+  OrchestratorClient
+} from './services/orchestrator-client.service'
+
+async function collectChatEvents(stream: AsyncIterable<OrchestratorChatStreamEvent>): Promise<OrchestratorChatStreamEvent[]> {
+  const events: OrchestratorChatStreamEvent[] = []
+
+  for await (const event of stream) events.push(event)
+
+  return events
+}
 
 jest.mock('axios')
 
@@ -23,25 +36,77 @@ describe('orchestrator client', () => {
   it('times out chat rpc request when orchestrator does not respond', async () => {
     requestMock.mockRejectedValue(Object.assign(new Error('timeout'), { code: 'ECONNABORTED' }))
 
-    await expect(client.requestChatRpc({
+    await expect(collectChatEvents(client.streamChatRpc({
       prompt: 'timeout me',
       repoId: 1
-    })).rejects.toThrow('Orchestrator request timed out')
+    }))).rejects.toThrow('Orchestrator request timed out')
   })
 
-  it('returns parsed chat response when orchestrator replies with json', async () => {
+  it('parses multiple SSE frames from a single readable chunk', async () => {
     requestMock.mockResolvedValue({
-      data: JSON.stringify({ response: 'ok' }),
+      data: Readable.from([
+        'event: chunk\ndata: {"delta":"hel","done":false}\n\nevent: chunk\ndata: {"delta":"lo","done":false}\n\nevent: done\ndata: {"delta":"!","done":true}\n\n'
+      ]),
       status: 200,
       statusText: 'OK'
     })
 
-    await expect(
-      client.requestChatRpc({
-        prompt: 'hello',
-        repoId: 2
-      })
-    ).resolves.toBe('ok')
+    await expect(collectChatEvents(client.streamChatRpc({
+      prompt: 'hello',
+      repoId: 2
+    }))).resolves.toEqual([
+      { delta: 'hel', done: false, type: 'chunk' },
+      { delta: 'lo', done: false, type: 'chunk' },
+      { delta: '!', done: true, type: 'done' }
+    ])
+
+    expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({
+      headers: expect.objectContaining({ accept: 'text/event-stream' }),
+      responseType: 'stream',
+      url: expect.stringContaining('/v1/chat/rpc')
+    }))
+  })
+
+  it('buffers an SSE frame split across readable chunks', async () => {
+    const encoded = Buffer.from('event: chunk\ndata: {"delta":"zażółć","done":false}\n\nevent: done\ndata: {"delta":"","done":true}\n\n')
+
+    requestMock.mockResolvedValue({
+      data: Readable.from([
+        encoded.subarray(0, 18),
+        encoded.subarray(18, 37),
+        encoded.subarray(37, 44),
+        encoded.subarray(44)
+      ]),
+      status: 200,
+      statusText: 'OK'
+    })
+
+    await expect(collectChatEvents(client.streamChatRpc({
+      prompt: 'split the stream',
+      repoId: 3
+    }))).resolves.toEqual([
+      { delta: 'zażółć', done: false, type: 'chunk' },
+      { delta: '', done: true, type: 'done' }
+    ])
+  })
+
+  it('passes through a terminal SSE error event', async () => {
+    requestMock.mockResolvedValue({
+      data: Readable.from([
+        'event: chunk\ndata: {"delta":"partial","done":false}\n\n',
+        'event: error\ndata: {"code":"CHAT_STREAM_IDLE_TIMEOUT","message":"stream timed out"}\n\n'
+      ]),
+      status: 200,
+      statusText: 'OK'
+    })
+
+    await expect(collectChatEvents(client.streamChatRpc({
+      prompt: 'fail eventually',
+      repoId: 4
+    }))).resolves.toEqual([
+      { delta: 'partial', done: false, type: 'chunk' },
+      { code: 'CHAT_STREAM_IDLE_TIMEOUT', message: 'stream timed out', type: 'error' }
+    ])
   })
 
   it('rejects ingest publish when producer payload is invalid', async () => {
