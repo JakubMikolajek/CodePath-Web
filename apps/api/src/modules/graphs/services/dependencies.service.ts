@@ -31,6 +31,7 @@ interface InteractiveGraphQuery {
 const SUPPORTED_RELATION_TYPES: RepoGraphEdgeType[] = [
   RepoGraphEdgeType.IMPORTS,
   RepoGraphEdgeType.CALLS,
+  RepoGraphEdgeType.EXTENDS,
   RepoGraphEdgeType.DEPENDS_ON,
   RepoGraphEdgeType.OWNS,
   RepoGraphEdgeType.PRODUCES,
@@ -173,12 +174,13 @@ export class DependenciesService {
       truncated = true
       truncationReason = truncationReason ? `${truncationReason}+edge_cap` : 'edge_cap'
       const edgePriority: Record<RepoGraphEdgeType, number> = {
-        [RepoGraphEdgeType.CALLS]: 3,
-        [RepoGraphEdgeType.CONSUMES]: 5,
+        [RepoGraphEdgeType.CALLS]: 4,
+        [RepoGraphEdgeType.CONSUMES]: 6,
         [RepoGraphEdgeType.DEPENDS_ON]: 0,
+        [RepoGraphEdgeType.EXTENDS]: 3,
         [RepoGraphEdgeType.IMPORTS]: 1,
         [RepoGraphEdgeType.OWNS]: 2,
-        [RepoGraphEdgeType.PRODUCES]: 4
+        [RepoGraphEdgeType.PRODUCES]: 5
       }
 
       const sortedEdges = [...limitedEdges].sort((a, b) => {

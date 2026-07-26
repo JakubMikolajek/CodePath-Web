@@ -282,6 +282,50 @@ describe('ingest.v2 contract', () => {
     })
   })
 
+  it('exposes optional AST graph target fields in the segment JSON schema', () => {
+    const [, batchReadySchema] = INGEST_MESSAGE_JSON_SCHEMA_V2.oneOf as unknown[]
+
+    expect(batchReadySchema).toMatchObject({
+      allOf: [
+        expect.any(Object),
+        {
+          properties: {
+            payload: {
+              properties: {
+                segments: {
+                  items: {
+                    additionalProperties: false,
+                    properties: {
+                      callTargets: {
+                        items: { type: 'string' },
+                        type: 'array'
+                      },
+                      extendsTargets: {
+                        items: { type: 'string' },
+                        type: 'array'
+                      }
+                    },
+                    required: [
+                      'segmentId',
+                      'filePath',
+                      'category',
+                      'parseStrategy',
+                      'symbolKind',
+                      'content',
+                      'contentSha256',
+                      'chunkIndex',
+                      'chunkCount'
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    })
+  })
+
   it('validates ingest.job.request payload', () => {
     const message = {
       contractVersion: 'ingest.v2',
@@ -383,6 +427,7 @@ describe('ingest.v2 contract', () => {
         isLastBatch: true,
         segments: [{
           astPath: ['program', 'function_declaration'],
+          callTargets: ['buildRepositoryGraph', 'graph.addEdge'],
           category: 'code',
           chunkCount: 1,
           chunkIndex: 0,
@@ -392,6 +437,7 @@ describe('ingest.v2 contract', () => {
           decorators: ['@Trace()'],
           endByte: 30,
           endLine: 1,
+          extendsTargets: ['BaseGraphBuilder'],
           fileExt: '.ts',
           filePath: 'src/a.ts',
           httpMethod: 'GET',
@@ -427,6 +473,26 @@ describe('ingest.v2 contract', () => {
     }
 
     expect(isIngestMessageV2(message)).toBe(true)
+    expect(isIngestMessageV2({
+      ...message,
+      payload: {
+        ...message.payload,
+        segments: [{
+          ...message.payload.segments[0],
+          callTargets: ['buildRepositoryGraph', 1]
+        }]
+      }
+    })).toBe(false)
+    expect(isIngestMessageV2({
+      ...message,
+      payload: {
+        ...message.payload,
+        segments: [{
+          ...message.payload.segments[0],
+          extendsTargets: ['BaseGraphBuilder', 1]
+        }]
+      }
+    })).toBe(false)
   })
 
   it('validates ingest.batch.ready with deleted file paths', () => {

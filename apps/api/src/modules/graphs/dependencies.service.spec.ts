@@ -1,4 +1,5 @@
 import { ServiceUnavailableException } from '@nestjs/common'
+import { RepoGraphEdgeType } from '@workspace/codepath-common/graph'
 
 import { DependenciesService } from './services/dependencies.service'
 
@@ -9,9 +10,11 @@ type RepoFixture = {
 
 type SegmentFixture = {
   ast_path?: string[]
+  call_targets?: string[]
   category?: string
   content?: string
   end_line?: number
+  extends_targets?: string[]
   file_ext?: string
   file_path: string
   http_method?: string
@@ -499,8 +502,156 @@ describe('DependenciesService interactive graph topology resolution', () => {
     ]))
   })
 
+  it('uses AST call targets for symbol-to-symbol calls without also running the file regex fallback', async () => {
+    const repo = { id: 7, name: 'semantic-calls' }
+    const service = createService(repo, [
+      astSegment('/repo/src/caller.ts', 'run', {
+        call_targets: ['TargetFromAst'],
+        content: 'TargetFromRegex()',
+        import_specifiers: ['./targets'],
+        segment_id: 'seg-run',
+        symbol_kind: 'function'
+      }),
+      astSegment('/repo/src/targets.ts', 'TargetFromAst', {
+        content: 'export function TargetFromAst() {}',
+        segment_id: 'seg-target-from-ast',
+        symbol_kind: 'function'
+      }),
+      astSegment('/repo/src/targets.ts', 'TargetFromRegex', {
+        content: 'export function TargetFromRegex() {}',
+        segment_id: 'seg-target-from-regex',
+        symbol_kind: 'function'
+      })
+    ])
+
+    const graph = await service.getRepoInteractiveGraph(7, repo.id, {
+      includeSymbols: 'true'
+    })
+
+    expect(graph.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        metadata: {
+          label: 'TargetFromAst',
+          rawType: 'symbol_call_ast'
+        },
+        source: 'symbol:/repo/src/caller.ts:seg-run',
+        target: 'symbol:/repo/src/targets.ts:seg-target-from-ast',
+        type: 'calls'
+      })
+    ]))
+    expect(graph.edges.some(edge => (
+      edge.source === 'file:/repo/src/caller.ts'
+      && edge.type === RepoGraphEdgeType.CALLS
+    ))).toBe(false)
+    expect(graph.edges.some(edge => edge.metadata?.label === 'TargetFromRegex' && edge.type === RepoGraphEdgeType.CALLS)).toBe(false)
+  })
+
+  it('builds and filters AST-derived symbol-to-symbol extends edges', async () => {
+    const repo = { id: 8, name: 'semantic-extends' }
+    const service = createService(repo, [
+      astSegment('/repo/src/derived.ts', 'DerivedService', {
+        content: 'export class DerivedService extends BaseService {}',
+        extends_targets: ['BaseService'],
+        import_specifiers: ['./base'],
+        node_type: 'class_declaration',
+        segment_id: 'seg-derived-service',
+        symbol_kind: 'class'
+      }),
+      astSegment('/repo/src/base.ts', 'BaseService', {
+        content: 'export class BaseService {}',
+        node_type: 'class_declaration',
+        segment_id: 'seg-base-service',
+        symbol_kind: 'class'
+      })
+    ])
+
+    const graph = await service.getRepoInteractiveGraph(8, repo.id, {
+      includeSymbols: 'true',
+      relationTypes: 'extends'
+    })
+
+    expect(graph.edges).toEqual([
+      expect.objectContaining({
+        metadata: {
+          label: 'BaseService',
+          rawType: 'symbol_extends'
+        },
+        source: 'symbol:/repo/src/derived.ts:seg-derived-service',
+        target: 'symbol:/repo/src/base.ts:seg-base-service',
+        type: 'extends'
+      })
+    ])
+    expect(graph.metadata.availableEdgeTypes).toEqual(['extends'])
+    expect(graph.filters.relationTypes).toEqual(['extends'])
+  })
+
+  it('keeps the existing file-to-symbol regex call fallback when AST call targets are empty', async () => {
+    const repo = { id: 9, name: 'legacy-call-fallback' }
+    const service = createService(repo, [
+      astSegment('/repo/src/caller.ts', 'runLegacy', {
+        call_targets: [],
+        content: 'LegacyTarget()',
+        import_specifiers: ['./target'],
+        segment_id: 'seg-run-legacy',
+        symbol_kind: 'function'
+      }),
+      astSegment('/repo/src/target.ts', 'LegacyTarget', {
+        content: 'export function LegacyTarget() {}',
+        segment_id: 'seg-legacy-target',
+        symbol_kind: 'function'
+      })
+    ])
+
+    const graph = await service.getRepoInteractiveGraph(9, repo.id, {
+      includeSymbols: 'true'
+    })
+
+    expect(graph.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        metadata: {
+          label: 'LegacyTarget',
+          rawType: 'symbol_call'
+        },
+        source: 'file:/repo/src/caller.ts',
+        target: 'symbol:/repo/src/target.ts:seg-legacy-target',
+        type: 'calls'
+      })
+    ]))
+  })
+
+  it('caps AST-derived call edges at the existing per-file maximum', async () => {
+    const repo = { id: 10, name: 'semantic-call-cap' }
+    const targetNames = Array.from({ length: 125 }, (_, index) => `Target${index}`)
+    const targetSegments = targetNames.map(targetName => astSegment('/repo/src/targets.ts', targetName, {
+      content: `export function ${targetName}() {}`,
+      segment_id: `seg-${targetName}`,
+      symbol_kind: 'function'
+    }))
+    const service = createService(repo, [
+      astSegment('/repo/src/caller.ts', 'runAll', {
+        call_targets: targetNames,
+        content: 'return true',
+        import_specifiers: ['./targets'],
+        segment_id: 'seg-run-all',
+        symbol_kind: 'function'
+      }),
+      ...targetSegments
+    ])
+
+    const graph = await service.getRepoInteractiveGraph(10, repo.id, {
+      includeSymbols: 'true'
+    })
+    const astCallEdges = graph.edges.filter(edge => (
+      edge.source === 'symbol:/repo/src/caller.ts:seg-run-all'
+      && edge.type === RepoGraphEdgeType.CALLS
+      && edge.metadata?.rawType === 'symbol_call_ast'
+    ))
+
+    expect(astCallEdges).toHaveLength(120)
+  })
+
   it('surfaces Qdrant failures instead of returning an empty graph', async () => {
-    const repo = { id: 7, name: 'qdrant-down' }
+    const repo = { id: 11, name: 'qdrant-down' }
     const service = createServiceWithQdrant(
       repo,
       createFailingQdrantServiceMock(new Error('connection refused'))

@@ -21,6 +21,7 @@ import { getGraphs, getInteractiveGraph } from '@/redux/slices/graphsSlice'
 const EDGE_TYPE_OPTIONS: RepoGraphEdgeType[] = [
   RepoGraphEdgeType.IMPORTS,
   RepoGraphEdgeType.CALLS,
+  RepoGraphEdgeType.EXTENDS,
   RepoGraphEdgeType.DEPENDS_ON,
   RepoGraphEdgeType.OWNS,
   RepoGraphEdgeType.PRODUCES,

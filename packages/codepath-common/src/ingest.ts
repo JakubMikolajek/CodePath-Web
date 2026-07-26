@@ -144,6 +144,7 @@ export interface IngestJobRequestPayloadV2 {
 
 export interface IngestSegmentV2 {
   astPath?: string[]
+  callTargets?: string[]
   category: IngestSegmentCategoryV2
   chunkCount: number
   chunkIndex: number
@@ -155,6 +156,7 @@ export interface IngestSegmentV2 {
   decorators?: string[]
   endByte?: number
   endLine?: number
+  extendsTargets?: string[]
   fallbackReason?: string
   fileExt?: string
   filePath: string
@@ -326,6 +328,10 @@ const INGEST_SEGMENT_SCHEMA_V2: JsonSchemaObject = {
       items: { type: 'string' },
       type: 'array'
     },
+    callTargets: {
+      items: { type: 'string' },
+      type: 'array'
+    },
     category: {
       enum: INGEST_SEGMENT_CATEGORIES_V2
     },
@@ -352,6 +358,10 @@ const INGEST_SEGMENT_SCHEMA_V2: JsonSchemaObject = {
     },
     endByte: { minimum: 0, type: 'integer' },
     endLine: { minimum: 1, type: 'integer' },
+    extendsTargets: {
+      items: { type: 'string' },
+      type: 'array'
+    },
     fallbackReason: { type: 'string' },
     fileExt: { type: 'string' },
     filePath: {
@@ -822,7 +832,9 @@ function isIngestSegmentV2(value: unknown): value is IngestSegmentV2 {
     && isOptionalString(value.jsDoc)
     && isOptionalString(value.returnType)
     && isOptionalString(value.routePath)
+    && (value.callTargets === undefined || isStringArray(value.callTargets))
     && (value.decorators === undefined || isStringArray(value.decorators))
+    && (value.extendsTargets === undefined || isStringArray(value.extendsTargets))
     && (value.importSpecifiers === undefined || isStringArray(value.importSpecifiers))
     && (value.params === undefined || isStringArray(value.params))
     && (value.astPath === undefined || isStringArray(value.astPath))

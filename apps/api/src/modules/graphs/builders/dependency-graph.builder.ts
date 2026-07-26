@@ -25,9 +25,11 @@ export interface RepoOwnership {
 
 export interface IngestSegmentPayload {
   ast_path?: string[]
+  call_targets?: string[]
   category?: string
   content?: string
   end_line?: number
+  extends_targets?: string[]
   file_ext?: string
   file_path?: string
   http_method?: string
@@ -46,7 +48,9 @@ export interface IngestSegmentPayload {
 
 interface CanonicalSymbol {
   astPath?: string[]
+  callTargets?: string[]
   endLine?: number
+  extendsTargets?: string[]
   httpMethod?: string
   id: string
   label: string
@@ -317,38 +321,109 @@ export class DependencyGraphBuilder {
       }
 
       if (options.includeSymbols) {
-        // TODO(ingest.v2): replace this best-effort source fallback once Ingest emits call/reference metadata.
-        const callCandidates = this.codeExtractor.extractCallIdentifiers(file.content, file.language, file.fileExt)
         let callEdgesAdded = 0
+        const hasAstCallData = file.symbols.some(symbol => (symbol.callTargets?.length ?? 0) > 0)
 
-        for (const callIdentifier of callCandidates) {
-          if (callEdgesAdded >= MAX_CALL_EDGES_PER_FILE) break
+        if (hasAstCallData) {
+          for (const symbol of file.symbols) {
+            if (callEdgesAdded >= MAX_CALL_EDGES_PER_FILE) break
 
-          const normalizedCallIdentifier = this.normalizeSymbolName(callIdentifier)
-          const symbolRefs = symbolRefsByNormalizedName.get(normalizedCallIdentifier)
+            const sourceSymbolNodeId = this.toSymbolNodeId(file.filePath, symbol)
 
-          if (!symbolRefs || symbolRefs.length === 0) continue
+            for (const targetName of symbol.callTargets ?? []) {
+              if (callEdgesAdded >= MAX_CALL_EDGES_PER_FILE) break
 
-          const matchingRef = symbolRefs.find(symbolRef => {
-            if (symbolRef.filePath === file.filePath) return false
-            if (internalImports.has(symbolRef.filePath)) return true
+              const normalizedTargetName = this.normalizeSymbolName(targetName)
+              const symbolRefs = symbolRefsByNormalizedName.get(normalizedTargetName)
 
-            const sourceModuleId = moduleNodeIdByFilePath.get(file.filePath)
-            const targetModuleId = moduleNodeIdByFilePath.get(symbolRef.filePath)
+              if (!symbolRefs || symbolRefs.length === 0) continue
 
-            return sourceModuleId && targetModuleId && sourceModuleId === targetModuleId
-          })
+              const matchingRef = symbolRefs.find(symbolRef => {
+                if (symbolRef.filePath === file.filePath) return false
+                if (internalImports.has(symbolRef.filePath)) return true
 
-          if (!matchingRef) continue
+                const sourceModuleId = moduleNodeIdByFilePath.get(file.filePath)
+                const targetModuleId = moduleNodeIdByFilePath.get(symbolRef.filePath)
 
-          this.addEdge(edgesByKey, {
-            id: `${sourceFileNodeId}->${matchingRef.symbolNodeId}:calls`,
-            metadata: { label: callIdentifier, rawType: 'symbol_call' },
-            source: sourceFileNodeId,
-            target: matchingRef.symbolNodeId,
-            type: RepoGraphEdgeType.CALLS
-          })
-          callEdgesAdded += 1
+                return sourceModuleId && targetModuleId && sourceModuleId === targetModuleId
+              })
+
+              if (!matchingRef) continue
+
+              this.addEdge(edgesByKey, {
+                id: `${sourceSymbolNodeId}->${matchingRef.symbolNodeId}:calls`,
+                metadata: { label: targetName, rawType: 'symbol_call_ast' },
+                source: sourceSymbolNodeId,
+                target: matchingRef.symbolNodeId,
+                type: RepoGraphEdgeType.CALLS
+              })
+              callEdgesAdded += 1
+            }
+          }
+        } else {
+          // AST call metadata is preferred per file; regex extraction remains a fallback for unreingested or unsupported files.
+          const callCandidates = this.codeExtractor.extractCallIdentifiers(file.content, file.language, file.fileExt)
+
+          for (const callIdentifier of callCandidates) {
+            if (callEdgesAdded >= MAX_CALL_EDGES_PER_FILE) break
+
+            const normalizedCallIdentifier = this.normalizeSymbolName(callIdentifier)
+            const symbolRefs = symbolRefsByNormalizedName.get(normalizedCallIdentifier)
+
+            if (!symbolRefs || symbolRefs.length === 0) continue
+
+            const matchingRef = symbolRefs.find(symbolRef => {
+              if (symbolRef.filePath === file.filePath) return false
+              if (internalImports.has(symbolRef.filePath)) return true
+
+              const sourceModuleId = moduleNodeIdByFilePath.get(file.filePath)
+              const targetModuleId = moduleNodeIdByFilePath.get(symbolRef.filePath)
+
+              return sourceModuleId && targetModuleId && sourceModuleId === targetModuleId
+            })
+
+            if (!matchingRef) continue
+
+            this.addEdge(edgesByKey, {
+              id: `${sourceFileNodeId}->${matchingRef.symbolNodeId}:calls`,
+              metadata: { label: callIdentifier, rawType: 'symbol_call' },
+              source: sourceFileNodeId,
+              target: matchingRef.symbolNodeId,
+              type: RepoGraphEdgeType.CALLS
+            })
+            callEdgesAdded += 1
+          }
+        }
+
+        for (const symbol of file.symbols) {
+          const sourceSymbolNodeId = this.toSymbolNodeId(file.filePath, symbol)
+
+          for (const targetName of symbol.extendsTargets ?? []) {
+            const normalizedTargetName = this.normalizeSymbolName(targetName)
+            const symbolRefs = symbolRefsByNormalizedName.get(normalizedTargetName)
+
+            if (!symbolRefs || symbolRefs.length === 0) continue
+
+            const matchingRef = symbolRefs.find(symbolRef => {
+              if (symbolRef.filePath === file.filePath) return false
+              if (internalImports.has(symbolRef.filePath)) return true
+
+              const sourceModuleId = moduleNodeIdByFilePath.get(file.filePath)
+              const targetModuleId = moduleNodeIdByFilePath.get(symbolRef.filePath)
+
+              return sourceModuleId && targetModuleId && sourceModuleId === targetModuleId
+            })
+
+            if (!matchingRef) continue
+
+            this.addEdge(edgesByKey, {
+              id: `${sourceSymbolNodeId}->${matchingRef.symbolNodeId}:extends`,
+              metadata: { label: targetName, rawType: 'symbol_extends' },
+              source: sourceSymbolNodeId,
+              target: matchingRef.symbolNodeId,
+              type: RepoGraphEdgeType.EXTENDS
+            })
+          }
         }
       }
 
@@ -555,6 +630,8 @@ export class DependencyGraphBuilder {
     const routePath = this.safeString(segment.route_path) ?? undefined
     const httpMethod = this.safeString(segment.http_method)?.toUpperCase()
     const astPath = this.normalizeAstPath(segment.ast_path)
+    const callTargets = this.normalizeStringArray(segment.call_targets)
+    const extendsTargets = this.normalizeStringArray(segment.extends_targets)
     const isAstSemanticSegment = parseStrategy === 'tree_sitter' || Boolean(nodeType || routePath || httpMethod || astPath)
     const nonSemanticKinds = new Set(['config', 'documentation', 'file'])
 
@@ -574,7 +651,9 @@ export class DependencyGraphBuilder {
 
     return {
       astPath,
+      callTargets: callTargets.length > 0 ? callTargets : undefined,
       endLine,
+      extendsTargets: extendsTargets.length > 0 ? extendsTargets : undefined,
       httpMethod,
       id: explicitId ?? fallbackId,
       label,
