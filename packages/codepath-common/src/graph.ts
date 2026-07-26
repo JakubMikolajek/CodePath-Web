@@ -17,6 +17,7 @@ export enum RepoGraphEdgeType {
   CALLS = 'calls',
   CONSUMES = 'consumes',
   DEPENDS_ON = 'depends_on',
+  EXTENDS = 'extends',
   IMPORTS = 'imports',
   OWNS = 'owns',
   PRODUCES = 'produces'
