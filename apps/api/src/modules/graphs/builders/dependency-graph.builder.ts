@@ -324,44 +324,8 @@ export class DependencyGraphBuilder {
         let callEdgesAdded = 0
         const hasAstCallData = file.symbols.some(symbol => (symbol.callTargets?.length ?? 0) > 0)
 
-        if (hasAstCallData) {
-          for (const symbol of file.symbols) {
-            if (callEdgesAdded >= MAX_CALL_EDGES_PER_FILE) break
-
-            const sourceSymbolNodeId = this.toSymbolNodeId(file.filePath, symbol)
-
-            for (const targetName of symbol.callTargets ?? []) {
-              if (callEdgesAdded >= MAX_CALL_EDGES_PER_FILE) break
-
-              const normalizedTargetName = this.normalizeSymbolName(targetName)
-              const symbolRefs = symbolRefsByNormalizedName.get(normalizedTargetName)
-
-              if (!symbolRefs || symbolRefs.length === 0) continue
-
-              const matchingRef = symbolRefs.find(symbolRef => {
-                if (symbolRef.filePath === file.filePath) return false
-                if (internalImports.has(symbolRef.filePath)) return true
-
-                const sourceModuleId = moduleNodeIdByFilePath.get(file.filePath)
-                const targetModuleId = moduleNodeIdByFilePath.get(symbolRef.filePath)
-
-                return sourceModuleId && targetModuleId && sourceModuleId === targetModuleId
-              })
-
-              if (!matchingRef) continue
-
-              this.addEdge(edgesByKey, {
-                id: `${sourceSymbolNodeId}->${matchingRef.symbolNodeId}:calls`,
-                metadata: { label: targetName, rawType: 'symbol_call_ast' },
-                source: sourceSymbolNodeId,
-                target: matchingRef.symbolNodeId,
-                type: RepoGraphEdgeType.CALLS
-              })
-              callEdgesAdded += 1
-            }
-          }
-        } else {
-          // AST call metadata is preferred per file; regex extraction remains a fallback for unreingested or unsupported files.
+        if (!hasAstCallData) {
+          // AST call metadata is resolved by the graph RPC; regex extraction remains a fallback for unreingested or unsupported files.
           const callCandidates = this.codeExtractor.extractCallIdentifiers(file.content, file.language, file.fileExt)
 
           for (const callIdentifier of callCandidates) {
@@ -392,37 +356,6 @@ export class DependencyGraphBuilder {
               type: RepoGraphEdgeType.CALLS
             })
             callEdgesAdded += 1
-          }
-        }
-
-        for (const symbol of file.symbols) {
-          const sourceSymbolNodeId = this.toSymbolNodeId(file.filePath, symbol)
-
-          for (const targetName of symbol.extendsTargets ?? []) {
-            const normalizedTargetName = this.normalizeSymbolName(targetName)
-            const symbolRefs = symbolRefsByNormalizedName.get(normalizedTargetName)
-
-            if (!symbolRefs || symbolRefs.length === 0) continue
-
-            const matchingRef = symbolRefs.find(symbolRef => {
-              if (symbolRef.filePath === file.filePath) return false
-              if (internalImports.has(symbolRef.filePath)) return true
-
-              const sourceModuleId = moduleNodeIdByFilePath.get(file.filePath)
-              const targetModuleId = moduleNodeIdByFilePath.get(symbolRef.filePath)
-
-              return sourceModuleId && targetModuleId && sourceModuleId === targetModuleId
-            })
-
-            if (!matchingRef) continue
-
-            this.addEdge(edgesByKey, {
-              id: `${sourceSymbolNodeId}->${matchingRef.symbolNodeId}:extends`,
-              metadata: { label: targetName, rawType: 'symbol_extends' },
-              source: sourceSymbolNodeId,
-              target: matchingRef.symbolNodeId,
-              type: RepoGraphEdgeType.EXTENDS
-            })
           }
         }
       }

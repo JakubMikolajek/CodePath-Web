@@ -1,6 +1,8 @@
 import { ServiceUnavailableException } from '@nestjs/common'
+import type { RepoGraphEdge } from '@workspace/codepath-common/graph'
 import { RepoGraphEdgeType } from '@workspace/codepath-common/graph'
 
+import { OrchestratorClientError } from '../orchestrator-client/services/orchestrator-client.service'
 import { DependenciesService } from './services/dependencies.service'
 
 type RepoFixture = {
@@ -103,17 +105,32 @@ function createFailingQdrantServiceMock(error: Error) {
   } as never
 }
 
-function createService(repo: RepoFixture, segments: SegmentFixture[]) {
+function createOrchestratorClientMock(edges: RepoGraphEdge[] = []) {
+  return {
+    graphRpc: jest.fn().mockResolvedValue({
+      edges,
+      nodes: []
+    })
+  }
+}
+
+function createService(
+  repo: RepoFixture,
+  segments: SegmentFixture[],
+  orchestratorClient = createOrchestratorClientMock()
+) {
   return new DependenciesService(
     createDbServiceMock(repo),
-    createQdrantServiceMock(segments)
+    createQdrantServiceMock(segments),
+    orchestratorClient as never
   )
 }
 
 function createServiceWithQdrant(repo: RepoFixture, qdrantService: never) {
   return new DependenciesService(
     createDbServiceMock(repo),
-    qdrantService
+    qdrantService,
+    createOrchestratorClientMock() as never
   )
 }
 
@@ -502,8 +519,19 @@ describe('DependenciesService interactive graph topology resolution', () => {
     ]))
   })
 
-  it('uses AST call targets for symbol-to-symbol calls without also running the file regex fallback', async () => {
+  it('merges graph RPC call edges without also running the local regex fallback for AST call data', async () => {
     const repo = { id: 7, name: 'semantic-calls' }
+    const aiCallEdge: RepoGraphEdge = {
+      id: 'ai-call-run-target',
+      metadata: {
+        label: 'TargetFromAst',
+        rawType: 'symbol_call_ast'
+      },
+      source: 'symbol:/repo/src/caller.ts:seg-run',
+      target: 'symbol:/repo/src/targets.ts:seg-target-from-ast',
+      type: RepoGraphEdgeType.CALLS
+    }
+    const orchestratorClient = createOrchestratorClientMock([aiCallEdge])
     const service = createService(repo, [
       astSegment('/repo/src/caller.ts', 'run', {
         call_targets: ['TargetFromAst'],
@@ -522,12 +550,16 @@ describe('DependenciesService interactive graph topology resolution', () => {
         segment_id: 'seg-target-from-regex',
         symbol_kind: 'function'
       })
-    ])
+    ], orchestratorClient)
 
     const graph = await service.getRepoInteractiveGraph(7, repo.id, {
       includeSymbols: 'true'
     })
 
+    expect(orchestratorClient.graphRpc).toHaveBeenCalledWith({
+      relationTypes: ['calls', 'extends'],
+      repoId: repo.id
+    })
     expect(graph.edges).toEqual(expect.arrayContaining([
       expect.objectContaining({
         metadata: {
@@ -546,8 +578,18 @@ describe('DependenciesService interactive graph topology resolution', () => {
     expect(graph.edges.some(edge => edge.metadata?.label === 'TargetFromRegex' && edge.type === RepoGraphEdgeType.CALLS)).toBe(false)
   })
 
-  it('builds and filters AST-derived symbol-to-symbol extends edges', async () => {
+  it('filters merged graph RPC extends edges through the existing relation type pipeline', async () => {
     const repo = { id: 8, name: 'semantic-extends' }
+    const orchestratorClient = createOrchestratorClientMock([{
+      id: 'ai-extends-derived-base',
+      metadata: {
+        label: 'BaseService',
+        rawType: 'symbol_extends'
+      },
+      source: 'symbol:/repo/src/derived.ts:seg-derived-service',
+      target: 'symbol:/repo/src/base.ts:seg-base-service',
+      type: RepoGraphEdgeType.EXTENDS
+    }])
     const service = createService(repo, [
       astSegment('/repo/src/derived.ts', 'DerivedService', {
         content: 'export class DerivedService extends BaseService {}',
@@ -563,7 +605,7 @@ describe('DependenciesService interactive graph topology resolution', () => {
         segment_id: 'seg-base-service',
         symbol_kind: 'class'
       })
-    ])
+    ], orchestratorClient)
 
     const graph = await service.getRepoInteractiveGraph(8, repo.id, {
       includeSymbols: 'true',
@@ -619,13 +661,197 @@ describe('DependenciesService interactive graph topology resolution', () => {
     ]))
   })
 
-  it('caps AST-derived call edges at the existing per-file maximum', async () => {
+  it('deduplicates graph RPC edges against local fallback edges by source, type, and target', async () => {
+    const repo = { id: 10, name: 'deduplicated-calls' }
+    const duplicateAiEdge: RepoGraphEdge = {
+      id: 'ai-duplicate-call',
+      metadata: {
+        label: 'LegacyTarget',
+        rawType: 'symbol_call_ast'
+      },
+      source: 'file:/repo/src/caller.ts',
+      target: 'symbol:/repo/src/target.ts:seg-legacy-target',
+      type: RepoGraphEdgeType.CALLS
+    }
+    const service = createService(repo, [
+      astSegment('/repo/src/caller.ts', 'runLegacy', {
+        call_targets: [],
+        content: 'LegacyTarget()',
+        import_specifiers: ['./target'],
+        segment_id: 'seg-run-legacy',
+        symbol_kind: 'function'
+      }),
+      astSegment('/repo/src/target.ts', 'LegacyTarget', {
+        content: 'export function LegacyTarget() {}',
+        segment_id: 'seg-legacy-target',
+        symbol_kind: 'function'
+      })
+    ], createOrchestratorClientMock([duplicateAiEdge]))
+
+    const graph = await service.getRepoInteractiveGraph(10, repo.id, {
+      includeSymbols: 'true'
+    })
+    const matchingEdges = graph.edges.filter(edge => (
+      edge.source === duplicateAiEdge.source
+      && edge.type === duplicateAiEdge.type
+      && edge.target === duplicateAiEdge.target
+    ))
+
+    expect(matchingEdges).toHaveLength(1)
+    expect(matchingEdges[0]).toMatchObject({
+      id: 'file:/repo/src/caller.ts->symbol:/repo/src/target.ts:seg-legacy-target:calls',
+      metadata: {
+        label: 'LegacyTarget',
+        rawType: 'symbol_call'
+      }
+    })
+  })
+
+  it('applies focus and depth filtering after graph RPC edges are merged', async () => {
+    const repo = { id: 11, name: 'scoped-ai-calls' }
+    const symbolIds = {
+      first: 'symbol:/repo/src/symbols.ts:seg-first',
+      focus: 'symbol:/repo/src/symbols.ts:seg-focus',
+      second: 'symbol:/repo/src/symbols.ts:seg-second',
+      third: 'symbol:/repo/src/symbols.ts:seg-third'
+    }
+    const orchestratorClient = createOrchestratorClientMock([
+      {
+        id: 'focus-first',
+        source: symbolIds.focus,
+        target: symbolIds.first,
+        type: RepoGraphEdgeType.CALLS
+      },
+      {
+        id: 'first-second',
+        source: symbolIds.first,
+        target: symbolIds.second,
+        type: RepoGraphEdgeType.CALLS
+      },
+      {
+        id: 'second-third',
+        source: symbolIds.second,
+        target: symbolIds.third,
+        type: RepoGraphEdgeType.CALLS
+      }
+    ])
+    const service = createService(repo, [
+      astSegment('/repo/src/symbols.ts', 'focus', { segment_id: 'seg-focus', symbol_kind: 'function' }),
+      astSegment('/repo/src/symbols.ts', 'first', { segment_id: 'seg-first', symbol_kind: 'function' }),
+      astSegment('/repo/src/symbols.ts', 'second', { segment_id: 'seg-second', symbol_kind: 'function' }),
+      astSegment('/repo/src/symbols.ts', 'third', { segment_id: 'seg-third', symbol_kind: 'function' })
+    ], orchestratorClient)
+
+    const graph = await service.getRepoInteractiveGraph(11, repo.id, {
+      depth: '1',
+      focusNodeId: symbolIds.focus,
+      includeSymbols: 'true',
+      relationTypes: 'calls'
+    })
+
+    expect(graph.edges).toEqual([
+      expect.objectContaining({
+        source: symbolIds.focus,
+        target: symbolIds.first,
+        type: RepoGraphEdgeType.CALLS
+      })
+    ])
+    expect(graph.nodes.map(node => node.id).sort()).toEqual([
+      `repo:${repo.id}`,
+      symbolIds.first,
+      symbolIds.focus
+    ].sort())
+    expect(graph.filters).toMatchObject({
+      depth: 1,
+      focusNodeId: symbolIds.focus,
+      relationTypes: [RepoGraphEdgeType.CALLS]
+    })
+  })
+
+  it('applies graph scale limits after graph RPC edges are merged', async () => {
+    const repo = { id: 12, name: 'scaled-ai-calls' }
+    const symbolCount = 88
+    const symbolSegments = Array.from({ length: symbolCount }, (_, index) => (
+      astSegment('/repo/src/symbols.ts', `symbol${index}`, {
+        content: `export function symbol${index}() {}`,
+        segment_id: `seg-symbol-${index}`,
+        symbol_kind: 'function'
+      })
+    ))
+    const symbolNodeIds = symbolSegments.map(segment => `symbol:${segment.file_path}:${segment.segment_id}`)
+    const aiEdges: RepoGraphEdge[] = []
+
+    for (const source of symbolNodeIds) {
+      for (const target of symbolNodeIds) {
+        if (source === target) continue
+
+        aiEdges.push({
+          id: `${source}->${target}:calls`,
+          source,
+          target,
+          type: RepoGraphEdgeType.CALLS
+        })
+
+        if (aiEdges.length === 3_801) break
+      }
+
+      if (aiEdges.length === 3_801) break
+    }
+
+    const service = createService(repo, symbolSegments, createOrchestratorClientMock(aiEdges))
+    const graph = await service.getRepoInteractiveGraph(12, repo.id, {
+      includeSymbols: 'true',
+      relationTypes: 'calls'
+    })
+
+    expect(graph.edges).toHaveLength(3_800)
+    expect(graph.metadata).toMatchObject({
+      edgeCount: 3_800,
+      truncated: true,
+      truncationReason: 'edge_cap'
+    })
+    expect(graph.metadata.availableEdgeTypes).toEqual([RepoGraphEdgeType.CALLS])
+  })
+
+  it('surfaces graph RPC failures as service unavailable', async () => {
+    const repo = { id: 13, name: 'graph-rpc-down' }
+    const orchestratorClient = {
+      graphRpc: jest.fn().mockRejectedValue(new OrchestratorClientError('Orchestrator request timed out'))
+    }
+    const service = createService(repo, [
+      astSegment('/repo/src/app.ts', 'run', {
+        segment_id: 'seg-run',
+        symbol_kind: 'function'
+      })
+    ], orchestratorClient)
+
+    const graphRequest = service.getRepoInteractiveGraph(13, repo.id, {
+      includeSymbols: 'true'
+    })
+
+    await expect(graphRequest).rejects.toMatchObject({
+      message: 'Repository dependency graph is unavailable because the graph RPC failed'
+    })
+    await expect(graphRequest).rejects.toBeInstanceOf(ServiceUnavailableException)
+  })
+
+  it('does not apply the removed local per-file AST call cap to graph RPC edges', async () => {
     const repo = { id: 10, name: 'semantic-call-cap' }
     const targetNames = Array.from({ length: 125 }, (_, index) => `Target${index}`)
     const targetSegments = targetNames.map(targetName => astSegment('/repo/src/targets.ts', targetName, {
       content: `export function ${targetName}() {}`,
       segment_id: `seg-${targetName}`,
       symbol_kind: 'function'
+    }))
+    const aiCallEdges: RepoGraphEdge[] = targetNames.map(targetName => ({
+      id: `ai-run-all-${targetName}`,
+      metadata: {
+        label: targetName,
+        rawType: 'symbol_call_ast'
+      },
+      source: 'symbol:/repo/src/caller.ts:seg-run-all',
+      target: `symbol:/repo/src/targets.ts:seg-${targetName}`,
+      type: RepoGraphEdgeType.CALLS
     }))
     const service = createService(repo, [
       astSegment('/repo/src/caller.ts', 'runAll', {
@@ -636,7 +862,7 @@ describe('DependenciesService interactive graph topology resolution', () => {
         symbol_kind: 'function'
       }),
       ...targetSegments
-    ])
+    ], createOrchestratorClientMock(aiCallEdges))
 
     const graph = await service.getRepoInteractiveGraph(10, repo.id, {
       includeSymbols: 'true'
@@ -647,11 +873,11 @@ describe('DependenciesService interactive graph topology resolution', () => {
       && edge.metadata?.rawType === 'symbol_call_ast'
     ))
 
-    expect(astCallEdges).toHaveLength(120)
+    expect(astCallEdges).toHaveLength(125)
   })
 
   it('surfaces Qdrant failures instead of returning an empty graph', async () => {
-    const repo = { id: 11, name: 'qdrant-down' }
+    const repo = { id: 14, name: 'qdrant-down' }
     const service = createServiceWithQdrant(
       repo,
       createFailingQdrantServiceMock(new Error('connection refused'))
