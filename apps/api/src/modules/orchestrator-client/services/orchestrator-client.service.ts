@@ -2,6 +2,7 @@ import type { Readable } from 'node:stream'
 import { StringDecoder } from 'node:string_decoder'
 
 import { Inject, Injectable } from '@nestjs/common'
+import type { RepoGraphEdge } from '@workspace/codepath-common/graph'
 import type { IngestJobRequestV2 } from '@workspace/codepath-common/ingest'
 import type { RepoDocsJobRequest, RepoEvaluationJobRequest } from '@workspace/codepath-common/repository'
 import axios, { type AxiosInstance } from 'axios'
@@ -13,6 +14,16 @@ import { assertValidIngestJobRequestFromWeb } from './ingest-message.validator'
 export interface OrchestratorChatRpcInput {
   prompt: string
   repoId: number
+}
+
+export interface OrchestratorGraphRpcInput {
+  relationTypes?: string[]
+  repoId: number
+}
+
+export interface OrchestratorGraphRpcResponse {
+  edges: RepoGraphEdge[]
+  nodes: unknown[]
 }
 
 export type OrchestratorChatStreamEvent
@@ -122,6 +133,10 @@ export class OrchestratorClient {
     }
 
     await this.postJson<void>('/v1/jobs/ingest', input)
+  }
+
+  async graphRpc(input: OrchestratorGraphRpcInput): Promise<OrchestratorGraphRpcResponse> {
+    return this.postJson<OrchestratorGraphRpcResponse>('/v1/graph/rpc', input)
   }
 
   async *streamChatRpc(input: OrchestratorChatRpcInput): AsyncGenerator<OrchestratorChatStreamEvent> {

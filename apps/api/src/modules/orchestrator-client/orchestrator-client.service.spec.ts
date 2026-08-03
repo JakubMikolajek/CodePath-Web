@@ -201,4 +201,43 @@ describe('orchestrator client', () => {
       validateStatus: expect.any(Function)
     }))
   })
+
+  it('posts graph RPC input and returns the parsed JSON response', async () => {
+    const responseBody = {
+      edges: [{
+        id: 'symbol:caller->symbol:target:calls',
+        source: 'symbol:caller',
+        target: 'symbol:target',
+        type: 'calls'
+      }],
+      nodes: []
+    }
+
+    requestMock.mockResolvedValue({
+      data: JSON.stringify(responseBody),
+      status: 200,
+      statusText: 'OK'
+    })
+
+    await expect(client.graphRpc({
+      relationTypes: ['calls', 'extends'],
+      repoId: 17
+    })).resolves.toEqual(responseBody)
+
+    expect(requestMock).toHaveBeenCalledTimes(1)
+    expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: {
+        relationTypes: ['calls', 'extends'],
+        repoId: 17
+      },
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json'
+      },
+      method: 'POST',
+      responseType: 'text',
+      url: expect.stringContaining('/v1/graph/rpc'),
+      validateStatus: expect.any(Function)
+    }))
+  })
 })

@@ -15,6 +15,7 @@ import { env } from '../../../config/env'
 import { assertRepoOwnership } from '../../../utils/helpers'
 import { dependencies } from '../../db/schema'
 import { DbService } from '../../db/services/db.service'
+import { OrchestratorClient } from '../../orchestrator-client/services/orchestrator-client.service'
 import { QdrantService } from '../../qdrant/services/qdrant.service'
 import {
   DependencyGraphBuilder,
@@ -48,7 +49,8 @@ export class DependenciesService {
 
   constructor(
     private readonly dbService: DbService,
-    private readonly qdrantService: QdrantService
+    private readonly qdrantService: QdrantService,
+    private readonly orchestratorClient: OrchestratorClient
   ) { }
 
   async getRepoDependencies(userId: number, repoId: number) {
@@ -72,6 +74,21 @@ export class DependenciesService {
     const includeSymbols = this.parseIncludeSymbols(query.includeSymbols)
     const segments = await this.fetchRepoSegmentsFromQdrant(repo.id)
     const canonicalGraph = this.graphBuilder.build(repo, segments, { includeSymbols })
+
+    if (includeSymbols) {
+      try {
+        const aiEdges = await this.orchestratorClient.graphRpc({
+          relationTypes: ['calls', 'extends'],
+          repoId: repo.id
+        })
+        canonicalGraph.edges = this.mergeGraphEdges(canonicalGraph.edges, aiEdges.edges)
+      } catch (error) {
+        const safeError = error instanceof Error ? error.message : String(error)
+        this.logger.error(`Failed to load AI dependency edges from graph RPC for repo=${repo.id}: ${safeError}`)
+        throw new ServiceUnavailableException('Repository dependency graph is unavailable because the graph RPC failed')
+      }
+    }
+
     const requestedRelationTypes = this.parseRelationTypes(query.relationTypes)
     const focusNodeId = query.focusNodeId?.trim() || undefined
     const depth = this.parseDepth(query.depth)
@@ -297,6 +314,20 @@ export class DependenciesService {
     }
 
     return payloads
+  }
+
+  private mergeGraphEdges(existingEdges: RepoGraphEdge[], aiEdges: RepoGraphEdge[]): RepoGraphEdge[] {
+    const edgesByKey = new Map<string, RepoGraphEdge>()
+
+    for (const edge of existingEdges) edgesByKey.set(`${edge.source}|${edge.type}|${edge.target}`, edge)
+
+    for (const edge of aiEdges) {
+      const key = `${edge.source}|${edge.type}|${edge.target}`
+
+      if (!edgesByKey.has(key)) edgesByKey.set(key, edge)
+    }
+
+    return [...edgesByKey.values()]
   }
 
   private normalizeFilePath(filePath: unknown): Nullable<string> {
