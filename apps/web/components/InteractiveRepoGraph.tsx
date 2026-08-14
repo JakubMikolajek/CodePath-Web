@@ -67,7 +67,18 @@ function getDegreeByNode(edges: RepoGraphEdge[]) {
 }
 
 function getOverviewNodes(nodes: RepoGraphNode[], edges: RepoGraphEdge[], focusedNodeId: Nullable<string>) {
-  if (nodes.length <= OVERVIEW_NODE_LIMIT || focusedNodeId) return nodes
+  if (focusedNodeId) {
+    const neighborIds = new Set([focusedNodeId])
+
+    for (const edge of edges) {
+      if (edge.source === focusedNodeId) neighborIds.add(edge.target)
+      if (edge.target === focusedNodeId) neighborIds.add(edge.source)
+    }
+
+    return nodes.filter(node => neighborIds.has(node.id))
+  }
+
+  if (nodes.length <= OVERVIEW_NODE_LIMIT) return nodes
 
   const degreeByNode = getDegreeByNode(edges)
 

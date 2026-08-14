@@ -9,6 +9,7 @@ interface NextAuthRouteContext {
 type NextAuthRouteHandler = (request: Request, context: NextAuthRouteContext) => Promise<Response>
 
 const sessionHandler = authHandler as NextAuthRouteHandler
+const appUrl = (process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? '').replace(/\/+$/, '')
 
 export async function GET(request: NextRequest) {
   const sessionResponse = await sessionHandler(request, { params: { nextauth: ['session'] } })
@@ -23,17 +24,29 @@ export async function GET(request: NextRequest) {
 }
 
 function resolveCallbackUrl(request: NextRequest): URL {
+  const origin = resolvePublicOrigin(request)
   const rawCallbackUrl = request.nextUrl.searchParams.get('callbackUrl') ?? '/dashboard'
 
   try {
-    const callbackUrl = new URL(rawCallbackUrl, request.nextUrl.origin)
+    const callbackUrl = new URL(rawCallbackUrl, origin)
 
-    if (callbackUrl.origin === request.nextUrl.origin) return callbackUrl
+    if (callbackUrl.origin === origin) return callbackUrl
   } catch {
     // Fall through to the default safe callback URL.
   }
 
-  return new URL('/dashboard', request.nextUrl.origin)
+  return new URL('/dashboard', origin)
+}
+
+function resolvePublicOrigin(request: NextRequest): string {
+  if (appUrl) return appUrl
+
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const forwardedProto = request.headers.get('x-forwarded-proto') ?? 'http'
+
+  if (forwardedHost) return `${forwardedProto}://${forwardedHost}`.replace(/\/+$/, '')
+
+  return request.nextUrl.origin.replace(/\/+$/, '')
 }
 
 export function getSetCookieHeaders(headers: Headers): string[] {
