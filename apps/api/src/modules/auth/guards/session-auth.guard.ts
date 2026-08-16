@@ -4,7 +4,7 @@ import {
   Injectable,
   UnauthorizedException
 } from '@nestjs/common'
-import { Undefinable } from '@workspace/codepath-common'
+import { Nullable, Undefinable } from '@workspace/codepath-common'
 
 import { SelectUser } from '../../db/schema'
 import { AuthService } from '../services/auth.service'
@@ -22,6 +22,7 @@ export class SessionAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>()
     const token = extractAccessToken(request)
 
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (!token) throw new UnauthorizedException('Missing access token')
 
     return await this.attachKeycloakUser(request, token)
@@ -30,6 +31,7 @@ export class SessionAuthGuard implements CanActivate {
   private async attachKeycloakUser(request: AuthenticatedRequest, token: string): Promise<boolean> {
     const user = await this.authService.validateKeycloakAccessToken(token)
 
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (!user) throw new UnauthorizedException('Invalid Keycloak access token')
 
     request.user = user
@@ -37,7 +39,7 @@ export class SessionAuthGuard implements CanActivate {
   }
 }
 
-function extractAccessToken(request: AuthenticatedRequest): null | string {
+function extractAccessToken(request: AuthenticatedRequest): Nullable<string> {
   const authHeader = request.headers.authorization
 
   if (typeof authHeader === 'string' && authHeader.toLowerCase().startsWith('bearer ')) return authHeader.slice('bearer '.length).trim()

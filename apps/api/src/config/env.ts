@@ -69,6 +69,7 @@ function parseStorageProvider(value: Undefinable<string>): 'local' | 'minio' {
   return 'local'
 }
 
+// TODO: rename to ENV
 export const env = {
   corsAllowedOrigins: parseList(process.env.CORS_ALLOWED_ORIGINS, DEFAULTS.corsAllowedOrigins),
   databaseUrl: process.env.DATABASE_URL ?? DEFAULTS.databaseUrl,

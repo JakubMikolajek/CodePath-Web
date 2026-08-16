@@ -7,11 +7,11 @@ import { AuthService } from './services/auth.service'
 
 @Module({
   controllers: [AuthController],
-  imports: [HttpClientModule],
   exports: [
     AuthService,
     SessionAuthGuard
   ],
+  imports: [HttpClientModule],
   providers: [
     AuthService,
     SessionAuthGuard

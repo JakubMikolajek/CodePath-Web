@@ -19,6 +19,7 @@ import { HTTP_CLIENT } from '../../http-client/http-client.tokens'
 
 const JWT_ALGORITHM = 'RS256'
 
+// TODO:  MOVE TYPES TO SHARED
 interface KeycloakJwk {
   alg?: string
   kid: string
@@ -53,8 +54,9 @@ export class AuthService {
 
   constructor(
     private readonly dbService: DbService,
-    @Inject(HTTP_CLIENT) private readonly httpClient: AxiosInstance
-  ) { }
+    @Inject(HTTP_CLIENT)
+    private readonly httpClient: AxiosInstance
+  ) {}
 
   async validateKeycloakAccessToken(accessToken: string): Promise<Nullable<SelectUser>> {
     try {
@@ -65,6 +67,7 @@ export class AuthService {
       return await this.findOrCreateExternalUser({ email: claims.email, login: claims.preferred_username, subject: claims.sub })
     } catch (error) {
       this.logger.warn(`Keycloak token validation failed: ${error instanceof Error ? error.message : 'unknown error'}`)
+
       return null
     }
   }
@@ -93,25 +96,32 @@ export class AuthService {
     login?: string
     subject?: string
   }): Promise<SelectUser> {
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (!identity.subject) throw new UnauthorizedException('Missing Keycloak subject')
 
     const normalizedEmail: Undefinable<string> = identity.email?.trim().toLowerCase()
 
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (!normalizedEmail) throw new UnauthorizedException('Missing Keycloak email')
 
     const normalizedLogin: string = identity.login?.trim() || normalizedEmail.split('@')[0] || `kc-${Date.now()}`
 
-    const [existingUser] = await this.dbService.dbClient.select().from(users)
-      .where(or(eq(users.authSubject, identity.subject), eq(users.email, normalizedEmail)))
-      .limit(1)
+    const [existingUser] = await this.dbService.dbClient.select().from(users).where(
+      or(
+        eq(users.authSubject, identity.subject),
+        eq(users.email, normalizedEmail)
+      )
+    ).limit(1)
 
     if (existingUser) {
       if (existingUser.authProvider === 'keycloak' && existingUser.authSubject === identity.subject) return existingUser
 
-      const [updatedUser] = await this.dbService.dbClient.update(users)
-        .set({ authProvider: 'keycloak', authSubject: identity.subject, email: normalizedEmail, login: normalizedLogin })
-        .where(eq(users.id, existingUser.id))
-        .returning()
+      const [updatedUser] = await this.dbService.dbClient.update(users).set({
+        authProvider: 'keycloak',
+        authSubject: identity.subject,
+        email: normalizedEmail,
+        login: normalizedLogin
+      }).where(eq(users.id, existingUser.id)).returning()
 
       return updatedUser
     }
@@ -137,6 +147,7 @@ export class AuthService {
   }
 
   private async resolveKeyObject(header: JwtHeader): Promise<KeyObject> {
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (!header.kid) throw new UnauthorizedException('Missing token key id')
 
     const jwks = await this.fetchKeycloakJwks()
@@ -147,6 +158,7 @@ export class AuthService {
       const refreshedJwks = await this.fetchKeycloakJwks()
       const refreshedJwk = refreshedJwks.find(item => item.kid === header.kid)
 
+      // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
       if (!refreshedJwk) throw new UnauthorizedException('Unknown token key id')
 
       return createPublicKey({ format: 'jwk', key: refreshedJwk as unknown as JsonWebKey })
@@ -158,12 +170,14 @@ export class AuthService {
   private async verifyKeycloakJwt(token: string): Promise<KeycloakClaims> {
     const parts = token.split('.')
 
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (parts.length !== 3) throw new UnauthorizedException('Invalid token format')
 
     const [encodedHeader, encodedPayload, encodedSignature] = parts
     const header = decodeJwtPart<JwtHeader>(encodedHeader)
     const claims = decodeJwtPart<KeycloakClaims>(encodedPayload)
 
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (header.alg !== JWT_ALGORITHM) throw new UnauthorizedException('Unsupported token algorithm')
 
     const key = await this.resolveKeyObject(header)
@@ -178,8 +192,11 @@ export class AuthService {
 
     const nowInSeconds = Math.floor(Date.now() / 1000)
 
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (!claims.exp || claims.exp <= nowInSeconds) throw new UnauthorizedException('Token expired')
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (claims.iss !== env.keycloakIssuer.replace(/\/+$/, '')) throw new UnauthorizedException('Invalid token issuer')
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (!this.isExpectedAudience(claims)) throw new UnauthorizedException('Invalid token audience')
 
     return claims
@@ -196,6 +213,7 @@ function decodeJwtPart<T>(value: string): T {
   try {
     return JSON.parse(base64UrlDecode(value).toString('utf8')) as T
   } catch {
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     throw new UnauthorizedException('Invalid token payload')
   }
 }
