@@ -3,7 +3,7 @@ import type { InferInsertModel, InferSelectModel } from 'drizzle-orm'
 import { relations } from 'drizzle-orm'
 import { foreignKey, index, integer, pgEnum, pgTable, serial, text, timestamp, unique } from 'drizzle-orm/pg-core'
 
-import { repos, repoDocsStatusEnum } from './repos'
+import { repoDocsStatusEnum, repos } from './repos'
 
 export const repoDocsFragmentTypeEnum = pgEnum('repo_docs_fragment_type', ['module_summary', 'section'])
 

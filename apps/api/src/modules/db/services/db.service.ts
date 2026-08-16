@@ -10,6 +10,8 @@ import { Pool } from 'pg'
 
 import { env } from '../../../config/env'
 
+// FIXME: please remote that deprecated old stuff
+
 // Tables that must exist for us to conclude this is a legacy DB (schema present, no Drizzle history).
 // Without this check, calling migrate() on a legacy DB crashes on migration 0000 because
 // the types and tables already exist and Postgres rejects the CREATE statements.

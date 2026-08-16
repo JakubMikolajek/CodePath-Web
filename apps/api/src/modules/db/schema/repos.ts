@@ -1,5 +1,5 @@
-import type { InferInsertModel, InferSelectModel } from 'drizzle-orm'
 import { RepoEmbeddingStatus } from '@workspace/codepath-common/repository'
+import type { InferInsertModel, InferSelectModel } from 'drizzle-orm'
 import { relations } from 'drizzle-orm'
 import { foreignKey, integer, pgEnum, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core'
 
