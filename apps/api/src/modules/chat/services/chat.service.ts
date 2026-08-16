@@ -13,7 +13,6 @@ import {
   TelemetryStatus
 } from '@workspace/codepath-common/telemetry'
 import { and, desc, eq } from 'drizzle-orm'
-import { map } from 'lodash'
 import { from, type Observable } from 'rxjs'
 
 import { chatHistory, chatSessions, repos } from '../../db/schema'
@@ -25,8 +24,6 @@ import {
 } from '../../orchestrator-client/services/orchestrator-client.service'
 import { emitTelemetry } from '../../telemetry/services/telemetry'
 import { AskDto } from '../dto/ask.dto'
-
-// FIXME ENUMS :)
 
 @Injectable()
 export class ChatService {
@@ -42,6 +39,8 @@ export class ChatService {
     await this.assertSessionOwnership(userId, repoId, sessionId)
 
     this.logger.log(`Repo: ${repoId}, Q: ${question}`)
+
+    // TODO: validate current flow; maybe better made it as a service
     emitTelemetry({
       component: 'chat.service',
       event: 'chat_request_received',
@@ -76,13 +75,14 @@ export class ChatService {
   async getChatSessionDetails(userId: number, repoId: number, sessionId: string) {
     await this.assertSessionOwnership(userId, repoId, sessionId)
 
-    const sessionDetails = await this.dbService.dbClient.select().from(chatHistory)
-      .where(and(
+    const sessionDetails = await this.dbService.dbClient.select().from(chatHistory).where(
+      and(
         eq(chatHistory.userId, userId),
         eq(chatHistory.sessionId, sessionId)
-      )).orderBy(desc(chatHistory.createdAt))
+      )
+    ).orderBy(desc(chatHistory.createdAt))
 
-    return map(sessionDetails, detail => ({
+    return sessionDetails.map(detail => ({
       content: detail.content,
       id: detail.id,
       role: detail.role
@@ -92,13 +92,14 @@ export class ChatService {
   async getRepoChats(userId: number, repoId: number) {
     await this.assertRepoOwnership(userId, repoId)
 
-    const sessions = await this.dbService.dbClient.select().from(chatSessions)
-      .where(and(
+    const sessions = await this.dbService.dbClient.select().from(chatSessions).where(
+      and(
         eq(chatSessions.userId, userId),
         eq(chatSessions.repoId, repoId)
-      )).orderBy(desc(chatSessions.createdAt))
+      )
+    ).orderBy(desc(chatSessions.createdAt))
 
-    return map(sessions, session => ({
+    return sessions.map(session => ({
       createdAt: session.createdAt,
       sessionId: session.id,
       sessionName: session.name
@@ -106,21 +107,28 @@ export class ChatService {
   }
 
   private async assertRepoOwnership(userId: number, repoId: number): Promise<void> {
-    const [repo] = await this.dbService.dbClient.select({ id: repos.id }).from(repos)
-      .where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
-      .limit(1)
+    const [repo] = await this.dbService.dbClient.select({
+      id: repos.id
+    }).from(repos).where(
+      and(
+        eq(repos.id, repoId),
+        eq(repos.userId, userId)
+      )
+    ).limit(1)
 
     if (!repo) throw new NotFoundException('Repository not found')
   }
 
   private async assertSessionOwnership(userId: number, repoId: number, sessionId: string): Promise<void> {
-    const [session] = await this.dbService.dbClient.select({ id: chatSessions.id })
-      .from(chatSessions)
-      .where(and(
+    const [session] = await this.dbService.dbClient.select({
+      id: chatSessions.id
+    }).from(chatSessions).where(
+      and(
         eq(chatSessions.id, sessionId),
         eq(chatSessions.repoId, repoId),
         eq(chatSessions.userId, userId)
-      )).limit(1)
+      )
+    ).limit(1)
 
     if (!session) throw new NotFoundException('Session not found')
   }
@@ -176,6 +184,7 @@ export class ChatService {
       for await (const event of this.orchestratorClient.streamChatRpc(segments)) {
         if (event.type === 'chunk') {
           answer += event.delta
+
           yield this.toMessageEvent(event)
           continue
         }
@@ -183,6 +192,7 @@ export class ChatService {
         if (event.type === 'error') {
           this.logger.error(`Chat stream failed for repo ${segments.repoId}: [${event.code}] ${event.message}`)
           this.emitStreamFailureTelemetry(correlationId, segments.repoId, startedAt, event)
+
           yield this.toMessageEvent(event)
           return
         }
@@ -252,6 +262,7 @@ export class ChatService {
       }
 
       this.logger.error(`Chat stream failed for repo ${segments.repoId}: ${cause instanceof Error ? cause.message : String(cause)}`)
+
       yield this.toMessageEvent(errorEvent)
     }
   }
