@@ -15,13 +15,10 @@ export class GraphNoiseFilter {
     if (!isNodeJsLikeSource) return false
     if (normalizedSpecifier.includes('/node_modules/')) return true
     if (normalizedSpecifier.startsWith('node:') || normalizedSpecifier.startsWith('npm:')) return true
-    if (
-      normalizedSpecifier.startsWith('.')
+
+    return !(normalizedSpecifier.startsWith('.')
       || normalizedSpecifier.startsWith('/')
       || normalizedSpecifier.startsWith('http://')
-      || normalizedSpecifier.startsWith('https://')
-    ) return false
-
-    return true
+      || normalizedSpecifier.startsWith('https://'))
   }
 }

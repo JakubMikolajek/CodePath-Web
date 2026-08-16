@@ -29,6 +29,7 @@ interface InteractiveGraphQuery {
   relationTypes?: string
 }
 
+// TODO: MOVE ME TO SHARED
 const SUPPORTED_RELATION_TYPES: RepoGraphEdgeType[] = [
   RepoGraphEdgeType.IMPORTS,
   RepoGraphEdgeType.CALLS,
@@ -56,10 +57,11 @@ export class DependenciesService {
   async getRepoDependencies(userId: number, repoId: number) {
     await assertRepoOwnership(this.dbService, userId, repoId)
 
-    const allDependencies = await this.dbService.dbClient.select()
-      .from(dependencies)
-      .where(eq(dependencies.repoId, repoId))
-      .orderBy(desc(dependencies.createdAt))
+    const allDependencies = await this.dbService.dbClient.select().from(dependencies).where(
+      eq(dependencies.repoId, repoId)
+    ).orderBy(
+      desc(dependencies.createdAt)
+    )
 
     return allDependencies.map(dependency => ({
       fileId: dependency.fileId,
@@ -81,10 +83,12 @@ export class DependenciesService {
           relationTypes: ['calls', 'extends'],
           repoId: repo.id
         })
+
         canonicalGraph.edges = this.mergeGraphEdges(canonicalGraph.edges, aiEdges.edges)
       } catch (error) {
         const safeError = error instanceof Error ? error.message : String(error)
         this.logger.error(`Failed to load AI dependency edges from graph RPC for repo=${repo.id}: ${safeError}`)
+        // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
         throw new ServiceUnavailableException('Repository dependency graph is unavailable because the graph RPC failed')
       }
     }
@@ -98,6 +102,7 @@ export class DependenciesService {
     if (requestedRelationTypes.length > 0) filteredEdges = filteredEdges.filter(edge => requestedRelationTypes.includes(edge.type))
 
     let scopedNodeIds = new Set(canonicalGraph.nodes.map(node => node.id))
+
     const repoNodeId = `repo:${repo.id}`
 
     if (focusNodeId && scopedNodeIds.has(focusNodeId)) {
@@ -166,6 +171,7 @@ export class DependenciesService {
     if (limitedNodes.length > MAX_RETURN_NODES) {
       truncated = true
       truncationReason = 'node_cap'
+
       const typePriority: Record<RepoGraphNode['type'], number> = {
         [RepoGraphNodeType.EXTERNAL_PACKAGE]: 3,
         [RepoGraphNodeType.FILE]: 2,
@@ -183,13 +189,16 @@ export class DependenciesService {
       })
 
       limitedNodes = sortedNodes.slice(0, MAX_RETURN_NODES)
+
       const keptNodeIds = new Set(limitedNodes.map(node => node.id))
+
       limitedEdges = limitedEdges.filter(edge => keptNodeIds.has(edge.source) && keptNodeIds.has(edge.target))
     }
 
     if (limitedEdges.length > MAX_RETURN_EDGES) {
       truncated = true
       truncationReason = truncationReason ? `${truncationReason}+edge_cap` : 'edge_cap'
+
       const edgePriority: Record<RepoGraphEdgeType, number> = {
         [RepoGraphEdgeType.CALLS]: 4,
         [RepoGraphEdgeType.CONSUMES]: 6,
@@ -209,6 +218,7 @@ export class DependenciesService {
       })
 
       limitedEdges = sortedEdges.slice(0, MAX_RETURN_EDGES)
+
       const referencedNodeIds = new Set<string>()
 
       for (const edge of limitedEdges) {
@@ -224,15 +234,14 @@ export class DependenciesService {
 
   private assertRelationType(value: string): Nullable<RepoGraphEdgeType> {
     const normalized = value.trim().toLowerCase()
+    // FIXME: need enum convertion
     return SUPPORTED_RELATION_TYPES.find(type => type === normalized) ?? null
   }
 
   private availableEdgeTypes(edges: RepoGraphEdge[]): RepoGraphEdgeType[] {
     const available = new Set<RepoGraphEdgeType>()
 
-    for (const edge of edges) {
-      available.add(edge.type)
-    }
+    for (const edge of edges) available.add(edge.type)
 
     return SUPPORTED_RELATION_TYPES.filter(type => available.has(type))
   }
@@ -304,12 +313,16 @@ export class DependenciesService {
 
         if (result?.next_page_offset === undefined || result?.next_page_offset === null) break
 
-        if (typeof result.next_page_offset === 'number' || typeof result.next_page_offset === 'string') offset = result.next_page_offset
-        else break
+        if (typeof result.next_page_offset === 'number' || typeof result.next_page_offset === 'string') {
+          offset = result.next_page_offset
+        } else {
+          break
+        }
       }
     } catch (error) {
       const safeError = error instanceof Error ? error.message : String(error)
       this.logger.error(`Failed to load repo segments from Qdrant for repo=${repoId}: ${safeError}`)
+      // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
       throw new ServiceUnavailableException('Repository graph is unavailable because Qdrant cannot be reached')
     }
 

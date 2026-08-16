@@ -1,5 +1,7 @@
 import type { Nullable } from '@workspace/codepath-common'
 
+// TODO: please clean me up
+
 const IGNORED_CALL_IDENTIFIERS = new Set([
   'and',
   'as',
@@ -161,9 +163,7 @@ export class DependencyCodeExtractor {
           .map(moduleName => moduleName.trim().split(/\s+as\s+/i)[0]?.trim())
           .filter(Boolean)
 
-        for (const moduleName of modules) {
-          addSpecifier(moduleName ?? null)
-        }
+        for (const moduleName of modules) addSpecifier(moduleName ?? null)
       }
     }
 

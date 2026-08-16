@@ -108,6 +108,7 @@ const DEFAULT_CODE_EXTENSIONS = [
   '.svelte'
 ]
 
+// TODO: move types etc to separate file
 export class RepoTopologyDetector {
   detect(files: Map<string, RepoTopologyFileInput>): RepoTopologyContext {
     const normalizedFiles = new Map<string, RepoTopologyFileInput>()
@@ -135,10 +136,12 @@ export class RepoTopologyDetector {
       if (boundary) {
         moduleIdByFilePath.set(filePath, boundary.moduleId)
         moduleLabelByFilePath.set(filePath, boundary.label)
+
         continue
       }
 
       const fallbackGroup = this.fallbackPathGroup(filePath)
+
       moduleIdByFilePath.set(filePath, `path:${fallbackGroup}`)
       moduleLabelByFilePath.set(filePath, fallbackGroup)
     }

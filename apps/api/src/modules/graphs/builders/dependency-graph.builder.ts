@@ -90,6 +90,8 @@ const MAX_SYMBOLS_PER_FILE = 300
 const MAX_CALL_EDGES_PER_FILE = 120
 const MAX_EVENT_EDGES_PER_FILE = 40
 
+// TODO: types and config should be moved to separate file
+
 export class DependencyGraphBuilder {
   private readonly codeExtractor = new DependencyCodeExtractor()
   private readonly noiseFilter = new GraphNoiseFilter()
@@ -139,6 +141,7 @@ export class DependencyGraphBuilder {
       const moduleNodeId = topology.moduleIdByFilePath.get(file.filePath) ?? this.toModuleNodeId(repo.id, this.fallbackModuleLabel(file.filePath))
       const moduleLabel = topology.moduleLabelByFilePath.get(file.filePath) ?? this.fallbackModuleLabel(file.filePath)
       const fileNodeId = this.toFileNodeId(file.filePath)
+
       moduleNodeIdByFilePath.set(file.filePath, moduleNodeId)
 
       this.addNode(nodesById, {
@@ -206,6 +209,7 @@ export class DependencyGraphBuilder {
           if (symbol.routePath) {
             const endpointLabel = this.toEndpointLabel(symbol.httpMethod, symbol.routePath)
             const endpointNodeId = this.toEndpointNodeId(symbol.httpMethod, symbol.routePath)
+
             this.addNode(nodesById, {
               id: endpointNodeId,
               label: endpointLabel,
@@ -246,6 +250,7 @@ export class DependencyGraphBuilder {
           internalImportsByFilePath.get(file.filePath)?.add(resolution.resolvedPath)
 
           const targetNodeId = this.toFileNodeId(resolution.resolvedPath)
+
           this.addEdge(edgesByKey, {
             id: `${sourceNodeId}->${targetNodeId}:imports`,
             metadata: {
@@ -322,6 +327,7 @@ export class DependencyGraphBuilder {
 
       if (options.includeSymbols) {
         let callEdgesAdded = 0
+
         const hasAstCallData = file.symbols.some(symbol => (symbol.callTargets?.length ?? 0) > 0)
 
         if (!hasAstCallData) {
@@ -355,6 +361,7 @@ export class DependencyGraphBuilder {
               target: matchingRef.symbolNodeId,
               type: RepoGraphEdgeType.CALLS
             })
+
             callEdgesAdded += 1
           }
         }
@@ -362,6 +369,7 @@ export class DependencyGraphBuilder {
 
       // TODO(ingest.v2): replace event regexes once event metadata is emitted by Ingest.
       const producedEvents = this.codeExtractor.extractEventNames(file.content, 'produces')
+
       let producedEdgesAdded = 0
 
       for (const eventName of producedEvents) {
@@ -390,6 +398,7 @@ export class DependencyGraphBuilder {
       }
 
       const consumedEvents = this.codeExtractor.extractEventNames(file.content, 'consumes')
+
       let consumedEdgesAdded = 0
 
       for (const eventName of consumedEvents) {
