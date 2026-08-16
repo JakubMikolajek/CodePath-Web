@@ -1,6 +1,8 @@
 import type { Undefinable } from '@workspace/codepath-common/globals'
 import type { TelemetryEventV1 } from '@workspace/codepath-common/telemetry'
 
+// TODO: review me, simplify and split into smaller files
+
 type LabelValues = Record<string, Undefinable<string>>
 
 interface CounterDefinition {
