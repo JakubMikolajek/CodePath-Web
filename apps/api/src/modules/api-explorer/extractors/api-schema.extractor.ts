@@ -94,6 +94,7 @@ export class ApiSchemaExtractor {
 
       const properties: Record<string, RepoOpenApiSchema> = {}
       const required: string[] = []
+
       for (const propertyMatch of block.matchAll(/(?:public\s+|private\s+|protected\s+|readonly\s+)?([A-Za-z_][A-Za-z0-9_]*)\??\s*:\s*([^;\n=]+)/g)) {
         const name = propertyMatch[1] ?? ''
         const rawType = propertyMatch[2] ?? ''
@@ -101,6 +102,7 @@ export class ApiSchemaExtractor {
         if (!name) continue
 
         const schema = this.inferSchemaFromTypeHint(rawType)
+
         properties[name] = schema
 
         if (!propertyMatch[0].includes('?')) required.push(name)

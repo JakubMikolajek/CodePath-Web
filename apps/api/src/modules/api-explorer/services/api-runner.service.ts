@@ -22,6 +22,7 @@ import { HTTP_CLIENT } from '../../http-client/http-client.tokens'
 import { ApiRunnerAuthPresetsRepository } from '../repositories/api-runner-auth-presets.repository'
 import { ApiRunnerCollectionsRepository } from '../repositories/api-runner-collections.repository'
 
+// TODO: move to api-explorer utils
 const SUPPORTED_METHODS: RepoApiHttpMethod[] = [
   RepoApiHttpMethod.DELETE,
   RepoApiHttpMethod.GET,
@@ -32,6 +33,7 @@ const SUPPORTED_METHODS: RepoApiHttpMethod[] = [
   RepoApiHttpMethod.PUT
 ]
 
+// TODO: move to api-explorer utils
 const RUNNER_DEFAULT_TIMEOUT_MS = 10_000
 const RUNNER_MAX_TIMEOUT_MS = 30_000
 const RUNNER_MAX_RESPONSE_BYTES = 1_000_000
@@ -49,7 +51,8 @@ export class ApiRunnerService {
   constructor(
     private readonly runnerAuthPresetsRepository: ApiRunnerAuthPresetsRepository,
     private readonly runnerCollectionsRepository: ApiRunnerCollectionsRepository,
-    @Inject(HTTP_CLIENT) private readonly httpClient: AxiosInstance
+    @Inject(HTTP_CLIENT)
+    private readonly httpClient: AxiosInstance
   ) {}
 
   async deleteRunnerAuthPreset(userId: number, repoId: number, presetId: number) {
@@ -70,11 +73,13 @@ export class ApiRunnerService {
 
   async runApiRequest(input: RepoApiRunnerRequest): Promise<RepoApiRunnerResponse> {
     const method = this.assertMethod(input.method)
-    if (!method) {
-      throw new BadRequestException('Unsupported HTTP method')
-    }
+
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
+    if (!method) throw new BadRequestException('Unsupported HTTP method')
 
     const targetUrl = this.normalizeRunnerUrl(input.url)
+
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (!isAllowedRunnerTarget(targetUrl)) throw new BadRequestException('Target URL must be localhost or private LAN address (10.x, 172.16-31.x, 192.168.x)')
 
     const timeoutMs = this.normalizeRunnerTimeout(input.timeoutMs)
@@ -114,6 +119,7 @@ export class ApiRunnerService {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
+      // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
       throw new BadRequestException(`Runner request failed: ${message}`)
     }
   }
@@ -157,9 +163,7 @@ export class ApiRunnerService {
       || normalizedContentType.includes('xml')
       || normalizedContentType.includes('html')
       || normalizedContentType.includes('javascript')
-    ) {
-      return buffer.toString('utf8')
-    }
+    ) return buffer.toString('utf8')
 
     return {
       base64: buffer.toString('base64'),
@@ -169,6 +173,7 @@ export class ApiRunnerService {
   }
 
   private normalizeCollectionConfig(config: RepoApiRunnerCollectionConfig): RepoApiRunnerCollectionConfig {
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (!config || typeof config !== 'object') throw new BadRequestException('Collection config is required')
 
     const timeoutMs = Number.isFinite(config.timeoutMs)
@@ -198,7 +203,9 @@ export class ApiRunnerService {
   private normalizeName(name: string, maxLength: number, label: string) {
     const normalizedName = typeof name === 'string' ? name.trim() : ''
 
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (!normalizedName) throw new BadRequestException(`${label} is required`)
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (normalizedName.length > maxLength) throw new BadRequestException(`${label} max length is ${maxLength}`)
 
     return normalizedName
@@ -252,11 +259,13 @@ export class ApiRunnerService {
   }
 
   private normalizeRunnerUrl(url: string) {
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (typeof url !== 'string' || !url.trim()) throw new BadRequestException('Runner URL is required')
 
     try {
       return new URL(url.trim()).toString()
     } catch {
+      // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
       throw new BadRequestException('Runner URL is invalid')
     }
   }

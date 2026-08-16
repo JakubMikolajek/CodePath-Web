@@ -13,14 +13,15 @@ export class ApiRunnerCollectionsRepository {
   constructor(private readonly dbService: DbService) {}
 
   async delete(userId: number, repoId: number, collectionId: number) {
-    const [deleted] = await this.dbService.dbClient.delete(apiRunnerCollections)
-      .where(and(
+    const [deleted] = await this.dbService.dbClient.delete(apiRunnerCollections).where(
+      and(
         eq(apiRunnerCollections.id, collectionId),
         eq(apiRunnerCollections.repoId, repoId),
         eq(apiRunnerCollections.userId, userId)
-      ))
-      .returning({ id: apiRunnerCollections.id })
+      )
+    ).returning({ id: apiRunnerCollections.id })
 
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (!deleted) throw new NotFoundException('Runner collection not found')
 
     return { id: deleted.id, ok: true as const }
@@ -33,13 +34,12 @@ export class ApiRunnerCollectionsRepository {
       id: apiRunnerCollections.id,
       name: apiRunnerCollections.name,
       updatedAt: apiRunnerCollections.updatedAt
-    })
-      .from(apiRunnerCollections)
-      .where(and(
+    }).from(apiRunnerCollections).where(
+      and(
         eq(apiRunnerCollections.repoId, repoId),
         eq(apiRunnerCollections.userId, userId)
-      ))
-      .orderBy(desc(apiRunnerCollections.updatedAt))
+      )
+    ).orderBy(desc(apiRunnerCollections.updatedAt))
 
     return rows.map(row => ({
       config: row.config,

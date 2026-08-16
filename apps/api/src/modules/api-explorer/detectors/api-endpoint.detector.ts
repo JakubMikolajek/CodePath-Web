@@ -14,6 +14,7 @@ import { normalizeHttpPath, uniqueParams } from '../../../utils/helpers'
 import { ApiSchemaExtractor } from '../extractors/api-schema.extractor'
 import type { CanonicalApiFile, SourceContext } from '../types/api-explorer-internal.types'
 
+// TODO: move to api-explorer utils
 const SUPPORTED_METHODS: RepoApiHttpMethod[] = [
   RepoApiHttpMethod.DELETE,
   RepoApiHttpMethod.GET,
@@ -24,6 +25,7 @@ const SUPPORTED_METHODS: RepoApiHttpMethod[] = [
   RepoApiHttpMethod.PUT
 ]
 
+// TODO: move to api-explorer utils
 function parsePathParamNames(path: string): string[] {
   const names = new Set<string>()
   for (const match of path.matchAll(/:([A-Za-z0-9_]+)/g)) {
@@ -110,6 +112,7 @@ export class ApiEndpointDetector {
       const path = normalizeHttpPath(match[1] ?? '/')
       const params: RepoApiEndpointParameter[] = []
       const sourceContext = this.readSourceContext(file.content, match.index ?? 0, 360)
+
       this.addPathParameters(params, path)
 
       endpoints.push(this.createEndpoint(file, RepoApiFramework.DJANGO, RepoApiHttpMethod.GET, path, params, { sourceContext }))
@@ -131,9 +134,11 @@ export class ApiEndpointDetector {
 
       const path = normalizeHttpPath(match[2] ?? '/')
       const params: RepoApiEndpointParameter[] = []
+
       this.addPathParameters(params, path)
 
       const sourceContext = this.readSourceContext(file.content, match.index ?? 0, 450)
+
       for (const reqParamMatch of sourceContext.snippet.matchAll(/\breq\.params\.([A-Za-z0-9_]+)/g)) {
         this.pushParam(params, { location: RepoApiParameterLocation.PATH, name: reqParamMatch[1] ?? 'param', required: true })
       }
@@ -178,9 +183,11 @@ export class ApiEndpointDetector {
       const prefix = routeOwner === 'app' ? '/' : (routerPrefixes.get(routeOwner) ?? '/')
       const path = this.joinHttpPath(prefix, rawPath)
       const params: RepoApiEndpointParameter[] = []
+
       this.addPathParameters(params, path)
 
       const sourceContext = this.readSourceContext(file.content, match.index ?? 0, 500)
+
       for (const paramMatch of sourceContext.snippet.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*[^=,\n)]+\s*=\s*(Query|Path|Body|Header)\(/g)) {
         const locationToken = (paramMatch[2] ?? '').toLowerCase()
         const location = locationToken === 'query'
@@ -239,6 +246,7 @@ export class ApiEndpointDetector {
       const path = this.joinHttpPath(prefix, match[2] ?? '/')
       const params: RepoApiEndpointParameter[] = []
       const sourceContext = this.readSourceContext(file.content, match.index ?? 0, 420)
+
       this.addPathParameters(params, path)
 
       const methodsLiteral = match[3] ?? ''
@@ -248,9 +256,7 @@ export class ApiEndpointDetector {
 
       const methods: RepoApiHttpMethod[] = methodsFromLiteral.length > 0 ? methodsFromLiteral : [RepoApiHttpMethod.GET]
 
-      for (const method of methods) {
-        endpoints.push(this.createEndpoint(file, RepoApiFramework.FLASK, method, path, params, { sourceContext }))
-      }
+      for (const method of methods) endpoints.push(this.createEndpoint(file, RepoApiFramework.FLASK, method, path, params, { sourceContext }))
     }
 
     return endpoints
@@ -277,6 +283,7 @@ export class ApiEndpointDetector {
       const symbolName = this.extractSymbolNameFromSnippet(sourceContext.snippet)
 
       const params: RepoApiEndpointParameter[] = []
+
       this.addPathParameters(params, routePath)
 
       for (const paramMatch of sourceContext.snippet.matchAll(/@Param\s*\(\s*['"`]([A-Za-z0-9_:-]+)['"`]/g)) {
@@ -293,6 +300,7 @@ export class ApiEndpointDetector {
 
       if (/@Body\s*\(/.test(sourceContext.snippet)) {
         const namedBodyMatch = sourceContext.snippet.match(/@Body\s*\(\s*['"`]([A-Za-z0-9_.-]+)['"`]/)
+
         this.pushParam(params, { location: RepoApiParameterLocation.BODY, name: namedBodyMatch?.[1] ?? 'body', required: false })
       }
 
@@ -471,7 +479,7 @@ export class ApiEndpointDetector {
   private normalizeModuleSegment(segment: string): string {
     const cleaned = segment
       .replace(/\.[^.]+$/, '')
-      .replace(/(?:\.|_)?(controller|controllers|route|routes|router|routers|view|views|handler|handlers)$/i, '')
+      .replace(/[._]?(controller|controllers|route|routes|router|routers|view|views|handler|handlers)$/i, '')
       .replace(/[-_]+/g, ' ')
       .trim()
 

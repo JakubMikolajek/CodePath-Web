@@ -1,6 +1,6 @@
 import { NotFoundException } from '@nestjs/common'
 import {
-  OpenApiVersion,
+  OpenApiVersion, RepoApiHttpMethod,
   RepoOpenApiParameterIn,
   RepoOpenApiSourceMode
 } from '@workspace/codepath-common/api-explorer'
@@ -57,7 +57,7 @@ function createService(dbService: unknown, qdrantService: unknown) {
   return new ApiExplorerService(
     dbService as never,
     qdrantService as never,
-    runnerService as never,
+    runnerService,
     httpClient as never
   )
 }
@@ -439,7 +439,7 @@ describe('ApiExplorerService', () => {
         }
       },
       status: 200
-    } as never)
+    })
 
     const spec = await service.getRepoOpenApiSpec(1, 33, {
       runtimeBaseUrl: 'http://127.0.0.1:3001'
@@ -510,7 +510,7 @@ describe('ApiExplorerService', () => {
     const service = createService(dbService, qdrantService)
 
     await expect(service.runApiRequest(1, 40, {
-      method: 'GET',
+      method: RepoApiHttpMethod.GET,
       url: 'https://example.com/api/health'
     })).rejects.toThrow('localhost or private LAN')
 
@@ -531,14 +531,14 @@ describe('ApiExplorerService', () => {
       },
       status: 200,
       statusText: 'OK'
-    } as never)
+    })
 
     const response = await service.runApiRequest(1, 41, {
       body: { hello: 'world' },
       headers: {
         'X-Test': '1'
       },
-      method: 'POST',
+      method: RepoApiHttpMethod.POST,
       timeoutMs: 2500,
       url: 'http://127.0.0.1:4000/api/test'
     })

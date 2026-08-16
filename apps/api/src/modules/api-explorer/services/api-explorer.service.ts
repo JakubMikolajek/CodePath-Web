@@ -26,15 +26,17 @@ import { QdrantService } from '../../qdrant/services/qdrant.service'
 import { OpenApiDocumentBuilder } from '../builders/openapi-document.builder'
 import { ApiEndpointDetector } from '../detectors/api-endpoint.detector'
 import type {
-  ApiExplorerIngestSegmentPayload as IngestSegmentPayload,
+  ApiExplorerIngestSegmentPayload,
   ApiExplorerQuery,
-  CanonicalApiFile as CanonicalFile
+  CanonicalApiFile
 } from '../types/api-explorer-internal.types'
 import { ApiRunnerService } from './api-runner.service'
 
+// TODO: move to api-explorer utils
 const MAX_CONTENT_PER_FILE = 220_000
 const MAX_SEGMENTS_PER_FILE = 400
 
+// TODO: move to api-explorer utils
 const SUPPORTED_FRAMEWORKS: RepoApiFramework[] = [
   RepoApiFramework.DJANGO,
   RepoApiFramework.EXPRESS,
@@ -44,6 +46,7 @@ const SUPPORTED_FRAMEWORKS: RepoApiFramework[] = [
   RepoApiFramework.UNKNOWN
 ]
 
+// TODO: move to api-explorer utils
 const SUPPORTED_METHODS: RepoApiHttpMethod[] = [
   RepoApiHttpMethod.DELETE,
   RepoApiHttpMethod.GET,
@@ -54,6 +57,7 @@ const SUPPORTED_METHODS: RepoApiHttpMethod[] = [
   RepoApiHttpMethod.PUT
 ]
 
+// TODO: move to api-explorer utils
 const RUNNER_MAX_RESPONSE_BYTES = 1_000_000
 const RUNTIME_OPENAPI_TIMEOUT_MS = 6_000
 const RUNTIME_OPENAPI_CANDIDATE_PATHS = [
@@ -75,7 +79,8 @@ export class ApiExplorerService {
     private readonly dbService: DbService,
     private readonly qdrantService: QdrantService,
     private readonly apiRunnerService: ApiRunnerService,
-    @Inject(HTTP_CLIENT) private readonly httpClient: AxiosInstance
+    @Inject(HTTP_CLIENT)
+    private readonly httpClient: AxiosInstance
   ) {}
 
   async deleteRunnerAuthPreset(userId: number, repoId: number, presetId: number) {
@@ -107,9 +112,7 @@ export class ApiExplorerService {
     for (const file of files.values()) {
       const fileEndpoints = this.endpointDetector.detectEndpointsForFile(file)
 
-      for (const endpoint of fileEndpoints) {
-        this.upsertEndpoint(endpointsByKey, endpoint)
-      }
+      for (const endpoint of fileEndpoints) this.upsertEndpoint(endpointsByKey, endpoint)
     }
 
     let endpoints = [...endpointsByKey.values()]
@@ -154,9 +157,11 @@ export class ApiExplorerService {
     })
 
     const frameworks = Array.from(new Set(endpoints.map(endpoint => endpoint.framework))).sort()
+
     const modules = Array.from(
       new Set(endpoints.map(endpoint => endpoint.moduleName?.trim()).filter((value): value is string => Boolean(value)))
     ).sort((a, b) => a.localeCompare(b))
+
     const endpointDistributionByFramework = this.countEndpointsByFramework(endpoints)
     const endpointDistributionByMethod = this.countEndpointsByMethod(endpoints)
     const endpointsWithRequestBodyModel = endpoints.filter(endpoint => typeof endpoint.requestBodyTypeName === 'string' && endpoint.requestBodyTypeName.trim().length > 0).length
@@ -233,12 +238,12 @@ export class ApiExplorerService {
     return await this.apiRunnerService.saveRunnerCollection(userId, repoId, input)
   }
 
-  private assertFramework(value: string): null | RepoApiFramework {
+  private assertFramework(value: string): Nullable<RepoApiFramework> {
     const normalized = value.trim().toLowerCase()
     return SUPPORTED_FRAMEWORKS.find(framework => framework === normalized) ?? null
   }
 
-  private assertMethod(value: string): null | RepoApiHttpMethod {
+  private assertMethod(value: string): Nullable<RepoApiHttpMethod> {
     const method = value.trim().toUpperCase() as RepoApiHttpMethod
 
     if (!SUPPORTED_METHODS.includes(method)) return null
@@ -246,8 +251,8 @@ export class ApiExplorerService {
     return method
   }
 
-  private buildCanonicalFiles(segments: IngestSegmentPayload[]): Map<string, CanonicalFile> {
-    const files = new Map<string, CanonicalFile>()
+  private buildCanonicalFiles(segments: ApiExplorerIngestSegmentPayload[]): Map<string, CanonicalApiFile> {
+    const files = new Map<string, CanonicalApiFile>()
 
     for (const segment of segments) {
       const normalizedPath = this.normalizeFilePath(segment.file_path)
@@ -281,7 +286,7 @@ export class ApiExplorerService {
     return files
   }
 
-  private buildEndpointFromSemanticSegment(segment: IngestSegmentPayload): Nullable<RepoApiEndpoint> {
+  private buildEndpointFromSemanticSegment(segment: ApiExplorerIngestSegmentPayload): Nullable<RepoApiEndpoint> {
     if (segment.symbol_kind !== 'http_endpoint') return null
 
     const filePath = this.normalizeFilePath(segment.file_path)
@@ -291,7 +296,9 @@ export class ApiExplorerService {
     if (!filePath || !method || !routePath) return null
 
     const params = Array.isArray(segment.params)
-      ? segment.params.map(param => this.toEndpointParam(param)).filter((param): param is RepoApiEndpointParameter => param !== null)
+      ? segment.params
+        .map(param => this.toEndpointParam(param))
+        .filter((param): param is RepoApiEndpointParameter => param !== null)
       : []
 
     return {
@@ -316,6 +323,7 @@ export class ApiExplorerService {
 
     for (const file of files.values()) {
       const nextSchemas = this.endpointDetector.extractSchemasFromFile(file)
+
       for (const [name, schema] of Object.entries(nextSchemas)) {
         if (!schemaRegistry[name]) schemaRegistry[name] = schema
       }
@@ -326,18 +334,16 @@ export class ApiExplorerService {
 
   private countEndpointsByFramework(endpoints: RepoApiEndpoint[]): Partial<Record<RepoApiFramework, number>> {
     const counts: Partial<Record<RepoApiFramework, number>> = {}
-    for (const endpoint of endpoints) {
-      counts[endpoint.framework] = (counts[endpoint.framework] ?? 0) + 1
-    }
+
+    for (const endpoint of endpoints) counts[endpoint.framework] = (counts[endpoint.framework] ?? 0) + 1
 
     return counts
   }
 
   private countEndpointsByMethod(endpoints: RepoApiEndpoint[]): Partial<Record<RepoApiHttpMethod, number>> {
     const counts: Partial<Record<RepoApiHttpMethod, number>> = {}
-    for (const endpoint of endpoints) {
-      counts[endpoint.method] = (counts[endpoint.method] ?? 0) + 1
-    }
+
+    for (const endpoint of endpoints) counts[endpoint.method] = (counts[endpoint.method] ?? 0) + 1
 
     return counts
   }
@@ -371,8 +377,8 @@ export class ApiExplorerService {
     return normalized
   }
 
-  private async fetchRepoSegmentsFromQdrant(repoId: number): Promise<IngestSegmentPayload[]> {
-    const payloads: IngestSegmentPayload[] = []
+  private async fetchRepoSegmentsFromQdrant(repoId: number): Promise<ApiExplorerIngestSegmentPayload[]> {
+    const payloads: ApiExplorerIngestSegmentPayload[] = []
     let offset: Undefinable<number | string> = undefined
     const collectionName = env.qdrantEmbeddingsCollectionName
 
@@ -394,7 +400,7 @@ export class ApiExplorerService {
         for (const point of points) {
           if (!point?.payload || typeof point.payload !== 'object') continue
 
-          const payload = point.payload as IngestSegmentPayload
+          const payload = point.payload as ApiExplorerIngestSegmentPayload
 
           if (typeof payload.message_type === 'string' && payload.message_type !== 'ingest.batch.ready') continue
 
@@ -407,19 +413,24 @@ export class ApiExplorerService {
 
         if (result?.next_page_offset === undefined || result?.next_page_offset === null) break
 
-        if (typeof result.next_page_offset === 'number' || typeof result.next_page_offset === 'string') offset = result.next_page_offset
-        else break
+        if (typeof result.next_page_offset === 'number' || typeof result.next_page_offset === 'string'){
+          offset = result.next_page_offset
+        } else {
+          break
+        }
       }
     } catch (error) {
       const safeError = error instanceof Error ? error.message : String(error)
+
       this.logger.error(`Failed to load repo segments from Qdrant for repo=${repoId}: ${safeError}`)
+
       return []
     }
 
     return payloads
   }
 
-  private inferFrameworkFromSemanticSegment(segment: IngestSegmentPayload): RepoApiFramework {
+  private inferFrameworkFromSemanticSegment(segment: ApiExplorerIngestSegmentPayload): RepoApiFramework {
     const language = this.safeString(segment.language)?.toLowerCase() ?? ''
     const filePath = this.safeString(segment.file_path)?.toLowerCase() ?? ''
 
@@ -515,11 +526,13 @@ export class ApiExplorerService {
     try {
       parsed = new URL(value.trim())
     } catch {
+      // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
       throw new BadRequestException('runtimeBaseUrl is invalid')
     }
 
     const normalized = parsed.toString()
 
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (!isAllowedRunnerTarget(normalized)) throw new BadRequestException('runtimeBaseUrl must be localhost or private LAN address (10.x, 172.16-31.x, 192.168.x)')
 
     return normalized

@@ -13,14 +13,15 @@ export class ApiRunnerAuthPresetsRepository {
   constructor(private readonly dbService: DbService) {}
 
   async delete(userId: number, repoId: number, presetId: number) {
-    const [deleted] = await this.dbService.dbClient.delete(apiRunnerAuthPresets)
-      .where(and(
+    const [deleted] = await this.dbService.dbClient.delete(apiRunnerAuthPresets).where(
+      and(
         eq(apiRunnerAuthPresets.id, presetId),
         eq(apiRunnerAuthPresets.repoId, repoId),
         eq(apiRunnerAuthPresets.userId, userId)
-      ))
-      .returning({ id: apiRunnerAuthPresets.id })
+      )
+    ).returning({ id: apiRunnerAuthPresets.id })
 
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (!deleted) throw new NotFoundException('Runner auth preset not found')
 
     return { id: deleted.id, ok: true as const }
@@ -33,13 +34,12 @@ export class ApiRunnerAuthPresetsRepository {
       id: apiRunnerAuthPresets.id,
       name: apiRunnerAuthPresets.name,
       updatedAt: apiRunnerAuthPresets.updatedAt
-    })
-      .from(apiRunnerAuthPresets)
-      .where(and(
+    }).from(apiRunnerAuthPresets).where(
+      and(
         eq(apiRunnerAuthPresets.repoId, repoId),
         eq(apiRunnerAuthPresets.userId, userId)
-      ))
-      .orderBy(desc(apiRunnerAuthPresets.updatedAt))
+      )
+    ).orderBy(desc(apiRunnerAuthPresets.updatedAt))
 
     return rows.map(row => ({
       config: row.config,

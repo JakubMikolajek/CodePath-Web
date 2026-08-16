@@ -20,6 +20,7 @@ import {
 
 import { normalizeHttpPath } from '../../../utils/helpers'
 
+// TODO: move to api-explorer utils
 const METHOD_TO_OPENAPI: Record<RepoApiHttpMethod, RepoOpenApiOperationMethod> = {
   [RepoApiHttpMethod.DELETE]: RepoOpenApiOperationMethod.DELETE,
   [RepoApiHttpMethod.GET]: RepoOpenApiOperationMethod.GET,
@@ -30,6 +31,7 @@ const METHOD_TO_OPENAPI: Record<RepoApiHttpMethod, RepoOpenApiOperationMethod> =
   [RepoApiHttpMethod.PUT]: RepoOpenApiOperationMethod.PUT
 }
 
+// TODO: move to api-explorer utils
 const SUPPORTED_OPENAPI_METHODS: RepoOpenApiOperationMethod[] = [
   RepoOpenApiOperationMethod.DELETE,
   RepoOpenApiOperationMethod.GET,
@@ -55,19 +57,18 @@ export class OpenApiDocumentBuilder {
 
       if (!existing) {
         paths[openApiPath][openApiMethod] = nextOperation
+
         continue
       }
 
       const mergedSources = this.mergeOperationSources(existing, nextOperation)
-      paths[openApiPath][openApiMethod] = {
-        ...existing,
-        'x-codepath-sources': mergedSources
-      }
+
+      paths[openApiPath][openApiMethod] = { ...existing, 'x-codepath-sources': mergedSources }
     }
 
     const tags = Array.from(
-      new Set(interactiveApi.endpoints.map(endpoint => endpoint.moduleName || endpoint.framework))).sort((a, b) => a.localeCompare(b)).map(name => ({ name })
-    )
+      new Set(interactiveApi.endpoints.map(endpoint => endpoint.moduleName || endpoint.framework))
+    ).sort((a, b) => a.localeCompare(b)).map(name => ({ name }))
 
     const staticOperationCount = this.countOpenApiOperations(paths)
     const staticOperationsWithCodeSource = this.countOperationsWithCodeSource(paths)
@@ -108,12 +109,14 @@ export class OpenApiDocumentBuilder {
 
       for (const [rawMethod, runtimeOperation] of Object.entries(runtimeOperations ?? {})) {
         const method = rawMethod as RepoOpenApiOperationMethod
+
         if (!runtimeOperation) continue
 
         const staticOperation = this.findStaticOperationForRuntimePath(staticPaths, runtimePath, method)
 
         if (!staticOperation) {
           mergedOperations[method] = runtimeOperation
+
           continue
         }
 
@@ -202,6 +205,7 @@ export class OpenApiDocumentBuilder {
       if (!item || typeof item !== 'object') return null
 
       const name = (item as Record<string, unknown>).name
+
       return typeof name === 'string' && name.trim() ? { name: name.trim() } : null
     }).filter((value): value is { name: string } => value !== null) : undefined
 
@@ -225,15 +229,20 @@ export class OpenApiDocumentBuilder {
     const normalized = normalizeHttpPath(path)
     const candidates = new Set<string>([normalized])
 
-    if (normalized.startsWith('/api/')) candidates.add(normalizeHttpPath(normalized.slice(4)))
-    else if (normalized === '/api') candidates.add('/')
-    else candidates.add(normalizeHttpPath(`/api${normalized}`))
+    if (normalized.startsWith('/api/')) {
+      candidates.add(normalizeHttpPath(normalized.slice(4)))
+    } else if (normalized === '/api') {
+      candidates.add('/')
+    } else {
+      candidates.add(normalizeHttpPath(`/api${normalized}`))
+    }
 
     return [...candidates]
   }
 
   private countOpenApiOperations(paths: RepoOpenApiDocument['paths']) {
     let total = 0
+
     for (const operations of Object.values(paths)) {
       for (const method of SUPPORTED_OPENAPI_METHODS) {
         if (operations?.[method]) total += 1
@@ -251,7 +260,6 @@ export class OpenApiDocumentBuilder {
         const operation = operations?.[method]
 
         if (!operation) continue
-
         if (operation['x-codepath'] || (operation['x-codepath-sources']?.length ?? 0) > 0) total += 1
       }
     }
@@ -315,9 +323,7 @@ export class OpenApiDocumentBuilder {
       ?.replace(/^.*\./, '')
       ?.replace(/[^A-Za-z0-9_]/g, '')
 
-    if (!normalized || normalized.length === 0) {
-      return undefined
-    }
+    if (!normalized || normalized.length === 0) return undefined
 
     return normalized
   }
