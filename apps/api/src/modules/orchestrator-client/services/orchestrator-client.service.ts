@@ -2,6 +2,7 @@ import type { Readable } from 'node:stream'
 import { StringDecoder } from 'node:string_decoder'
 
 import { Inject, Injectable } from '@nestjs/common'
+import { Nullable, Undefinable } from '@workspace/codepath-common'
 import type { RepoGraphEdge } from '@workspace/codepath-common/graph'
 import type { IngestJobRequestV2 } from '@workspace/codepath-common/ingest'
 import type { RepoDocsJobRequest, RepoEvaluationJobRequest } from '@workspace/codepath-common/repository'
@@ -48,6 +49,7 @@ function isTimeoutError(cause: unknown): boolean {
 }
 
 function parseChatStreamFrame(frame: string): OrchestratorChatStreamEvent {
+  // TODO: remove duplication
   let eventType = ''
   const dataLines: string[] = []
 
@@ -63,6 +65,7 @@ function parseChatStreamFrame(frame: string): OrchestratorChatStreamEvent {
     if (field === 'data') dataLines.push(value)
   }
 
+  // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
   if (!eventType || dataLines.length === 0) throw new OrchestratorClientError('Orchestrator chat stream frame was invalid')
 
   let payload: unknown
@@ -70,11 +73,14 @@ function parseChatStreamFrame(frame: string): OrchestratorChatStreamEvent {
   try {
     payload = JSON.parse(dataLines.join('\n'))
   } catch (cause) {
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     throw new OrchestratorClientError('Orchestrator chat stream data was not valid JSON', cause)
   }
 
+  // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
   if (!isRecord(payload)) throw new OrchestratorClientError('Orchestrator chat stream payload was invalid')
 
+  // TODO: remove duplication
   if (eventType === 'chunk') {
     const { delta, done } = payload
 
@@ -93,14 +99,16 @@ function parseChatStreamFrame(frame: string): OrchestratorChatStreamEvent {
     if (typeof code === 'string' && typeof message === 'string') return { code, message, type: 'error' }
   }
 
+  // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
   throw new OrchestratorClientError('Orchestrator chat stream payload was invalid')
 }
 
+// TODO: remove duplication
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object'
 }
 
-function takeCompleteFrame(buffer: string): null | { frame: string; rest: string } {
+function takeCompleteFrame(buffer: string): Nullable<{ frame: string; rest: string }> {
   const separator = /\r?\n\r?\n/.exec(buffer)
 
   if (!separator || separator.index === undefined) return null
@@ -114,7 +122,8 @@ function takeCompleteFrame(buffer: string): null | { frame: string; rest: string
 @Injectable()
 export class OrchestratorClient {
   constructor(
-    @Inject(HTTP_CLIENT) private readonly httpClient: HttpClient
+    @Inject(HTTP_CLIENT)
+    private readonly httpClient: HttpClient
   ) {}
 
   async enqueueDocsJob(input: RepoDocsJobRequest): Promise<void> {
@@ -129,6 +138,7 @@ export class OrchestratorClient {
     try {
       assertValidIngestJobRequestFromWeb(input)
     } catch (cause) {
+      // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
       throw new OrchestratorClientError('Ingest job payload failed producer-side contract validation', cause)
     }
 
@@ -140,7 +150,7 @@ export class OrchestratorClient {
   }
 
   async *streamChatRpc(input: OrchestratorChatRpcInput): AsyncGenerator<OrchestratorChatStreamEvent> {
-    let stream: Readable | undefined
+    let stream: Undefinable<Readable>
 
     try {
       const response = await this.httpClient.request<Readable>({
@@ -159,15 +169,18 @@ export class OrchestratorClient {
       stream = response.data
 
       if (response.status < 200 || response.status >= 300) {
+        // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
         throw new OrchestratorClientError(`Orchestrator chat stream request failed with status ${response.status}`)
       }
 
       const decoder = new StringDecoder('utf8')
+
       let buffer = ''
 
       for await (const chunk of stream) {
         buffer += typeof chunk === 'string' ? chunk : decoder.write(Buffer.from(chunk))
 
+        // TODO: remove duplication
         let completeFrame = takeCompleteFrame(buffer)
 
         while (completeFrame) {
@@ -186,14 +199,18 @@ export class OrchestratorClient {
 
       buffer += decoder.end()
 
+      // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
       if (buffer.trim()) throw new OrchestratorClientError('Orchestrator chat stream ended with an incomplete frame')
 
+      // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
       throw new OrchestratorClientError('Orchestrator chat stream ended without a terminal event')
     } catch (cause) {
       if (cause instanceof OrchestratorClientError) throw cause
 
+      // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
       if (isTimeoutError(cause)) throw new OrchestratorClientError('Orchestrator request timed out', cause)
 
+      // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
       throw new OrchestratorClientError('Orchestrator chat stream request failed', cause)
     } finally {
       if (stream && !stream.destroyed) stream.destroy()
@@ -218,6 +235,7 @@ export class OrchestratorClient {
 
       const rawBody = response.data ?? ''
 
+      // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
       if (response.status < 200 || response.status >= 300) throw new OrchestratorClientError(`Orchestrator request failed with status ${response.status}${rawBody ? `: ${rawBody}` : ''}`)
 
       if (!rawBody) return undefined as TResponse
@@ -225,13 +243,16 @@ export class OrchestratorClient {
       try {
         return JSON.parse(rawBody) as TResponse
       } catch (cause) {
+        // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
         throw new OrchestratorClientError('Orchestrator response body was not valid JSON', cause)
       }
     } catch (cause) {
       if (cause instanceof OrchestratorClientError) throw cause
 
+      // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
       if (isTimeoutError(cause)) throw new OrchestratorClientError('Orchestrator request timed out', cause)
 
+      // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
       throw new OrchestratorClientError('Orchestrator request failed', cause)
     }
   }
