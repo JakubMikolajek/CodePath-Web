@@ -151,32 +151,6 @@ export class SystemStatusService {
     })
   }
 
-  private async fetchRabbitQueues(): Promise<Map<string, RabbitManagementQueue>> {
-    const response = await this.withTimeout(
-      fetch(this.rabbitManagementQueuesUrl(), {
-        headers: {
-          authorization: this.rabbitManagementAuthorizationHeader()
-        }
-      }),
-      'RabbitMQ management check timed out'
-    )
-
-    if (!response.ok) throw new Error(`RabbitMQ management returned HTTP ${response.status}`)
-
-    const payload = await response.json() as unknown
-
-    if (!Array.isArray(payload)) throw new Error('RabbitMQ management returned invalid queue payload')
-
-    const queues = new Map<string, RabbitManagementQueue>()
-
-    for (const item of payload) {
-      if (!this.isRabbitManagementQueue(item)) continue
-      queues.set(item.name, item)
-    }
-
-    return queues
-  }
-
   private checkRabbitQueueGroup(
     queueMetrics: Map<string, RabbitManagementQueue>,
     queueName: RequiredQueueName
@@ -217,6 +191,47 @@ export class SystemStatusService {
     })
   }
 
+  private coerceQueueMetric(value: number | undefined): number {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return 0
+
+    return Math.trunc(value)
+  }
+
+  private async fetchRabbitQueues(): Promise<Map<string, RabbitManagementQueue>> {
+    const response = await this.withTimeout(
+      // TODO: use HttpClinet
+      fetch(this.rabbitManagementQueuesUrl(), {
+        headers: {
+          authorization: this.rabbitManagementAuthorizationHeader()
+        }
+      }),
+      'RabbitMQ management check timed out'
+    )
+
+    if (!response.ok) throw new Error(`RabbitMQ management returned HTTP ${response.status}`)
+
+    const payload = await response.json() as unknown
+
+    if (!Array.isArray(payload)) throw new Error('RabbitMQ management returned invalid queue payload')
+
+    const queues = new Map<string, RabbitManagementQueue>()
+
+    for (const item of payload) {
+      if (!this.isRabbitManagementQueue(item)) continue
+
+      queues.set(item.name, item)
+    }
+
+    return queues
+  }
+
+  private isRabbitManagementQueue(value: unknown): value is RabbitManagementQueue & { name: string } {
+    return typeof value === 'object'
+      && value !== null
+      && 'name' in value
+      && typeof (value as { name?: unknown }).name === 'string'
+  }
+
   private async measure(
     name: string,
     check: () => Promise<ComponentCheckResult>
@@ -248,6 +263,23 @@ export class SystemStatusService {
     }
   }
 
+  private rabbitManagementAuthorizationHeader(): string {
+    const rabbitUrl = new URL(env.rabbitUrl)
+    const username = decodeURIComponent(rabbitUrl.username || 'guest')
+    const password = decodeURIComponent(rabbitUrl.password || 'guest')
+
+    return `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`
+  }
+
+  private rabbitManagementQueuesUrl(): string {
+    const rabbitUrl = new URL(env.rabbitUrl)
+    const vhost = decodeURIComponent(rabbitUrl.pathname.replace(/^\//, '')) || '/'
+    const url = new URL('/api/queues/', env.rabbitManagementUrl)
+    url.pathname = `/api/queues/${encodeURIComponent(vhost)}`
+
+    return url.toString()
+  }
+
   private resolveOverallStatus(components: SystemComponentStatus[]): ComponentStatus {
     if (components.some(component => component.status === ComponentStatus.DOWN)) return ComponentStatus.DOWN
     if (components.some(component => component.status === ComponentStatus.DEGRADED)) return ComponentStatus.DEGRADED
@@ -269,35 +301,5 @@ export class SystemStatusService {
     } finally {
       if (timeout) clearTimeout(timeout)
     }
-  }
-
-  private coerceQueueMetric(value: number | undefined): number {
-    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return 0
-
-    return Math.trunc(value)
-  }
-
-  private isRabbitManagementQueue(value: unknown): value is RabbitManagementQueue & { name: string } {
-    return typeof value === 'object'
-      && value !== null
-      && 'name' in value
-      && typeof (value as { name?: unknown }).name === 'string'
-  }
-
-  private rabbitManagementAuthorizationHeader(): string {
-    const rabbitUrl = new URL(env.rabbitUrl)
-    const username = decodeURIComponent(rabbitUrl.username || 'guest')
-    const password = decodeURIComponent(rabbitUrl.password || 'guest')
-
-    return `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`
-  }
-
-  private rabbitManagementQueuesUrl(): string {
-    const rabbitUrl = new URL(env.rabbitUrl)
-    const vhost = decodeURIComponent(rabbitUrl.pathname.replace(/^\//, '')) || '/'
-    const url = new URL('/api/queues/', env.rabbitManagementUrl)
-    url.pathname = `/api/queues/${encodeURIComponent(vhost)}`
-
-    return url.toString()
   }
 }
