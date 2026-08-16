@@ -39,13 +39,13 @@ export class DocsController {
     return await this.docsService.generateDocumentation(req.user.id, repoId, { moduleKey, sectionKey })
   }
 
-  @Get('status/:repoId')
+  @Get(':repoId')
   @UseGuards(SessionAuthGuard)
-  async getDocumentationStatus(
+  async getDocumentation(
     @Req() req: { user: SelectUser },
     @Param('repoId', ParseIntPipe) repoId: number
   ) {
-    return await this.docsService.getDocumentationStatus(req.user.id, repoId)
+    return await this.docsService.getDocumentation(req.user.id, repoId)
   }
 
   @Get(':repoId/modules')
@@ -66,12 +66,12 @@ export class DocsController {
     return await this.docsService.getDocumentationModules(req.user.id, repoId)
   }
 
-  @Get(':repoId')
+  @Get('status/:repoId')
   @UseGuards(SessionAuthGuard)
-  async getDocumentation(
+  async getDocumentationStatus(
     @Req() req: { user: SelectUser },
     @Param('repoId', ParseIntPipe) repoId: number
   ) {
-    return await this.docsService.getDocumentation(req.user.id, repoId)
+    return await this.docsService.getDocumentationStatus(req.user.id, repoId)
   }
 }
