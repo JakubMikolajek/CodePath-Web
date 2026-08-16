@@ -57,7 +57,7 @@ export class RepoService {
   }
 
   async getUserRepos(userId: number) {
-    const userRepos = await this.dbService.dbClient.select({
+    return await this.dbService.dbClient.select({
       cloneStatus: repos.cloneStatus,
       docsStatus: repos.docsStatus,
       embeddingStatus: repos.embeddingStatus,
@@ -65,9 +65,9 @@ export class RepoService {
       lastPipelineError: repos.lastPipelineError,
       name: repos.name,
       pipelineUpdatedAt: repos.pipelineUpdatedAt
-    }).from(repos).where(eq(repos.userId, userId))
-
-    return userRepos
+    }).from(repos).where(
+      eq(repos.userId, userId)
+    )
   }
 
   async retryClonePipeline(userId: number, repoId: number) {
@@ -94,7 +94,13 @@ export class RepoService {
       sourceCommitSha: null,
       storageBucket: null,
       storageKey: null
-    }).where(and(eq(repos.id, repoId), eq(repos.userId, userId))).returning()
+    }).where(
+      and(
+        eq(repos.id, repoId),
+        eq(repos.userId, userId)
+      )
+    ).returning()
+
     await this.dbService.dbClient.delete(repoDocsFragments).where(eq(repoDocsFragments.repoId, repoId))
 
     return this.toPipelineStatus(updatedRepo)
@@ -103,16 +109,16 @@ export class RepoService {
   async retryIngestPipeline(userId: number, repoId: number) {
     const repo = await this.findUserRepo(userId, repoId)
 
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM | cloneStatus to enum
     if (repo.cloneStatus !== 'cloned') throw new ConflictException(`Repository clone is not ready for ingest retry (cloneStatus=${repo.cloneStatus})`)
 
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (
       repo.storageProvider !== 'minio'
       || !repo.storageBucket
       || !repo.storageKey
       || !repo.sourceCommitSha
-    ) {
-      throw new ConflictException('Repository snapshot is unavailable; restart clone first')
-    }
+    ) throw new ConflictException('Repository snapshot is unavailable; restart clone first')
 
     await this.dbService.dbClient.update(repos).set({
       docsProgressCurrent: null,
@@ -128,7 +134,13 @@ export class RepoService {
       embeddingStatus: RepoEmbeddingStatus.PROCESSING,
       lastPipelineError: null,
       pipelineUpdatedAt: nowIso()
-    }).where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
+    }).where(
+      and(
+        eq(repos.id, repoId),
+        eq(repos.userId, userId)
+      )
+    )
+
     await this.dbService.dbClient.delete(repoDocsFragments).where(eq(repoDocsFragments.repoId, repoId))
 
     try {
@@ -141,7 +153,12 @@ export class RepoService {
         embeddingStatus: RepoEmbeddingStatus.FAILED,
         lastPipelineError: error instanceof Error ? error.message : 'Failed to enqueue ingest retry',
         pipelineUpdatedAt: nowIso()
-      }).where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
+      }).where(
+        and(
+          eq(repos.id, repoId),
+          eq(repos.userId, userId)
+        )
+      )
 
       throw new ServiceUnavailableException(error instanceof Error ? error.message : 'Failed to enqueue ingest retry')
     }
@@ -157,10 +174,14 @@ export class RepoService {
   }
 
   private async findUserRepo(userId: number, repoId: number) {
-    const [repo] = await this.dbService.dbClient.select().from(repos)
-      .where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
-      .limit(1)
+    const [repo] = await this.dbService.dbClient.select().from(repos).where(
+      and(
+        eq(repos.id, repoId),
+        eq(repos.userId, userId)
+      )
+    ).limit(1)
 
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (!repo) throw new NotFoundException('Repository not found')
 
     return repo
@@ -186,6 +207,7 @@ export class RepoService {
       }
     }
 
+    // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (!effectiveSecret) throw new BadRequestException('Auth secret is required for selected auth type')
 
     if (requestedAuthType === RepoAuthType.HTTPS_TOKEN) {

@@ -19,7 +19,6 @@ import {
 import crypto from 'crypto'
 import { and, eq, lt } from 'drizzle-orm'
 import { readdir, readFile, rm, stat, unlink, writeFile } from 'fs/promises'
-import { map } from 'lodash'
 import NodeRSA from 'node-rsa'
 import path from 'path'
 import simpleGit, { type SimpleGit } from 'simple-git'
@@ -66,29 +65,46 @@ export class RepoFetcherService {
   async markStalePipelineStages() {
     const cutoff = new Date(Date.now() - env.pipelineStaleAfterMs).toISOString()
 
-    const staleClones = await this.dbService.dbClient.update(repos).set({
-      cloneStatus: 'failed',
-      docsStatus: 'failed',
-      embeddingStatus: RepoEmbeddingStatus.FAILED,
-      lastPipelineError: `Clone stage exceeded ${env.pipelineStaleAfterMs}ms without completion`,
-      pipelineUpdatedAt: nowIso()
-    }).where(and(eq(repos.cloneStatus, 'cloning'), lt(repos.pipelineUpdatedAt, cutoff))).returning({ id: repos.id })
+    const [staleClones, staleEmbeddings, staleDocs] = await Promise.all([
+      this.dbService.dbClient.update(repos).set({
+        cloneStatus: 'failed',
+        docsStatus: 'failed',
+        embeddingStatus: RepoEmbeddingStatus.FAILED,
+        lastPipelineError: `Clone stage exceeded ${env.pipelineStaleAfterMs}ms without completion`,
+        pipelineUpdatedAt: nowIso()
+      }).where(
+        and(
+          eq(repos.cloneStatus, 'cloning'),
+          lt(repos.pipelineUpdatedAt, cutoff)
+        )
+      ).returning({ id: repos.id }),
 
-    const staleEmbeddings = await this.dbService.dbClient.update(repos).set({
-      docsStatus: 'failed',
-      embeddingStatus: RepoEmbeddingStatus.FAILED,
-      lastPipelineError: `Embedding stage exceeded ${env.pipelineStaleAfterMs}ms without completion`,
-      pipelineUpdatedAt: nowIso()
-    }).where(and(eq(repos.embeddingStatus, RepoEmbeddingStatus.PROCESSING), lt(repos.pipelineUpdatedAt, cutoff))).returning({ id: repos.id })
+      this.dbService.dbClient.update(repos).set({
+        docsStatus: 'failed',
+        embeddingStatus: RepoEmbeddingStatus.FAILED,
+        lastPipelineError: `Embedding stage exceeded ${env.pipelineStaleAfterMs}ms without completion`,
+        pipelineUpdatedAt: nowIso()
+      }).where(
+        and(
+          eq(repos.embeddingStatus, RepoEmbeddingStatus.PROCESSING),
+          lt(repos.pipelineUpdatedAt, cutoff)
+        )
+      ).returning({ id: repos.id }),
 
-    const staleDocs = await this.dbService.dbClient.update(repos).set({
-      docsProgressMessage: `Documentation stage exceeded ${env.pipelineStaleAfterMs}ms without completion`,
-      docsProgressStage: 'failed',
-      docsProgressUpdatedAt: nowIso(),
-      docsStatus: 'failed',
-      lastPipelineError: `Documentation stage exceeded ${env.pipelineStaleAfterMs}ms without completion`,
-      pipelineUpdatedAt: nowIso()
-    }).where(and(eq(repos.docsStatus, 'processing'), lt(repos.pipelineUpdatedAt, cutoff))).returning({ id: repos.id })
+      this.dbService.dbClient.update(repos).set({
+        docsProgressMessage: `Documentation stage exceeded ${env.pipelineStaleAfterMs}ms without completion`,
+        docsProgressStage: 'failed',
+        docsProgressUpdatedAt: nowIso(),
+        docsStatus: 'failed',
+        lastPipelineError: `Documentation stage exceeded ${env.pipelineStaleAfterMs}ms without completion`,
+        pipelineUpdatedAt: nowIso()
+      }).where(
+        and(
+          eq(repos.docsStatus, 'processing'),
+          lt(repos.pipelineUpdatedAt, cutoff)
+        )
+      ).returning({ id: repos.id })
+    ])
 
     for (const repo of [...staleClones, ...staleEmbeddings, ...staleDocs]) {
       emitTelemetry({
@@ -106,10 +122,9 @@ export class RepoFetcherService {
 
   @Cron(CronExpression.EVERY_10_SECONDS)
   async pollForPending() {
-    const [repoToClone] = await this.dbService.dbClient.select({ id: repos.id })
-      .from(repos)
-      .where(eq(repos.cloneStatus, 'pending'))
-      .limit(1)
+    const [repoToClone] = await this.dbService.dbClient.select({ id: repos.id }).from(repos).where(
+      eq(repos.cloneStatus, 'pending')
+    ).limit(1)
 
     if (!repoToClone) return
 
@@ -117,7 +132,12 @@ export class RepoFetcherService {
       cloneStatus: 'cloning',
       lastPipelineError: null,
       pipelineUpdatedAt: nowIso()
-    }).where(and(eq(repos.id, repoToClone.id), eq(repos.cloneStatus, 'pending'))).returning()
+    }).where(
+      and(
+        eq(repos.id, repoToClone.id),
+        eq(repos.cloneStatus, 'pending')
+      )
+    ).returning()
 
     if (!claimedRepo) return
 
@@ -310,11 +330,13 @@ export class RepoFetcherService {
       const previousFiles = await this.dbService.dbClient.select({
         hash: files.hash,
         path: files.path
-      }).from(files).where(eq(files.repoId, repo.id))
+      }).from(files).where(
+        eq(files.repoId, repo.id)
+      )
 
       const filePaths = await this.getAllFiles(targetPath)
       const filesData = await Promise.all(
-        map(filePaths, async (filePath): Promise<InsertFile & TrackedFile> => {
+        filePaths.map(async (filePath): Promise<InsertFile & TrackedFile> => {
           const relPath = path.relative(targetPath, filePath)
           const stats = await stat(filePath)
           const hash = await this.hashFile(filePath)
@@ -325,11 +347,14 @@ export class RepoFetcherService {
       const ingestDelta = this.calculateIngestDelta(previousFiles, filesData)
       const deltaForIngest = previousFiles.length > 0 ? ingestDelta : undefined
 
-      await this.dbService.dbClient.delete(files).where(eq(files.repoId, repo.id))
+      await this.dbService.dbClient.delete(files).where(
+        eq(files.repoId, repo.id)
+      )
       await this.dbService.dbClient.insert(files).values(filesData)
 
       try {
         const ingestMessage = this.buildIngestJobRequest(repo.id, commitSha, snapshot, deltaForIngest)
+
         await this.orchestratorClient.enqueueIngestJob(ingestMessage)
 
         emitTelemetry({
@@ -356,7 +381,9 @@ export class RepoFetcherService {
           embeddingStatus: RepoEmbeddingStatus.FAILED,
           lastPipelineError: safeCauseMessage,
           pipelineUpdatedAt: nowIso()
-        }).where(eq(repos.id, repo.id))
+        }).where(
+          eq(repos.id, repo.id)
+        )
 
         emitTelemetry({
           component: 'repo-fetcher.service',
@@ -385,7 +412,9 @@ export class RepoFetcherService {
         embeddingStatus: RepoEmbeddingStatus.FAILED,
         lastPipelineError: safeErrorMessage,
         pipelineUpdatedAt: nowIso()
-      }).where(eq(repos.id, repo.id))
+      }).where(
+        eq(repos.id, repo.id)
+      )
 
       throw new Error(safeErrorMessage)
     } finally {
