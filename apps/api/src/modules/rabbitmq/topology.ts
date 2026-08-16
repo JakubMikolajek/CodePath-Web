@@ -23,6 +23,8 @@ interface TopologyNames {
   retryQueue: string
 }
 
+// TODO: convert me to service
+
 function topologyNames(queueName: string): TopologyNames {
   return {
     dlq: `${queueName}.dlq`,
