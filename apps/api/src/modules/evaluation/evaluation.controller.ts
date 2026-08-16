@@ -12,16 +12,6 @@ interface TriggerEvaluationBody {
 export class EvaluationController {
   constructor(private readonly evaluationService: EvaluationService) {}
 
-  @Get(':repoId/runs')
-  @UseGuards(SessionAuthGuard)
-  async listRuns(
-    @Req() req: { user: SelectUser },
-    @Param('repoId', ParseIntPipe) repoId: number,
-    @Query('limit') limit?: string
-  ) {
-    return await this.evaluationService.listRuns(req.user.id, repoId, limit)
-  }
-
   @Get(':repoId/runs/:runId/metrics')
   @UseGuards(SessionAuthGuard)
   async getRunMetrics(
@@ -39,6 +29,16 @@ export class EvaluationController {
     @Param('repoId', ParseIntPipe) repoId: number
   ) {
     return await this.evaluationService.getTrend(req.user.id, repoId)
+  }
+
+  @Get(':repoId/runs')
+  @UseGuards(SessionAuthGuard)
+  async listRuns(
+    @Req() req: { user: SelectUser },
+    @Param('repoId', ParseIntPipe) repoId: number,
+    @Query('limit') limit?: string
+  ) {
+    return await this.evaluationService.listRuns(req.user.id, repoId, limit)
   }
 
   @Post(':repoId/trigger')
