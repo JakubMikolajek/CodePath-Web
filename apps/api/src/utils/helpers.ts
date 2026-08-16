@@ -1,17 +1,12 @@
 import { NotFoundException } from '@nestjs/common'
 import type { RepoApiEndpointParameter } from '@workspace/codepath-common'
 import { and, eq } from 'drizzle-orm'
-import { replace, toLower } from 'lodash'
 
 import type {
   ApiExplorerRepoOwnership as RepoOwnership
 } from '../modules/api-explorer/types/api-explorer-internal.types'
 import { repos } from '../modules/db/schema'
 import type { DbService } from '../modules/db/services/db.service'
-
-export function sanitizeString(value: string): string {
-  return replace(toLower(value), /[^a-z0-9]/g, '_')
-}
 
 export function normalizeHttpPath(path: string) {
   const trimmed = path.trim()
@@ -60,9 +55,8 @@ export function isPrivateIpv4Host(hostname: string) {
 
   if (first === 10) return true
   if (first === 192 && second === 168) return true
-  if (first === 172 && second >= 16 && second <= 31) return true
 
-  return false
+  return first === 172 && second >= 16 && second <= 31
 }
 
 export function isAllowedRunnerTarget(urlString: string) {
@@ -90,10 +84,12 @@ export function isAllowedRunnerTarget(urlString: string) {
 }
 
 export async function assertRepoOwnership(dbService: DbService, userId: number, repoId: number): Promise<RepoOwnership> {
-  const [repo] = await dbService.dbClient.select({ id: repos.id, name: repos.name })
-    .from(repos)
-    .where(and(eq(repos.id, repoId), eq(repos.userId, userId)))
-    .limit(1)
+  const [repo] = await dbService.dbClient.select({ id: repos.id, name: repos.name }).from(repos).where(
+    and(
+      eq(repos.id, repoId),
+      eq(repos.userId, userId)
+    )
+  ).limit(1)
 
   if (!repo) throw new NotFoundException('Repository not found')
 
