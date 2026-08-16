@@ -8,14 +8,13 @@ import {
 
 import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common'
 import { Nullable, Undefinable } from '@workspace/codepath-common/globals'
-import type { AxiosInstance } from 'axios'
 import * as bcrypt from 'bcrypt'
 import { eq, or } from 'drizzle-orm'
 
 import { env } from '../../../config/env'
 import { InserUser, SelectUser, users } from '../../db/schema'
 import { DbService } from '../../db/services/db.service'
-import { HTTP_CLIENT } from '../../http-client/http-client.tokens'
+import { HTTP_CLIENT, type HttpClient } from '../../http-client/http-client.tokens'
 
 const JWT_ALGORITHM = 'RS256'
 
@@ -55,7 +54,7 @@ export class AuthService {
   constructor(
     private readonly dbService: DbService,
     @Inject(HTTP_CLIENT)
-    private readonly httpClient: AxiosInstance
+    private readonly httpClient: HttpClient
   ) {}
 
   async validateKeycloakAccessToken(accessToken: string): Promise<Nullable<SelectUser>> {

@@ -16,12 +16,11 @@ import type {
   RepoOpenApiSchema
 } from '@workspace/codepath-common/api-explorer'
 import { RepoApiFramework, RepoApiHttpMethod, RepoApiParameterLocation } from '@workspace/codepath-common/api-explorer'
-import type { AxiosInstance } from 'axios'
 
 import { env } from '../../../config/env'
 import { assertRepoOwnership, isAllowedRunnerTarget, normalizeHttpPath, uniqueParams } from '../../../utils/helpers'
 import { DbService } from '../../db/services/db.service'
-import { HTTP_CLIENT } from '../../http-client/http-client.tokens'
+import { HTTP_CLIENT, type HttpClient } from '../../http-client/http-client.tokens'
 import { QdrantService } from '../../qdrant/services/qdrant.service'
 import { OpenApiDocumentBuilder } from '../builders/openapi-document.builder'
 import { ApiEndpointDetector } from '../detectors/api-endpoint.detector'
@@ -80,7 +79,7 @@ export class ApiExplorerService {
     private readonly qdrantService: QdrantService,
     private readonly apiRunnerService: ApiRunnerService,
     @Inject(HTTP_CLIENT)
-    private readonly httpClient: AxiosInstance
+    private readonly httpClient: HttpClient
   ) {}
 
   async deleteRunnerAuthPreset(userId: number, repoId: number, presetId: number) {

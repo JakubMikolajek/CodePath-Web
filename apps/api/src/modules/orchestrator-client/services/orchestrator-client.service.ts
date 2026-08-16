@@ -5,10 +5,10 @@ import { Inject, Injectable } from '@nestjs/common'
 import type { RepoGraphEdge } from '@workspace/codepath-common/graph'
 import type { IngestJobRequestV2 } from '@workspace/codepath-common/ingest'
 import type { RepoDocsJobRequest, RepoEvaluationJobRequest } from '@workspace/codepath-common/repository'
-import axios, { type AxiosInstance } from 'axios'
+import axios from 'axios'
 
 import { env } from '../../../config/env'
-import { HTTP_CLIENT } from '../../http-client/http-client.tokens'
+import { HTTP_CLIENT, type HttpClient } from '../../http-client/http-client.tokens'
 import { assertValidIngestJobRequestFromWeb } from './ingest-message.validator'
 
 export interface OrchestratorChatRpcInput {
@@ -114,7 +114,7 @@ function takeCompleteFrame(buffer: string): null | { frame: string; rest: string
 @Injectable()
 export class OrchestratorClient {
   constructor(
-    @Inject(HTTP_CLIENT) private readonly httpClient: AxiosInstance
+    @Inject(HTTP_CLIENT) private readonly httpClient: HttpClient
   ) {}
 
   async enqueueDocsJob(input: RepoDocsJobRequest): Promise<void> {

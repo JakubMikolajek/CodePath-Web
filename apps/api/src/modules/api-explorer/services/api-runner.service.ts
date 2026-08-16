@@ -15,10 +15,9 @@ import {
   RepoApiRunnerApiKeyPlacement,
   RepoApiRunnerAuthMode
 } from '@workspace/codepath-common/api-explorer'
-import type { AxiosInstance } from 'axios'
 
 import { isAllowedRunnerTarget } from '../../../utils/helpers'
-import { HTTP_CLIENT } from '../../http-client/http-client.tokens'
+import { HTTP_CLIENT, type HttpClient } from '../../http-client/http-client.tokens'
 import { ApiRunnerAuthPresetsRepository } from '../repositories/api-runner-auth-presets.repository'
 import { ApiRunnerCollectionsRepository } from '../repositories/api-runner-collections.repository'
 
@@ -52,7 +51,7 @@ export class ApiRunnerService {
     private readonly runnerAuthPresetsRepository: ApiRunnerAuthPresetsRepository,
     private readonly runnerCollectionsRepository: ApiRunnerCollectionsRepository,
     @Inject(HTTP_CLIENT)
-    private readonly httpClient: AxiosInstance
+    private readonly httpClient: HttpClient
   ) {}
 
   async deleteRunnerAuthPreset(userId: number, repoId: number, presetId: number) {
