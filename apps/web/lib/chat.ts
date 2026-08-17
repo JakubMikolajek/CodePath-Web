@@ -1,15 +1,9 @@
-import type { ChatSession, SessionDetail } from '@workspace/codepath-common/chat'
-
-import { apiClient } from '@/lib/api/api'
+import type { Nullable } from '@workspace/codepath-common'
 
 export type ChatStreamEvent
   = | { code: string; message: string; type: 'error' }
   | { delta: string; done: false; type: 'chunk' }
   | { delta: string; done: true; type: 'done' }
-
-export async function createSession (repoId: number) {
-  return await apiClient.get(`/chat/${repoId}/createSession`)
-}
 
 export async function* sendMessage (repoId: number, body: object): AsyncGenerator<ChatStreamEvent> {
   const response = await fetch(`/api/backend/chat/${repoId}`, {
@@ -32,6 +26,7 @@ export async function* sendMessage (repoId: number, body: object): AsyncGenerato
 
   const decoder = new TextDecoder()
   const reader = response.body.getReader()
+
   let buffer = ''
 
   try {
@@ -42,6 +37,7 @@ export async function* sendMessage (repoId: number, body: object): AsyncGenerato
 
       buffer += decoder.decode(value, { stream: true })
 
+      //FIXME: duplication
       let completeFrame = takeCompleteFrame(buffer)
 
       while (completeFrame) {
@@ -73,15 +69,8 @@ export async function* sendMessage (repoId: number, body: object): AsyncGenerato
   }
 }
 
-export async function getChatSessions (repoId: number) {
-  return await apiClient.get<ChatSession[]>(`/chat/${repoId}`)
-}
-
-export async function getSessionDetails (repoId: number, sessionId: string) {
-  return await apiClient.get<SessionDetail[]>(`/chat/${repoId}/${sessionId}`)
-}
-
 function parseChatStreamFrame(frame: string): ChatStreamEvent {
+  //FIXME: duplication
   let eventType = ''
   const dataLines: string[] = []
 
@@ -109,6 +98,7 @@ function parseChatStreamFrame(frame: string): ChatStreamEvent {
 
   if (!isRecord(payload)) throw new Error('Chat response contained an invalid event payload')
 
+  //FIXME: duplication
   if (eventType === 'chunk') {
     const { delta, done } = payload
 
@@ -130,11 +120,12 @@ function parseChatStreamFrame(frame: string): ChatStreamEvent {
   throw new Error('Chat response contained an invalid event payload')
 }
 
+//FIXME: duplication
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object'
 }
 
-function takeCompleteFrame(buffer: string): null | { frame: string; rest: string } {
+function takeCompleteFrame(buffer: string): Nullable<{ frame: string; rest: string }> {
   const separator = /\r?\n\r?\n/.exec(buffer)
 
   if (!separator || separator.index === undefined) return null

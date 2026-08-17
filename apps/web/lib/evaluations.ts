@@ -1,13 +1,14 @@
-import { apiClient } from '@/lib/api/api'
+import type { Nullable } from '@workspace/codepath-common'
 
+//FIXME: maybe enum?
 export const EVALUATION_RUN_TYPES = ['docs_quality', 'retrieval', 'chat_faithfulness', 'full'] as const
 
 export type EvaluationRunType = typeof EVALUATION_RUN_TYPES[number]
-export type EvaluationRunStatus = 'pending' | 'running' | 'completed' | 'failed'
+export type EvaluationRunStatus = 'completed' | 'failed' | 'pending' | 'running'
 
 export interface EvaluationRun {
-  completedAt: string | null
-  errorMessage: string | null
+  completedAt: Nullable<string>
+  errorMessage: Nullable<string>
   id: number
   repoId: number
   runType: EvaluationRunType
@@ -21,13 +22,13 @@ export interface EvaluationMetric {
   metricName: string
   metricValue: number
   runId: number
-  targetRef: string | null
+  targetRef: Nullable<string>
 }
 
 export interface EvaluationTrendPoint {
   averageMetricValue: number
-  firstMetricAt: string | null
-  lastMetricAt: string | null
+  firstMetricAt: Nullable<string>
+  lastMetricAt: Nullable<string>
   metricName: string
   sampleCount: number
 }
@@ -35,22 +36,4 @@ export interface EvaluationTrendPoint {
 export interface TriggerEvaluationResponse {
   message: string
   status: 'queued'
-}
-
-export async function getRepoEvaluationRuns(repoId: number, limit?: number) {
-  return await apiClient.get<EvaluationRun[]>(`/evaluation/${repoId}/runs`, {
-    params: { limit }
-  })
-}
-
-export async function getRunMetrics(repoId: number, runId: number) {
-  return await apiClient.get<EvaluationMetric[]>(`/evaluation/${repoId}/runs/${runId}/metrics`)
-}
-
-export async function getRepoEvaluationTrend(repoId: number) {
-  return await apiClient.get<EvaluationTrendPoint[]>(`/evaluation/${repoId}/trend`)
-}
-
-export async function triggerEvaluationRun(repoId: number, runType: EvaluationRunType) {
-  return await apiClient.post<TriggerEvaluationResponse, { runType: EvaluationRunType }>(`/evaluation/${repoId}/trigger`, { runType })
 }
