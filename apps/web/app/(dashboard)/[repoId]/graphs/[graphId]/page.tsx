@@ -37,10 +37,10 @@ export default function Page() {
   }, [graphId, graphs])
 
   return (
-    <div className="space-y-[18px]">
+    <div className="space-y-4.5">
       <PageHeader
         actions={(
-          <Button asChild className="rounded-[9px] px-[13px] py-2 text-[12.5px]" variant="glass">
+          <Button asChild className="rounded-[9px] px-3.25 py-2 text-[12.5px]" variant="glass">
             <Link href={`/${repoId}/graphs`}>
               <ArrowLeft className="size-4" />
               Back to graph explorer

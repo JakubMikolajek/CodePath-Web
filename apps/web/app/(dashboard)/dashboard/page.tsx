@@ -21,11 +21,11 @@ const sessions = [
 
 export default function Page() {
   return (
-    <div className="space-y-[18px]">
+    <div className="space-y-4.5">
       <PageHeader
         actions={(
-          <Button className="rounded-[9px] px-[13px] py-2 text-[12.5px]" variant="glass">
-            <CalendarDays className="size-[13px]" />
+          <Button className="rounded-[9px] px-3.25 py-2 text-[12.5px]" variant="glass">
+            <CalendarDays className="size-3.25" />
             This week
           </Button>
         )}
@@ -47,29 +47,29 @@ export default function Page() {
 
       <section className="grid gap-4 xl:grid-cols-3">
         <div className="nurt-panel p-[18px_20px]">
-          <div className="mb-[14px] flex items-center justify-between">
+          <div className="mb-3.5 flex items-center justify-between">
             <h2 className="text-[15px] font-semibold text-foreground">Recent activity</h2>
 
             <Button className="h-auto px-0 py-0 text-[11.5px] text-primary hover:bg-transparent hover:text-primary" size="sm" variant="ghost">View all</Button>
           </div>
 
-          <div className="space-y-[14px]">
+          <div className="space-y-3.5">
             {recentActivity.map(item => {
               const Icon = item.icon
 
               return (
                 <div className="flex items-center gap-3" key={item.title}>
-                  <div className={`grid size-8 shrink-0 place-items-center rounded-[9px] bg-linear-to-br ${item.tone} text-[var(--nurt-ink)]`}>
+                  <div className={`grid size-8 shrink-0 place-items-center rounded-[9px] bg-linear-to-br ${item.tone} text-(--nurt-ink)`}>
                     <Icon className="size-4" />
                   </div>
 
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[12.5px] font-medium text-foreground">{item.title}</p>
 
-                    <p className="mt-0.5 truncate font-mono text-[10.5px] text-[var(--nurt-t3)]">{item.meta}</p>
+                    <p className="mt-0.5 truncate font-mono text-[10.5px] text-(--nurt-t3)">{item.meta}</p>
                   </div>
 
-                  <span className="shrink-0 text-[11px] text-[var(--nurt-t3)]">{item.time}</span>
+                  <span className="shrink-0 text-[11px] text-(--nurt-t3)">{item.time}</span>
                 </div>
               )
             })}
@@ -81,15 +81,15 @@ export default function Page() {
             <div>
               <h2 className="text-[15px] font-semibold text-foreground">AI Usage</h2>
 
-              <p className="mt-1.5 text-[11px] text-[var(--nurt-t3)]">Requests</p>
+              <p className="mt-1.5 text-[11px] text-(--nurt-t3)">Requests</p>
 
-              <p className="text-[26px] font-bold leading-tight text-[var(--nurt-title)]">12k</p>
+              <p className="text-[26px] font-bold leading-tight text-(--nurt-title)">12k</p>
             </div>
 
-            <Button className="rounded-[7px] px-[9px] py-[3px] text-[11px]" size="sm" variant="glass">This week</Button>
+            <Button className="rounded-[7px] px-2.25 py-0.75 text-[11px]" size="sm" variant="glass">This week</Button>
           </div>
 
-          <div className="relative min-h-[130px] flex-1">
+          <div className="relative min-h-32.5 flex-1">
             <svg aria-label="AI usage trend chart" className="absolute inset-0 size-full" preserveAspectRatio="none" role="img" viewBox="0 0 320 150">
               <defs>
                 <linearGradient id="aiFill" x1="0" x2="0" y1="0" y2="1">
@@ -105,21 +105,21 @@ export default function Page() {
             </svg>
           </div>
 
-          <div className="mt-1.5 flex justify-between font-mono text-[9.5px] text-[var(--nurt-t4)]">
+          <div className="mt-1.5 flex justify-between font-mono text-[9.5px] text-(--nurt-t4)">
             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => <span key={day}>{day}</span>)}
           </div>
         </div>
 
         <aside aria-label="Recent chat sessions" className="nurt-panel p-[18px_20px]">
-          <h2 className="mb-[14px] text-[15px] font-semibold text-foreground">Recent chats</h2>
+          <h2 className="mb-3.5 text-[15px] font-semibold text-foreground">Recent chats</h2>
 
           <div>
             {sessions.map(([title, time], index) => (
-              <div className={index === 0 ? 'py-2.5' : 'border-t border-white/[0.06] py-2.5'} key={title}>
+              <div className={index === 0 ? 'py-2.5' : 'border-t border-white/6 py-2.5'} key={title}>
                 <div className="flex items-center justify-between gap-3">
                   <p className="truncate text-[12.5px] text-foreground">{title}</p>
 
-                  <span className="shrink-0 text-[11px] text-[var(--nurt-t3)]">{time}</span>
+                  <span className="shrink-0 text-[11px] text-(--nurt-t3)">{time}</span>
                 </div>
               </div>
             ))}

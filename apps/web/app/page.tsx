@@ -17,7 +17,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       </div>
 
       <div className="relative z-10 flex w-full items-center justify-center px-5 py-8 md:px-10">
-        <div className="w-full max-w-[430px]">
+        <div className="w-full max-w-107.5">
           <LoginPageContent callbackUrl={callbackUrl} />
         </div>
       </div>

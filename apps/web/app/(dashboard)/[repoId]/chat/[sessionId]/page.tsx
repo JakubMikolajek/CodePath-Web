@@ -131,7 +131,7 @@ export default function ChatPage() {
   }, [dispatch, hasValidRouteParams, repoId, sessionId])
 
   return (
-    <div className="flex h-[calc(100svh-70px)] flex-col gap-[18px]">
+    <div className="flex h-[calc(100svh-70px)] flex-col gap-4.5">
       <PageHeader
         description="Repository-aware assistant for DTOs, endpoints, documentation and code navigation context."
         eyebrow={`Repo ${Number.isFinite(repoId) ? repoId : 'unknown'}`}
@@ -140,13 +140,13 @@ export default function ChatPage() {
 
       <section
         aria-label="Chat conversation"
-        className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(20,27,40,0.4),rgba(13,17,26,0.25))]"
+        className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/6 bg-[linear-gradient(180deg,rgba(20,27,40,0.4),rgba(13,17,26,0.25))]"
       >
-        <div className="flex-1 space-y-[18px] overflow-y-auto p-[22px]">
+        <div className="flex-1 space-y-4.5 overflow-y-auto p-5.5">
           {sessionDetails.length === 0 && streamingAssistantText === null && !isLoading && (
             <Card className="mx-auto mt-12 max-w-2xl rounded-[14px] border-primary/25 bg-primary/10 py-0">
               <CardContent className="p-8 text-center">
-                <div className="mx-auto grid size-14 place-items-center rounded-[14px] border border-white/10 bg-white/[0.02] text-primary">
+                <div className="mx-auto grid size-14 place-items-center rounded-[14px] border border-white/10 bg-white/2 text-primary">
                   <Sparkles className="size-6" />
                 </div>
 
@@ -163,32 +163,32 @@ export default function ChatPage() {
             <div className="space-y-4" key={detail.id}>
               {detail.role === 'user' ? (
                 <div className="flex justify-end">
-                  <Card className="max-w-[520px] overflow-hidden rounded-[14px] border-primary/30 bg-primary/12 py-0">
+                  <Card className="max-w-130 overflow-hidden rounded-[14px] border-primary/30 bg-primary/12 py-0">
                     <CardContent className="p-0">
-                      <div className="flex items-center gap-2 border-b border-white/[0.06] px-[14px] py-[9px] text-[12.5px] font-semibold text-foreground">
-                        <User className="size-[13px] text-primary" />
+                      <div className="flex items-center gap-2 border-b border-white/6 px-3.5 py-2.25 text-[12.5px] font-semibold text-foreground">
+                        <User className="size-3.25 text-primary" />
                         Ty
                       </div>
 
-                      <p className="px-[14px] py-3 text-[13px] leading-relaxed text-foreground">{detail.content}</p>
+                      <p className="px-3.5 py-3 text-[13px] leading-relaxed text-foreground">{detail.content}</p>
                     </CardContent>
                   </Card>
                 </div>
               ) : (
                 <div className="flex justify-start">
-                  <Card className="max-w-[680px] overflow-hidden rounded-[14px] border-secondary/30 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--nurt-accent2)_12%,transparent),color-mix(in_oklab,var(--nurt-accent)_5%,transparent))] py-0">
+                  <Card className="max-w-170 overflow-hidden rounded-[14px] border-secondary/30 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--nurt-accent2)_12%,transparent),color-mix(in_oklab,var(--nurt-accent)_5%,transparent))] py-0">
                     <CardContent className="p-0">
-                      <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-[15px] py-[11px]">
-                        <div className="flex items-center gap-[9px] text-[13px] font-semibold text-foreground">
-                          <span className="grid size-6 place-items-center rounded-[7px] bg-[linear-gradient(135deg,var(--nurt-accent),var(--nurt-accent2))] text-[var(--nurt-ink)]">
-                            <Bot className="size-[13px]" />
+                      <div className="flex items-center justify-between gap-3 border-b border-white/6 px-3.75 py-2.75">
+                        <div className="flex items-center gap-2.25 text-[13px] font-semibold text-foreground">
+                          <span className="grid size-6 place-items-center rounded-[7px] bg-[linear-gradient(135deg,var(--nurt-accent),var(--nurt-accent2))] text-(--nurt-ink)">
+                            <Bot className="size-3.25" />
                           </span>
                           Asystent AI
                         </div>
 
                         <Button
                           aria-label="Skopiuj odpowiedź"
-                          className="size-7 text-[var(--nurt-t3)] hover:text-foreground"
+                          className="size-7 text-(--nurt-t3) hover:text-foreground"
                           onClick={() => copyToClipboard(detail.content, detail.id)}
                           size="icon"
                           variant="ghost"
@@ -201,7 +201,7 @@ export default function ChatPage() {
                         </Button>
                       </div>
 
-                      <article className="prose prose-sm max-w-none px-4 py-[14px] text-[13px] leading-[1.6] prose-p:my-2 prose-strong:text-foreground prose-code:rounded prose-code:border-0 prose-code:bg-white/[0.06] prose-code:px-1.5 prose-code:py-0.5 prose-code:font-mono prose-code:text-[11.5px] prose-code:text-foreground prose-pre:border prose-pre:border-white/10 prose-pre:bg-[var(--nurt-bg0)] prose-pre:text-gray-100 dark:prose-invert">
+                      <article className="prose prose-sm max-w-none px-4 py-3.5 text-[13px] leading-[1.6] prose-p:my-2 prose-strong:text-foreground prose-code:rounded prose-code:border-0 prose-code:bg-white/[0.06] prose-code:px-1.5 prose-code:py-0.5 prose-code:font-mono prose-code:text-[11.5px] prose-code:text-foreground prose-pre:border prose-pre:border-white/10 prose-pre:bg-[var(--nurt-bg0)] prose-pre:text-gray-100 dark:prose-invert">
                         <Markdown
                           components={markdownComponents}
                           rehypePlugins={[rehypeHighlight]}

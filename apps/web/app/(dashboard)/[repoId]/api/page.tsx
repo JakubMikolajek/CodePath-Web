@@ -260,20 +260,20 @@ function EndpointRow({ endpoint, isActive, onUse }: {
   onUse: (endpoint: RepoApiEndpoint) => void
 }) {
   return (
-    <tr className={`border-t border-white/[0.06] transition hover:bg-white/[0.025] ${isActive ? 'bg-primary/10' : ''}`}>
-      <td className="px-[18px] py-2.5 align-top">
-        <span className={`rounded-[6px] border px-[9px] py-[3px] font-mono text-[10.5px] font-semibold ${methodClasses[endpoint.method]}`}>
+    <tr className={`border-t border-white/6 transition hover:bg-white/2.5 ${isActive ? 'bg-primary/10' : ''}`}>
+      <td className="px-4.5 py-2.5 align-top">
+        <span className={`rounded-[6px] border px-2.25 py-0.75 font-mono text-[10.5px] font-semibold ${methodClasses[endpoint.method]}`}>
           {endpoint.method}
         </span>
       </td>
 
-      <td className="max-w-[260px] truncate px-3 py-2.5 align-top font-mono text-xs text-foreground">{endpoint.path}</td>
+      <td className="max-w-65 truncate px-3 py-2.5 align-top font-mono text-xs text-foreground">{endpoint.path}</td>
 
       <td className="px-3 py-2.5 align-top font-mono text-[11.5px] text-muted-foreground">{endpoint.framework}</td>
 
       <td className="px-3 py-2.5 align-top font-mono text-[11.5px] text-muted-foreground">{endpoint.moduleName ?? '-'}</td>
 
-      <td className="max-w-[320px] truncate px-3 py-2.5 align-top font-mono text-[11px] text-[var(--nurt-t3)]">{endpoint.filePath}</td>
+      <td className="max-w-[320px] truncate px-3 py-2.5 align-top font-mono text-[11px] text-(--nurt-t3)">{endpoint.filePath}</td>
 
       <td className="px-3 py-2.5 align-top text-xs">
         {endpoint.params.length === 0 ? (
@@ -282,7 +282,7 @@ function EndpointRow({ endpoint, isActive, onUse }: {
           <div className="flex flex-wrap gap-1">
             {endpoint.params.map(param => (
               <span
-                className="rounded-[5px] border border-white/[0.06] bg-white/[0.05] px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                className="rounded-[5px] border border-white/6 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
                 key={`${endpoint.id}:${param.location}:${param.name}`}
               >
                 {param.location}:{param.name}{param.required ? '*' : ''}
@@ -310,7 +310,7 @@ function EndpointRow({ endpoint, isActive, onUse }: {
 
       <td className="px-3 py-2.5 align-top">
         <button
-          className={`rounded-[7px] border px-2.5 py-1 text-[11px] transition ${isActive ? 'border-primary/60 bg-primary/15 text-primary' : 'border-white/10 bg-white/[0.03] text-foreground hover:bg-white/[0.05]'}`}
+          className={`rounded-[7px] border px-2.5 py-1 text-[11px] transition ${isActive ? 'border-primary/60 bg-primary/15 text-primary' : 'border-white/10 bg-white/3 text-foreground hover:bg-white/5'}`}
           onClick={() => onUse(endpoint)}
           type="button"
         >
@@ -729,7 +729,7 @@ export default function Page() {
   }, [runnerResult])
 
   return (
-    <div className="space-y-[18px]">
+    <div className="space-y-4.5">
       <PageHeader
         description="Explore detected backend endpoints, generated request payloads, OpenAPI exports and workspace-shared runner presets."
         eyebrow={`Repo ${Number.isFinite(repoId) ? repoId : 'unknown'}`}
@@ -739,8 +739,8 @@ export default function Page() {
       <section aria-label="API explorer filters" className="nurt-panel p-[18px_20px]">
         <div className="grid gap-6 lg:grid-cols-2">
           <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="api-search">
-            <span className="nurt-label flex items-center gap-[7px] text-[var(--nurt-t3)]">
-              <Search className="size-3 text-[var(--nurt-t3)]" />
+            <span className="nurt-label flex items-center gap-1.75 text-(--nurt-t3)">
+              <Search className="size-3 text-(--nurt-t3)" />
               SEARCH
             </span>
 
@@ -762,7 +762,7 @@ export default function Page() {
               value={runtimeOpenApiBaseUrl}
             />
 
-            <span className="text-right text-[10.5px] font-normal text-[var(--nurt-t3)]">
+            <span className="text-right text-[10.5px] font-normal text-(--nurt-t3)">
               OpenAPI export is runtime-first from this URL, with static fallback from code.
             </span>
           </label>
@@ -770,12 +770,12 @@ export default function Page() {
 
         <div className="mt-4 flex gap-10 max-lg:flex-col">
           <div className="space-y-2">
-            <p className="nurt-label text-[var(--nurt-t3)]">METHODS</p>
+            <p className="nurt-label text-(--nurt-t3)">METHODS</p>
 
             <div className="flex flex-wrap gap-2 text-sm">
               {METHOD_OPTIONS.map(method => (
                 <label
-                  className="flex cursor-pointer items-center gap-[7px] rounded-[8px] border border-white/10 px-2.5 py-[5px] transition hover:bg-white/[0.03]"
+                  className="flex cursor-pointer items-center gap-1.75 rounded-[8px] border border-white/10 px-2.5 py-1.25 transition hover:bg-white/3"
                   key={method}
                 >
                   <input
@@ -792,7 +792,7 @@ export default function Page() {
           </div>
 
           <div className="space-y-2">
-            <p className="nurt-label text-[var(--nurt-t3)]">FRAMEWORKS</p>
+            <p className="nurt-label text-(--nurt-t3)">FRAMEWORKS</p>
 
             <div className="flex flex-wrap gap-2 text-sm">
               {FRAMEWORK_OPTIONS.map(framework => {
@@ -800,7 +800,7 @@ export default function Page() {
 
                 return (
                   <label
-                    className={`flex cursor-pointer items-center gap-[7px] rounded-[8px] border border-white/[0.06] px-2.5 py-[5px] transition hover:bg-white/[0.03] ${selectedFrameworks.includes(framework) ? 'text-foreground' : 'text-[var(--nurt-t3)]'} ${enabled ? '' : 'opacity-40'}`}
+                    className={`flex cursor-pointer items-center gap-1.75 rounded-[8px] border border-white/6 px-2.5 py-1.25 transition hover:bg-white/3 ${selectedFrameworks.includes(framework) ? 'text-foreground' : 'text-(--nurt-t3)'} ${enabled ? '' : 'opacity-40'}`}
                     key={framework}
                   >
                     <input
@@ -819,32 +819,32 @@ export default function Page() {
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2.5">
-          <Button className="rounded-[9px] px-[14px] py-2 text-[12.5px]" onClick={loadExplorer} type="button" variant="glow">
+          <Button className="rounded-[9px] px-3.5 py-2 text-[12.5px]" onClick={loadExplorer} type="button" variant="glow">
             <Filter className="size-4" />
             Apply filters
           </Button>
 
-          <Button className="rounded-[9px] px-[13px] py-2 text-[12.5px]" onClick={resetFilters} type="button" variant="glass">
+          <Button className="rounded-[9px] px-3.25 py-2 text-[12.5px]" onClick={resetFilters} type="button" variant="glass">
             <RotateCcw className="size-4" />
             Reset
           </Button>
 
-          <Button className="rounded-[9px] px-[13px] py-2 text-[12.5px]" onClick={loadExplorer} type="button" variant="glass">
+          <Button className="rounded-[9px] px-3.25 py-2 text-[12.5px]" onClick={loadExplorer} type="button" variant="glass">
             <RefreshCw className="size-4" />
             Refresh
           </Button>
 
-          <Button className="rounded-[9px] px-[13px] py-2 text-[12.5px]" disabled={exportingEndpoints} onClick={handleExportEndpointsJson} type="button" variant="glass">
+          <Button className="rounded-[9px] px-3.25 py-2 text-[12.5px]" disabled={exportingEndpoints} onClick={handleExportEndpointsJson} type="button" variant="glass">
             <Download className="size-4" />
             {exportingEndpoints ? 'Exporting...' : 'Export Endpoints JSON'}
           </Button>
 
-          <Button className="rounded-[9px] px-[13px] py-2 text-[12.5px]" disabled={exportingOpenApi} onClick={handleExportOpenApi} type="button" variant="glass">
+          <Button className="rounded-[9px] px-3.25 py-2 text-[12.5px]" disabled={exportingOpenApi} onClick={handleExportOpenApi} type="button" variant="glass">
             <Download className="size-4" />
             {exportingOpenApi ? 'Exporting...' : 'Export OpenAPI JSON'}
           </Button>
 
-          <span className="ml-auto font-mono text-[11px] text-[var(--nurt-t3)]">
+          <span className="ml-auto font-mono text-[11px] text-(--nurt-t3)">
             Endpoints: {data?.metadata.endpointCount ?? 0} | Segments scanned: {data?.metadata.segmentCount ?? 0}
           </span>
         </div>
@@ -899,7 +899,7 @@ export default function Page() {
         </div>
 
         <div className={runnerPanelClassName}>
-          <p className="nurt-label text-[var(--nurt-t3)]">AUTH PRESET</p>
+          <p className="nurt-label text-(--nurt-t3)">AUTH PRESET</p>
 
           <div className="grid gap-3 md:grid-cols-2">
             <label className="flex flex-col gap-1 text-sm">
@@ -1233,25 +1233,25 @@ export default function Page() {
       )}
 
       {!loading && !error && endpoints.length > 0 && (
-        <div className="overflow-x-auto rounded-[14px] border border-white/[0.06] bg-white/[0.012]">
+        <div className="overflow-x-auto rounded-[14px] border border-white/6 bg-white/[0.012]">
           <table className="min-w-full">
             <thead>
-              <tr className="border-b border-white/[0.06] text-left font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--nurt-t3)]">
-                <th className="px-[18px] py-[11px]">Method</th>
+              <tr className="border-b border-white/6 text-left font-mono text-[10px] uppercase tracking-[0.08em] text-(--nurt-t3)">
+                <th className="px-4.5 py-2.75">Method</th>
 
-                <th className="px-3 py-[11px]">Path</th>
+                <th className="px-3 py-2.75">Path</th>
 
-                <th className="px-3 py-[11px]">Framework</th>
+                <th className="px-3 py-2.75">Framework</th>
 
-                <th className="px-3 py-[11px]">Module</th>
+                <th className="px-3 py-2.75">Module</th>
 
-                <th className="px-3 py-[11px]">File</th>
+                <th className="px-3 py-2.75">File</th>
 
-                <th className="px-3 py-[11px]">Params</th>
+                <th className="px-3 py-2.75">Params</th>
 
-                <th className="px-3 py-[11px]">Code</th>
+                <th className="px-3 py-2.75">Code</th>
 
-                <th className="px-3 py-[11px]">Runner</th>
+                <th className="px-3 py-2.75">Runner</th>
               </tr>
             </thead>
             <tbody>

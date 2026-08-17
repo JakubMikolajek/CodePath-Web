@@ -181,16 +181,16 @@ export default function Page() {
   }
 
   return (
-    <div className="space-y-[14px]">
+    <div className="space-y-3.5">
       <PageHeader
         actions={(
           <>
-            <Button className="rounded-[9px] px-[14px] py-2 text-[12.5px]" onClick={applyFilters} type="button" variant="glow">
+            <Button className="rounded-[9px] px-3.5 py-2 text-[12.5px]" onClick={applyFilters} type="button" variant="glow">
               <SlidersHorizontal className="size-4" />
               Apply filters
             </Button>
 
-            <Button className="rounded-[9px] px-[13px] py-2 text-[12.5px]" onClick={resetFilters} type="button" variant="glass">
+            <Button className="rounded-[9px] px-3.25 py-2 text-[12.5px]" onClick={resetFilters} type="button" variant="glass">
               <RotateCcw className="size-4" />
               Reset
             </Button>
@@ -201,24 +201,24 @@ export default function Page() {
         title="Repository Graph"
       />
 
-      <section aria-label="Graph controls" className="rounded-[12px] border border-white/[0.06] bg-white/[0.012] p-[9px_12px]">
+      <section aria-label="Graph controls" className="rounded-[12px] border border-white/6 bg-white/[0.012] p-[9px_12px]">
         <div className="flex flex-wrap items-center gap-2.5">
-          <label className="flex items-center gap-[7px] rounded-[8px] border border-white/10 px-[11px] py-1.5 text-xs text-foreground transition hover:bg-white/[0.03]">
+          <label className="flex items-center gap-1.75 rounded-[8px] border border-white/10 px-2.75 py-1.5 text-xs text-foreground transition hover:bg-white/3">
             <input
               checked={scopeToFocus}
               className="size-4 accent-primary"
               onChange={event => setScopeToFocus(event.target.checked)}
               type="checkbox"
             />
-            <Target className="size-[13px] text-primary" />
+            <Target className="size-3.25 text-primary" />
             Focus mode
           </label>
 
-          <label className="flex items-center gap-2 rounded-[8px] border border-white/10 px-[11px] py-1.5 text-xs text-muted-foreground">
+          <label className="flex items-center gap-2 rounded-[8px] border border-white/10 px-2.75 py-1.5 text-xs text-muted-foreground">
             Depth:
             <Input
               aria-label="Graph traversal depth"
-              className="h-6 w-12 rounded-[7px] bg-[var(--nurt-bg0)] px-2 text-center font-mono text-xs"
+              className="h-6 w-12 rounded-[7px] bg-(--nurt-bg0) px-2 text-center font-mono text-xs"
               max={5}
               min={1}
               onChange={event => setDepth(Number(event.target.value))}
@@ -227,24 +227,24 @@ export default function Page() {
             />
           </label>
 
-          <label className="flex items-center gap-[7px] rounded-[8px] border border-white/10 px-[11px] py-1.5 text-xs text-foreground transition hover:bg-white/[0.03]">
+          <label className="flex items-center gap-1.75 rounded-[8px] border border-white/10 px-2.75 py-1.5 text-xs text-foreground transition hover:bg-white/3">
             <input
               checked={includeSymbols}
               className="size-4 accent-primary"
               onChange={event => setIncludeSymbols(event.target.checked)}
               type="checkbox"
             />
-            <Layers3 className="size-[13px] text-[var(--nurt-t3)]" />
+            <Layers3 className="size-3.25 text-(--nurt-t3)" />
             Include symbols
           </label>
 
           <details className="group relative">
-            <summary className="flex cursor-pointer list-none items-center gap-[7px] rounded-[8px] border border-white/10 px-[11px] py-1.5 text-xs text-foreground transition hover:bg-white/[0.03]">
-              <SlidersHorizontal className="size-[13px]" />
+            <summary className="flex cursor-pointer list-none items-center gap-1.75 rounded-[8px] border border-white/10 px-2.75 py-1.5 text-xs text-foreground transition hover:bg-white/3">
+              <SlidersHorizontal className="size-3.25" />
               Filters
             </summary>
 
-            <div className="absolute left-0 top-10 z-20 w-[min(38rem,calc(100vw-3rem))] rounded-[14px] border border-white/10 bg-[var(--nurt-bg2)] p-4">
+            <div className="absolute left-0 top-10 z-20 w-[min(38rem,calc(100vw-3rem))] rounded-[14px] border border-white/10 bg-(--nurt-bg2) p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Relation filters</p>
 
               <div className="mt-3 flex flex-wrap gap-2 text-sm">
@@ -254,7 +254,7 @@ export default function Page() {
 
                   return (
                     <label
-                      className={`flex cursor-pointer items-center gap-2 rounded-[8px] border px-3 py-2 transition ${isSelected ? 'border-primary/50 bg-primary/15 text-foreground' : 'border-white/10 bg-white/[0.03] text-muted-foreground'} ${isAvailable ? '' : 'opacity-40'}`}
+                      className={`flex cursor-pointer items-center gap-2 rounded-[8px] border px-3 py-2 transition ${isSelected ? 'border-primary/50 bg-primary/15 text-foreground' : 'border-white/10 bg-white/3 text-muted-foreground'} ${isAvailable ? '' : 'opacity-40'}`}
                       key={relationType}
                     >
                       <input
@@ -296,12 +296,12 @@ export default function Page() {
 
           <label className="relative min-w-64 flex-1">
             <span className="sr-only">Search nodes</span>
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-[13px] -translate-y-1/2 text-[var(--nurt-t3)]" />
-            <Input className="h-8 rounded-[8px] bg-[var(--nurt-bg0)] pl-8 font-mono text-xs" disabled placeholder="Search nodes..." />
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.25 -translate-y-1/2 text-(--nurt-t3)" />
+            <Input className="h-8 rounded-[8px] bg-(--nurt-bg0) pl-8 font-mono text-xs" disabled placeholder="Search nodes..." />
           </label>
 
-          <Button aria-label="Fullscreen graph" className="size-[34px] rounded-[8px] p-0" type="button" variant="glass">
-            <Maximize2 className="size-[15px]" />
+          <Button aria-label="Fullscreen graph" className="size-8.5 rounded-[8px] p-0" type="button" variant="glass">
+            <Maximize2 className="size-3.75" />
           </Button>
         </div>
 
@@ -325,7 +325,7 @@ export default function Page() {
       )}
 
       {interactiveGraph && (
-        <section aria-label="Interactive repository graph" className="h-[calc(100svh-290px)] min-h-[450px] overflow-hidden rounded-[14px] border border-white/10 bg-[radial-gradient(110%_90%_at_50%_40%,#0c1018_0%,#07090d_70%)] p-0">
+        <section aria-label="Interactive repository graph" className="h-[calc(100svh-290px)] min-h-112.5 overflow-hidden rounded-[14px] border border-white/10 bg-[radial-gradient(110%_90%_at_50%_40%,#0c1018_0%,#07090d_70%)] p-0">
           <InteractiveRepoGraph
             collapsedModuleIds={collapsedModuleIds}
             focusedNodeId={focusedNodeId}
