@@ -7,6 +7,7 @@ import { assertRepoOwnership } from '../../../utils/helpers'
 import { evaluationMetrics, evaluationRuns } from '../../db/schema'
 import { DbService } from '../../db/services/db.service'
 import { OrchestratorClient } from '../../orchestrator-client/services/orchestrator-client.service'
+import { RealtimeEventsService } from '../../realtime/services/realtime-events.service'
 
 // TODO: move ot evaluation utils
 const DEFAULT_RUN_LIMIT = 50
@@ -19,7 +20,8 @@ type EvaluationRunType = typeof SUPPORTED_RUN_TYPES[number]
 export class EvaluationService {
   constructor(
     private readonly dbService: DbService,
-    private readonly orchestratorClient: OrchestratorClient
+    private readonly orchestratorClient: OrchestratorClient,
+    private readonly realtimeEventsService?: RealtimeEventsService
   ) { }
 
   async getRunMetrics(userId: number, repoId: number, runId: number) {
@@ -88,6 +90,15 @@ export class EvaluationService {
       // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
       throw new ServiceUnavailableException('Evaluation job could not be enqueued')
     }
+
+    this.realtimeEventsService?.emitEvaluationRunQueued(userId, {
+      completedAt: null,
+      errorMessage: null,
+      repoId,
+      runType,
+      status: 'pending',
+      triggeredAt: new Date().toISOString()
+    })
 
     return { message: 'Evaluation job enqueued', status: 'queued' }
   }

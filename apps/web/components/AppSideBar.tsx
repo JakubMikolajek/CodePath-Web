@@ -31,7 +31,8 @@ interface AppSideBarProps {
   me: IUser
 }
 
-const REPOS_REFRESH_INTERVAL_MS = 7_500
+// Safety net only — RealtimeProvider patches this cache on repo.pipeline.updated WS events
+const REPOS_REFRESH_INTERVAL_MS = 60_000
 
 export default function AppSidebar({ fetchedRepos, me }: AppSideBarProps) {
   const dispatch = useAppDispatch()

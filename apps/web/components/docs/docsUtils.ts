@@ -7,7 +7,8 @@ import {
 
 import type { RepoDocsStatusResponse } from '@/redux/api/docsApi'
 
-export const DOCS_STATUS_POLL_MS = 5_000
+// Safety net only — RealtimeProvider patches this cache on repo.pipeline.updated WS events
+export const DOCS_STATUS_POLL_MS = 60_000
 
 export const resolveErrorMessage = (error: unknown) =>
   typeof error === 'object'
