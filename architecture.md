@@ -15,7 +15,8 @@ and repository understanding. It combines:
 - dependency and API discovery,
 - embeddings and semantic retrieval,
 - retrieval-augmented generation,
-- user-facing documentation and chat workflows.
+- user-facing documentation, chat and evaluation workflows,
+- Web-owned realtime delivery of live status updates.
 
 The architecture separates user-facing control-plane responsibilities from
 long-running ingestion and AI workloads.
@@ -24,7 +25,8 @@ long-running ingestion and AI workloads.
 
 1. **Control plane stays lightweight**
    The Web API owns users, repository metadata, permissions, status transitions
-   and read APIs. Heavy parsing, embedding and generation work is delegated.
+   and read APIs. Heavy parsing, embedding and generation work is delegated,
+   although clone, snapshot and hashing work currently run in the API process.
 
 2. **Service boundaries are contract-first**
    Services communicate through HTTP endpoints, queue messages and versioned
@@ -32,9 +34,10 @@ long-running ingestion and AI workloads.
    service.
 
 3. **Repository snapshots are immutable processing inputs**
-   A cloned repository is persisted as a snapshot before downstream services
-   process it. This makes ingestion replayable and decouples workers from the
-   API process.
+   A cloned repository is persisted under a commit-derived key before downstream
+   services process it. This makes ingestion replayable and decouples workers
+   from the API process; current unconditional storage writes do not enforce
+   object-lock immutability.
 
 4. **Asynchronous processing is the default**
    Long-running tasks such as ingest, embedding and documentation generation are
@@ -108,17 +111,27 @@ repository ingestion and AI generation are naturally asynchronous workloads.
 
 ```mermaid
 flowchart LR
-  User["User"] --> Web["CodePath Web UI"]
-  Web --> Api["CodePath Web API"]
+  User["User"] --> Browser["Browser"]
+  Browser --> Web["CodePath Web UI"]
+  Browser --> Proxy["Next /api/backend proxy"]
+  Proxy --> Api["CodePath Web API"]
 
   Api --> Db["PostgreSQL"]
   Api --> SnapshotStorage["Repository Snapshot Storage"]
-  Api --> Orchestrator["Orchestration Boundary"]
+  Api -->|Docs/ingest jobs| Orchestrator["Orchestration Boundary"]
+  Api -->|Graph RPC| Orchestrator
+  Api -->|Evaluation job| Orchestrator
+  Api -->|Streamed chat RPC| Orchestrator
+  Api --> VectorDb["Qdrant"]
+  Browser <--> |Socket.IO /realtime| Api
+  Db -->|triggers → NOTIFY → listener| Api
 
   Orchestrator --> Queue["RabbitMQ"]
 
   Queue --> Ingest["Ingestion Runtime"]
   Queue --> Ai["AI Runtime"]
+  Queue --> Evaluation["Evaluation Worker"]
+  Queue --> Graph["Graph Worker"]
 
   Ingest --> SnapshotStorage
   Ingest --> Queue
@@ -138,11 +151,11 @@ flowchart LR
 
 | Component              | Responsibility                                                                                | Notes                                                        |
 | ---------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| Web UI                 | Browser workspace for repository management, docs, graphs, API explorer and chat              | Owned by this repository                                     |
+| Web UI                 | Browser workspace for repository management, docs, graphs, evaluation, API explorer, chat and realtime status | Owned by this repository                                     |
 | Web API                | Application API, authentication, repository metadata, status tracking and orchestration calls | Owned by this repository                                     |
-| Orchestration Boundary | HTTP boundary that publishes queue jobs and handles synchronous chat RPC                      | Separate service; documented only as an external boundary    |
+| Orchestration Boundary | HTTP boundary for docs, evaluation and ingest jobs, graph RPC and streamed chat RPC           | Separate service; documented only as an external boundary    |
 | Ingestion Runtime      | Processes repository snapshots and publishes normalized code segments                         | Separate service; no internal implementation documented here |
-| AI Runtime             | Embeddings, documentation generation, chat and ingest-status handling                         | Separate service; no internal implementation documented here |
+| AI Runtime             | Embeddings, documentation generation, chat, ingest-status, evaluation and graph workers       | Separate service; no internal implementation documented here |
 | PostgreSQL             | Relational application data                                                                   | Shared platform dependency                                   |
 | Snapshot Storage       | Repository snapshot storage, usually S3-compatible                                            | Shared platform dependency                                   |
 | RabbitMQ               | Asynchronous job transport                                                                    | Shared platform dependency                                   |
@@ -218,17 +231,18 @@ sequenceDiagram
   participant Llm as Model Provider
 
   User->>Web: Ask question
-  Web->>Api: Submit chat prompt
+  Web->>Api: Authenticated POST SSE chat prompt
   Api->>Db: Persist user message
   Api->>Orch: Request chat RPC
   Orch->>Queue: Publish chat request
   Queue->>Ai: Deliver chat request
   Ai->>Vector: Retrieve relevant context
   Ai->>Llm: Generate grounded answer
-  Ai-->>Orch: Return answer
-  Orch-->>Api: Return answer
-  Api->>Db: Persist assistant message
-  Api-->>Web: Return answer
+  Ai-->>Orch: Stream chunk/done/error frames
+  Orch-->>Api: Stream chunk/done/error frames
+  Api-->>Web: Yield chunks immediately over SSE
+  Api->>Api: Accumulate streamed answer
+  Api->>Db: Persist complete assistant message on terminal done
 ```
 
 ### 6.3 Documentation Generation
@@ -245,15 +259,18 @@ sequenceDiagram
   participant Vector as Qdrant
   participant Llm as Model Provider
 
-  User->>Web: Generate documentation
-  Web->>Api: Start docs job
+  User->>Web: Generate repository/module/section documentation
+  Web->>Api: Start scoped docs job
   Api->>Db: Verify repository ownership and status
   Api->>Orch: Submit docs job
   Orch->>Queue: Publish docs request
   Queue->>Ai: Deliver docs request
   Ai->>Vector: Retrieve indexed repository context
   Ai->>Llm: Synthesize documentation
-  Ai->>Db: Persist documentation and status
+  Ai->>Db: Persist fragments in repo_docs_fragments and summaries in docs_summary_cache
+  Ai->>Db: Update progress stages and status
+  Db-->>Api: NOTIFY status update
+  Api-->>Web: Deliver realtime status notification
   Web->>Api: Read documentation
   Api->>Db: Fetch generated docs
   Api-->>Web: Return Markdown
@@ -263,8 +280,11 @@ sequenceDiagram
 
 ### HTTP Boundaries
 
-The Web UI communicates with the Web API through `/api/*`. The Web API uses an
-orchestration HTTP boundary for job submission and chat RPC.
+Browser traffic goes through the Next.js `/api/backend/*` proxy, which attaches
+a Keycloak bearer token before forwarding to the Nest `/api/*` API. The Web API
+uses an orchestration HTTP boundary for job submission, graph RPC, evaluation
+and streamed chat RPC. The Web UI and API also communicate over the Socket.IO
+`/realtime` boundary for live status updates.
 
 Publicly documented API areas:
 
@@ -273,6 +293,7 @@ Publicly documented API areas:
 - documentation,
 - chat,
 - dependency graphs,
+- evaluation,
 - API explorer,
 - metrics.
 
@@ -280,12 +301,16 @@ Publicly documented API areas:
 
 RabbitMQ is the asynchronous boundary for:
 
-- ingest jobs,
-- segment batches,
-- embedding work,
-- documentation jobs,
-- chat requests,
-- failure/status events.
+| Queue/RPC area | Responsibility |
+| -------------- | -------------- |
+| Ingest jobs | Repository ingest requests |
+| Segment batches | Normalized code segments for downstream work |
+| Embedding work | Vectorization of code segments |
+| Documentation jobs | Documentation generation requests |
+| Chat requests | Retrieval-augmented chat work |
+| Evaluation RPC | Evaluation job execution |
+| Graph RPC | Dependency graph generation/read work |
+| Failure/status events | Retry, failure and processing-status propagation |
 
 Queue messages should remain versioned and language-agnostic.
 
@@ -306,6 +331,10 @@ contracts owned by Web.
 | Dependency/API explorer read models | Web API                              | PostgreSQL                              |
 | Chat history                        | Web API                              | PostgreSQL                              |
 | Generated documentation             | AI runtime writes, Web API reads     | PostgreSQL                              |
+| Documentation fragments and summary cache | AI runtime writes, Web API reads | PostgreSQL (`repo_docs_fragments`, `docs_summary_cache`) |
+| Evaluation runs and metrics         | Web API / evaluation runtime          | PostgreSQL                              |
+| API runner collections and auth presets | Web API                           | PostgreSQL                              |
+| Realtime notification state and transport | PostgreSQL triggers / Web API     | NOTIFY listener and Socket.IO            |
 | Embeddings                          | AI runtime                           | Qdrant                                  |
 | Pipeline telemetry                  | Producing service                    | Logs/metrics pipeline                   |
 
@@ -320,6 +349,9 @@ Repository processing is represented as independent status dimensions:
 The statuses allow the UI and API to communicate whether a repository is ready
 for documentation or chat workflows. Documentation generation is gated on
 successful repository indexing/embedding.
+
+Evaluation runs use the lifecycle states `pending`, `running`, `completed` and
+`failed`.
 
 ## Engineering Challenges
 
@@ -438,7 +470,11 @@ flowchart TB
 
 The infrastructure repository owns cluster manifests, service names, secrets and
 environment profiles. `CodePath-Web` owns only the Web/API build artifacts and
-their runtime configuration surface.
+their runtime configuration surface. `NEXT_PUBLIC_REALTIME_URL` is required by
+the frontend realtime client but is currently undocumented and unset in the
+checked-in frontend environment. Current Kubernetes manifests deploy four of
+six AI workers (embedding, chat, docs and ingest-status); evaluation and graph
+workers exist in source but do not yet have Deployments.
 
 ## 14. Non-Goals
 

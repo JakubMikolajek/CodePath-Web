@@ -47,7 +47,8 @@ The main research/product question:
 4. Source files are segmented into searchable units.
 5. Embeddings are generated and stored in a vector database.
 6. Documentation and chat answers are generated from retrieved code context.
-7. The web UI exposes docs, chat, dependency graphs and API explorer views.
+7. Evaluation runs measure retrieval and generation quality over time.
+8. The web UI exposes docs, chat, dependency graphs, evaluation and API explorer views, with live status updates.
 
 ## Key Features
 
@@ -55,8 +56,10 @@ The main research/product question:
 - Branch-aware clone workflow.
 - Status tracking for clone, ingest, embedding and documentation stages.
 - Markdown documentation generated from indexed repository context.
-- "Chat with Code" using retrieval-augmented generation.
+- "Chat with Code" using POST-based SSE streaming with `chunk`, `done` and `error` events.
 - Dependency graph and API explorer views.
+- Evaluation runs, metrics and trend views.
+- Socket.IO delivery of live repository and pipeline status updates.
 - Web-owned shared contracts for ingest and telemetry.
 - Kubernetes/k3s-oriented deployment model.
 
@@ -85,10 +88,10 @@ flowchart LR
 
 Core architectural choices:
 
-- the Web API is a lightweight control plane,
+- the Web API is intended to remain a lightweight control plane, while currently performing clone, snapshot and hashing work in-process,
 - long-running ingest and AI work runs outside the API process,
 - queues provide retryable asynchronous processing,
-- repository snapshots are immutable pipeline inputs,
+- repository snapshots are commit-derived processing inputs; the current storage writes are unconditional and do not enforce object-lock immutability,
 - generated responses are grounded in retrieved repository context,
 - model and retrieval behavior can be evaluated independently from the UI.
 
@@ -183,6 +186,7 @@ Primary literature and research context:
 - Drizzle ORM
 - PostgreSQL
 - Redux Toolkit
+- Socket.IO and socket.io-client
 - Swagger/OpenAPI
 - Jest, Vitest and Playwright
 
@@ -211,13 +215,16 @@ Primary literature and research context:
 
 This repository does not currently include a full Docker Compose stack. The
 production-like local deployment is maintained in the infrastructure runtime.
+Kubernetes uses in-cluster DNS names such as `codepath-orchestrator`, `qdrant`,
+`minio`, `rabbitmq` and `keycloak` rather than the local `127.0.0.1`/
+`localhost` addresses shown above.
 
 ## Getting Started
 
 Requirements:
 
 - Node.js `>=20`
-- Bun `1.3.5`
+- Bun `1.3.13`
 - PostgreSQL for basic API flows
 - RabbitMQ, Qdrant, MinIO, Keycloak and platform runtimes for full end-to-end
   behavior
@@ -282,13 +289,16 @@ All API routes are served under the global `/api` prefix.
 
 | Area         | Purpose                                                   |
 | ------------ | --------------------------------------------------------- |
-| Auth         | Current user, login, logout and registration              |
+| Auth         | `GET /auth/me` and Keycloak bearer-token validation; login, logout and registration are frontend NextAuth/Keycloak flows |
 | Repositories | Repository creation, listing and processing status        |
-| Chat         | Repository chat sessions and prompt/answer flow           |
+| Chat         | Repository chat sessions and POST-based SSE prompt streaming (`chunk`/`done`/`error`) |
 | Docs         | Documentation generation, retrieval and status            |
 | Dependencies | Dependency graph data                                     |
 | API Explorer | Endpoint discovery, OpenAPI export and API runner support |
 | Metrics      | Runtime metrics                                           |
+| Evaluation   | Authenticated trigger, runs, metrics and trend endpoints  |
+| Realtime     | Socket.IO delivery of live status updates                 |
+| System Status | `GET /api/system/status` checks API, PostgreSQL, Qdrant, RabbitMQ, storage and Orchestrator health |
 
 Swagger is available at:
 
