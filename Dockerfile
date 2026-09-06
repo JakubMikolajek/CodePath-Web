@@ -21,7 +21,7 @@ COPY --from=pruner /app/out/full/ ./
 FROM installer AS builder
 
 ARG INTERNAL_API_BASE_URL=http://codepath-web-api:3001
-ARG NEXT_PUBLIC_REALTIME_URL=http://codepath-web-api:3001
+ARG NEXT_PUBLIC_REALTIME_URL=http://api.192.168.1.245.nip.io/
 
 ENV INTERNAL_API_BASE_URL=${INTERNAL_API_BASE_URL}
 ENV NEXT_PUBLIC_REALTIME_URL=${NEXT_PUBLIC_REALTIME_URL}
