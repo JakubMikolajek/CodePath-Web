@@ -21,8 +21,10 @@ COPY --from=pruner /app/out/full/ ./
 FROM installer AS builder
 
 ARG INTERNAL_API_BASE_URL=http://codepath-web-api:3001
+ARG NEXT_PUBLIC_REALTIME_URL=http://codepath-web-api:3001
 
 ENV INTERNAL_API_BASE_URL=${INTERNAL_API_BASE_URL}
+ENV NEXT_PUBLIC_REALTIME_URL=${NEXT_PUBLIC_REALTIME_URL}
 
 RUN bunx turbo run build
 
