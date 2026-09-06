@@ -54,11 +54,13 @@ export class QdrantService implements OnModuleInit {
   }
 
   async search(collectionName: string, vector: number[], filter?: Schemas['Filter'], limit = 5) {
-    return await this.client.search(collectionName, {
+    const result = await this.client.query(collectionName, {
       filter,
       limit,
-      vector,
+      query: vector,
       with_payload: true
     })
+
+    return result.points
   }
 }
