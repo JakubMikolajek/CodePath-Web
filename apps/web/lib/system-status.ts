@@ -1,5 +1,3 @@
-import { apiClient } from '@/lib/api/api'
-
 export type SystemComponentStatusValue = 'degraded' | 'down' | 'ok'
 
 export interface SystemComponentStatus {
@@ -32,8 +30,4 @@ export interface SystemStatusResponse {
   checkedAt: string
   components: SystemComponentStatus[]
   status: SystemComponentStatusValue
-}
-
-export async function getSystemStatus() {
-  return await apiClient.get<SystemStatusResponse>('/system/status')
 }

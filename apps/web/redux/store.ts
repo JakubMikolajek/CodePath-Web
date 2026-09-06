@@ -1,21 +1,18 @@
 import { configureStore } from '@reduxjs/toolkit'
 
+import { baseApi } from './api/baseApi'
+import { SliceName } from './sliceName'
 import authReducer from './slices/authSlice'
 import chatReducer from './slices/chatSlice'
 import collapsibleReducer from './slices/collapsibleSlice'
-import evaluationReducer from './slices/evaluationSlice'
-import graphsReducer from './slices/graphsSlice'
-import reposReducer from './slices/reposSlice'
-import { SliceName } from './sliceName'
 
 export const store = configureStore({
+  middleware: getDefaultMiddleware => getDefaultMiddleware().concat(baseApi.middleware),
   reducer: {
+    [baseApi.reducerPath]: baseApi.reducer,
     [SliceName.AUTH]: authReducer,
     [SliceName.CHAT]: chatReducer,
-    [SliceName.COLLAPSIBLE]: collapsibleReducer,
-    [SliceName.EVALUATION]: evaluationReducer,
-    [SliceName.GRAPHS]: graphsReducer,
-    [SliceName.REPOS]: reposReducer
+    [SliceName.COLLAPSIBLE]: collapsibleReducer
   }
 })
 

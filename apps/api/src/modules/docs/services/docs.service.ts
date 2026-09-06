@@ -24,6 +24,7 @@ import { and, asc, eq, ne } from 'drizzle-orm'
 import { repoDocsFragments, repos, type SelectRepoDocsFragment } from '../../db/schema'
 import { DbService } from '../../db/services/db.service'
 import { OrchestratorClient } from '../../orchestrator-client/services/orchestrator-client.service'
+import { RealtimeEventsService } from '../../realtime/services/realtime-events.service'
 import { emitTelemetry } from '../../telemetry/services/telemetry'
 
 // FIXME: clean that logic and move to docs utils part of it
@@ -52,7 +53,8 @@ const LEGACY_HEADING_TO_SECTION: Array<{ key: RepoDocsSectionKey, patterns: RegE
 export class DocsService {
   constructor(
     private readonly dbService: DbService,
-    private readonly orchestratorClient: OrchestratorClient
+    private readonly orchestratorClient: OrchestratorClient,
+    private readonly realtimeEventsService?: RealtimeEventsService
   ) { }
 
   async generateDocumentation(userId: number, repoId: number, target: GenerateDocumentationTarget = {}) {
@@ -79,6 +81,7 @@ export class DocsService {
     // TODO: add enum for docsStatus
     if (repo.docsStatus === 'processing') return { message: 'Documentation generation already in progress', status: 'processing' }
 
+    const pipelineUpdatedAt = nowIso()
     const [claimedRepo] = await this.dbService.dbClient.update(repos).set({
       docsProgressCurrent: 0,
       docsProgressMessage: this.createDocsProgressMessage(docsJob, RepoDocsProgressStage.QUEUED),
@@ -90,7 +93,7 @@ export class DocsService {
       docsProgressUpdatedAt: nowIso(),
       docsStatus: 'processing',
       lastPipelineError: null,
-      pipelineUpdatedAt: nowIso(),
+      pipelineUpdatedAt,
       ...(docsJob.scope === RepoDocsGenerationScope.REPOSITORY ? { documentation: null } : {})
     }).where(
       and(
@@ -101,6 +104,15 @@ export class DocsService {
     ).returning({ id: repos.id })
 
     if (!claimedRepo) return { message: 'Documentation generation already in progress', status: 'processing' }
+
+    this.realtimeEventsService?.emitRepoPipelineUpdated(userId, {
+      cloneStatus: repo.cloneStatus,
+      docsStatus: 'processing',
+      embeddingStatus: repo.embeddingStatus,
+      id: repoId,
+      lastPipelineError: null,
+      pipelineUpdatedAt
+    })
 
     if (docsJob.scope === RepoDocsGenerationScope.REPOSITORY) {
       await this.dbService.dbClient.delete(repoDocsFragments).where(eq(repoDocsFragments.repoId, repoId))

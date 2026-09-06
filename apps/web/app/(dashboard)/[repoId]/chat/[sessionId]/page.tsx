@@ -15,8 +15,9 @@ import remarkGfm from 'remark-gfm'
 
 import { PageHeader } from '@/components/PageHeader'
 import { getFirstRouteParam } from '@/lib/route-params'
+import { useGetSessionDetailsQuery } from '@/redux/api/chatApi'
 import { useAppDispatch, useAppSelector } from '@/redux/hooks'
-import { getSessionDetails, resetChatStream, sendMessage } from '@/redux/slices/chatSlice'
+import { resetChatStream, sendMessage } from '@/redux/slices/chatSlice'
 
 const markdownComponents: Components = {
   blockquote: ({ children }) => (
@@ -69,14 +70,21 @@ export default function ChatPage() {
 
   const {
     isStreaming,
-    sessionDetails,
     streamError,
     streamingAssistantText
   } = useAppSelector(state => state.chat)
 
   const repoId = useMemo(() => Number(getFirstRouteParam(params.repoId)), [params.repoId])
   const sessionId = useMemo(() => getFirstRouteParam(params.sessionId) ?? '', [params.sessionId])
+
   const hasValidRouteParams = Number.isFinite(repoId) && sessionId.length > 0
+
+  const { data: sessionDetails = [], refetch: refetchSessionDetails } = useGetSessionDetailsQuery({
+    repoId,
+    sessionId
+  }, {
+    skip: !hasValidRouteParams
+  })
 
   const [copiedId, setCopiedId] = useState<Nullable<string>>(null)
   const [inputValue, setInputValue] = useState<string>('')
@@ -96,10 +104,7 @@ export default function ChatPage() {
         sessionId
       })).unwrap()
 
-      await dispatch(getSessionDetails({
-        repoId,
-        sessionId
-      })).unwrap()
+      await refetchSessionDetails().unwrap()
 
       setInputValue('')
     } catch (error) {
@@ -112,7 +117,9 @@ export default function ChatPage() {
   const copyToClipboard = async (text: string, id: string) => {
     try {
       await navigator.clipboard.writeText(text)
+
       setCopiedId(id)
+
       setTimeout(() => setCopiedId(null), 2000)
     } catch (error) {
       console.error('Failed to copy:', error)
@@ -121,13 +128,6 @@ export default function ChatPage() {
 
   useEffect(() => {
     dispatch(resetChatStream())
-
-    if (!hasValidRouteParams) return
-
-    void dispatch(getSessionDetails({
-      repoId,
-      sessionId
-    }))
   }, [dispatch, hasValidRouteParams, repoId, sessionId])
 
   return (
@@ -150,7 +150,9 @@ export default function ChatPage() {
                   <Sparkles className="size-6" />
                 </div>
 
-                <h2 className="mt-5 text-base font-semibold tracking-normal text-foreground">Ask about this repository</h2>
+                <h2 className="mt-5 text-base font-semibold tracking-normal text-foreground">
+                  Ask about this repository
+                </h2>
 
                 <p className="mt-2 text-sm text-muted-foreground">
                   Start with a concrete question, for example about DTO shape, endpoint behaviour or module responsibilities.
@@ -170,7 +172,9 @@ export default function ChatPage() {
                         Ty
                       </div>
 
-                      <p className="px-3.5 py-3 text-[13px] leading-relaxed text-foreground">{detail.content}</p>
+                      <p className="px-3.5 py-3 text-[13px] leading-relaxed text-foreground">
+                        {detail.content}
+                      </p>
                     </CardContent>
                   </Card>
                 </div>
@@ -193,11 +197,7 @@ export default function ChatPage() {
                           size="icon"
                           variant="ghost"
                         >
-                          {copiedId === detail.id ? (
-                            <Check className="size-4 text-emerald-300" />
-                          ) : (
-                            <Copy className="size-4" />
-                          )}
+                          {copiedId === detail.id ? <Check className="size-4 text-emerald-300" /> : <Copy className="size-4" />}
                         </Button>
                       </div>
 
@@ -218,18 +218,22 @@ export default function ChatPage() {
           ))}
 
           {streamingAssistantText !== null && (
-            <div aria-busy={isStreaming} aria-live="polite" className="flex justify-start">
-              <Card className="max-w-[680px] overflow-hidden rounded-[14px] border-secondary/30 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--nurt-accent2)_12%,transparent),color-mix(in_oklab,var(--nurt-accent)_5%,transparent))] py-0">
+            <div
+              aria-busy={isStreaming}
+              aria-live="polite"
+              className="flex justify-start"
+            >
+              <Card className="max-w-170 overflow-hidden rounded-[14px] border-secondary/30 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--nurt-accent2)_12%,transparent),color-mix(in_oklab,var(--nurt-accent)_5%,transparent))] py-0">
                 <CardContent className="p-0">
-                  <div className="flex items-center gap-[9px] border-b border-white/[0.06] px-[15px] py-[11px] text-[13px] font-semibold text-foreground">
-                    <span className="grid size-6 place-items-center rounded-[7px] bg-[linear-gradient(135deg,var(--nurt-accent),var(--nurt-accent2))] text-[var(--nurt-ink)]">
-                      <Bot className="size-[13px]" />
+                  <div className="flex items-center gap-2.25 border-b border-white/6 px-3.75 py-2.75 text-[13px] font-semibold text-foreground">
+                    <span className="grid size-6 place-items-center rounded-[7px] bg-[linear-gradient(135deg,var(--nurt-accent),var(--nurt-accent2))] text-(--nurt-ink)">
+                      <Bot className="size-3.25" />
                     </span>
                     Asystent AI
                   </div>
 
                   {streamingAssistantText ? (
-                    <article className="prose prose-sm max-w-none px-4 py-[14px] text-[13px] leading-[1.6] prose-p:my-2 prose-strong:text-foreground prose-code:rounded prose-code:border-0 prose-code:bg-white/[0.06] prose-code:px-1.5 prose-code:py-0.5 prose-code:font-mono prose-code:text-[11.5px] prose-code:text-foreground prose-pre:border prose-pre:border-white/10 prose-pre:bg-[var(--nurt-bg0)] prose-pre:text-gray-100 dark:prose-invert">
+                    <article className="prose prose-sm max-w-none px-4 py-3.5 text-[13px] leading-[1.6] prose-p:my-2 prose-strong:text-foreground prose-code:rounded prose-code:border-0 prose-code:bg-white/[0.06] prose-code:px-1.5 prose-code:py-0.5 prose-code:font-mono prose-code:text-[11.5px] prose-code:text-foreground prose-pre:border prose-pre:border-white/10 prose-pre:bg-[var(--nurt-bg0)] prose-pre:text-gray-100 dark:prose-invert">
                       <Markdown
                         components={markdownComponents}
                         rehypePlugins={[rehypeHighlight]}
@@ -239,12 +243,15 @@ export default function ChatPage() {
                       </Markdown>
                     </article>
                   ) : (
-                    <div className="flex items-center gap-3 px-4 py-[14px]">
+                    <div className="flex items-center gap-3 px-4 py-3.5">
                       <div aria-hidden="true" className="flex gap-1">
                         <span className="size-2 animate-bounce rounded-full bg-primary" />
+
                         <span className="size-2 animate-bounce rounded-full bg-primary [animation-delay:120ms]" />
+
                         <span className="size-2 animate-bounce rounded-full bg-primary [animation-delay:240ms]" />
                       </div>
+
                       <span className="text-sm text-muted-foreground">Rozpoczynam odpowiedź...</span>
                     </div>
                   )}
@@ -254,12 +261,15 @@ export default function ChatPage() {
           )}
         </div>
 
-        <div className="border-t border-white/[0.06] p-[14px_16px_16px]">
-          <form className="flex items-center gap-[10px] rounded-[13px] border border-white/10 bg-[var(--nurt-bg0)] py-1.5 pl-4 pr-1.5" onSubmit={handleSubmit}>
+        <div className="border-t border-white/6 p-[14px_16px_16px]">
+          <form
+            className="flex items-center gap-2.5 rounded-[13px] border border-white/10 bg-(--nurt-bg0) py-1.5 pl-4 pr-1.5"
+            onSubmit={handleSubmit}
+          >
             <div className="flex-1">
               <Input
                 aria-label="Treść wiadomości"
-                className="h-[38px] border-transparent bg-transparent px-0 text-[13.5px] shadow-none focus-visible:border-transparent focus-visible:ring-0"
+                className="h-9.5 border-transparent bg-transparent px-0 text-[13.5px] shadow-none focus-visible:border-transparent focus-visible:ring-0"
                 disabled={isLoading || !hasValidRouteParams}
                 onChange={e => setInputValue(e.target.value)}
                 onKeyDown={async e => {
@@ -275,7 +285,7 @@ export default function ChatPage() {
 
             <Button
               aria-label="Wyślij wiadomość"
-              className="size-[38px] rounded-[10px] border-primary/35 bg-primary/15 text-primary hover:bg-primary/20"
+              className="size-9.5 rounded-xl border-primary/35 bg-primary/15 text-primary hover:bg-primary/20"
               disabled={isLoading || !inputValue.trim() || !hasValidRouteParams}
               size="icon"
               type="submit"
@@ -291,10 +301,8 @@ export default function ChatPage() {
             </p>
           )}
 
-          <p className="mt-[10px] text-center font-mono text-[10.5px] text-[var(--nurt-t3)]">
-            {hasValidRouteParams
-              ? 'Enter wysyła wiadomość, Shift+Enter dodaje nową linię.'
-              : 'Nieprawidłowe parametry sesji czatu.'}
+          <p className="mt-2.5 text-center font-mono text-[10.5px] text-(--nurt-t3)">
+            {hasValidRouteParams ? 'Enter wysyła wiadomość, Shift+Enter dodaje nową linię.' : 'Nieprawidłowe parametry sesji czatu.'}
           </p>
         </div>
       </section>

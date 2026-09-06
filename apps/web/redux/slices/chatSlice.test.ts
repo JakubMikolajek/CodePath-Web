@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import chatReducer, {
   appendStreamingAssistantText,
-  getSessionDetails,
+  clearCompletedChatStream,
   sendMessage
 } from './chatSlice'
 
@@ -13,31 +13,15 @@ const sendArgs = {
 }
 
 describe('chatSlice streaming state', () => {
-  it('keeps streamed text through done and clears it atomically with persisted history', () => {
+  it('keeps streamed text through done and clears it after persisted history loads', () => {
     const pendingState = chatReducer(undefined, sendMessage.pending('send-1', sendArgs))
     const chunkState = chatReducer(pendingState, appendStreamingAssistantText('Live answer'))
     const doneState = chatReducer(chunkState, sendMessage.fulfilled(undefined, 'send-1', sendArgs))
-    const refetchingState = chatReducer(doneState, getSessionDetails.pending('details-1', {
-      repoId: 7,
-      sessionId: 'session-1'
-    }))
-    const persistedState = chatReducer(refetchingState, getSessionDetails.fulfilled([{
-      content: 'Live answer',
-      id: 'message-1',
-      role: 'assistant'
-    }], 'details-1', {
-      repoId: 7,
-      sessionId: 'session-1'
-    }))
+    const persistedState = chatReducer(doneState, clearCompletedChatStream())
 
     expect(doneState.streamingAssistantText).toBe('Live answer')
-    expect(refetchingState.streamingAssistantText).toBe('Live answer')
     expect(persistedState.streamingAssistantText).toBeNull()
-    expect(persistedState.sessionDetails).toEqual([{
-      content: 'Live answer',
-      id: 'message-1',
-      role: 'assistant'
-    }])
+    expect(persistedState.streamCompleted).toBe(false)
   })
 
   it('surfaces stream errors and preserves a visible partial answer', () => {

@@ -42,7 +42,7 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 
 const noise = (x: number, y: number): number => {
   const raw = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453
-  
+
   return raw - Math.floor(raw)
 }
 
@@ -51,12 +51,12 @@ const createRng = (seed: number) => {
 
   return () => {
     state += 0x6D2B79F5
-    
+
     let t = state
-    
+
     t = Math.imul(t ^ (t >>> 15), t | 1)
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    
+
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
 }
@@ -241,9 +241,13 @@ export function GsapAurora({ className, density = GsapAuroraDensity.DEFAULT }: G
   return (
     <div aria-hidden="true" className={cn('pointer-events-none absolute inset-0 overflow-hidden', className)} ref={rootRef}>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_52%_42%,oklch(0.18_0.075_252/0.15),transparent_31rem),linear-gradient(180deg,#030819_0%,#05132b_48%,#020617_100%)]" />
+
       <div className="absolute left-[-4%] top-[12%] h-[55%] w-[52%] rounded-full bg-[radial-gradient(ellipse,rgba(148,80,255,0.22)_0%,rgba(100,40,220,0.10)_40%,transparent_70%)] blur-[28px]" />
+
       <div className="absolute right-[-6%] top-[28%] h-[50%] w-[58%] rounded-full bg-[radial-gradient(ellipse,rgba(40,180,255,0.20)_0%,rgba(20,120,255,0.09)_40%,transparent_70%)] blur-[32px]" />
+
       <div className="absolute bottom-[-8%] left-[28%] h-[40%] w-[36%] rounded-full bg-[radial-gradient(ellipse,rgba(60,100,255,0.14)_0%,transparent_70%)] blur-xl" />
+
       <canvas className="absolute inset-0 size-full" ref={canvasRef} />
     </div>
   )

@@ -13,6 +13,7 @@ import { pick } from 'lodash'
 import { env } from '../../../config/env'
 import { repoDocsFragments, repos } from '../../db/schema'
 import { DbService } from '../../db/services/db.service'
+import { RealtimeEventsService } from '../../realtime/services/realtime-events.service'
 import { RepoAuthType } from '../dto/create-repo.dto'
 import { RepoFetcherService } from './repo-fetcher.service'
 
@@ -33,7 +34,8 @@ interface CreateRepoPayload {
 export class RepoService {
   constructor(
     private readonly dbService: DbService,
-    private readonly repoFetcherService?: RepoFetcherService
+    private readonly repoFetcherService?: RepoFetcherService,
+    private readonly realtimeEventsService?: RealtimeEventsService
   ) { }
 
   async createRepo(payload: CreateRepoPayload) {
@@ -101,6 +103,8 @@ export class RepoService {
       )
     ).returning()
 
+    this.realtimeEventsService?.emitRepoPipelineUpdated(userId, this.toPipelineStatus(updatedRepo))
+
     await this.dbService.dbClient.delete(repoDocsFragments).where(eq(repoDocsFragments.repoId, repoId))
 
     return this.toPipelineStatus(updatedRepo)
@@ -120,6 +124,8 @@ export class RepoService {
       || !repo.sourceCommitSha
     ) throw new ConflictException('Repository snapshot is unavailable; restart clone first')
 
+    const pipelineUpdatedAt = nowIso()
+
     await this.dbService.dbClient.update(repos).set({
       docsProgressCurrent: null,
       docsProgressMessage: null,
@@ -133,13 +139,22 @@ export class RepoService {
       documentation: null,
       embeddingStatus: RepoEmbeddingStatus.PROCESSING,
       lastPipelineError: null,
-      pipelineUpdatedAt: nowIso()
+      pipelineUpdatedAt
     }).where(
       and(
         eq(repos.id, repoId),
         eq(repos.userId, userId)
       )
     )
+
+    this.realtimeEventsService?.emitRepoPipelineUpdated(userId, {
+      cloneStatus: repo.cloneStatus,
+      docsStatus: 'pending',
+      embeddingStatus: RepoEmbeddingStatus.PROCESSING,
+      id: repo.id,
+      lastPipelineError: null,
+      pipelineUpdatedAt
+    })
 
     await this.dbService.dbClient.delete(repoDocsFragments).where(eq(repoDocsFragments.repoId, repoId))
 
@@ -169,7 +184,7 @@ export class RepoService {
       embeddingStatus: RepoEmbeddingStatus.PROCESSING,
       id: repo.id,
       lastPipelineError: null,
-      pipelineUpdatedAt: nowIso()
+      pipelineUpdatedAt
     }
   }
 

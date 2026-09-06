@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 import AppSidebar from '@/components/AppSideBar'
 import { getCurrentUser } from '@/lib/auth/server'
 import { getRepos } from '@/lib/repos/server'
+import { RealtimeProvider } from '@/redux/realtime/RealtimeProvider'
 
 interface DashboardLayoutProps {
   children: ReactNode
@@ -24,6 +25,8 @@ export default async function DashboardLayout({ children }: Readonly<DashboardLa
           <span className="app-aurora-blob app-aurora-blob-3" />
           <span className="app-aurora-blob app-aurora-blob-4" />
         </div>
+
+        <RealtimeProvider />
 
         <AppSidebar fetchedRepos={repos} me={me} />
 

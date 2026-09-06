@@ -9,6 +9,7 @@ import { DocsModule } from './modules/docs/docs.module'
 import { EvaluationModule } from './modules/evaluation/evaluation.module'
 import { DependenciesModule } from './modules/graphs/dependencies.module'
 import { MetricsModule } from './modules/metrics/metrics.module'
+import { RealtimeModule } from './modules/realtime/realtime.module'
 import { RepoModule } from './modules/repos/repo.module'
 import { SystemStatusModule } from './modules/system-status/system-status.module'
 
@@ -19,6 +20,7 @@ import { SystemStatusModule } from './modules/system-status/system-status.module
     ApiExplorerModule,
     ChatModule,
     RepoModule,
+    RealtimeModule,
     AuthModule,
     DependenciesModule,
     DocsModule,
