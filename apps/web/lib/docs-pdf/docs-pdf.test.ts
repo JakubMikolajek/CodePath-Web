@@ -57,6 +57,41 @@ describe('docs PDF content', () => {
   })
 })
 
+describe('docs PDF markdown fidelity', () => {
+  it('keeps inline code inside one text block per list item instead of stacking runs', () => {
+    const [list] = markdownToPdf('- **Label:** call `run()` now\n- plain')
+
+    const items = list.ul as Array<Record<string, unknown>>
+    expect(items).toHaveLength(2)
+    expect(Array.isArray(items[0].text)).toBe(true)
+    expect(JSON.stringify(items[0].text)).toContain('run()')
+    expect(JSON.stringify(items[0].text)).toContain('Code')
+  })
+
+  it('collapses soft line breaks to spaces but keeps hard breaks', () => {
+    const [soft, hard] = [markdownToPdf('one\ntwo')[0], markdownToPdf('one  \ntwo')[0]]
+
+    expect(JSON.stringify(soft.text)).toContain('one two')
+    expect(JSON.stringify(hard.text)).toContain('\\n')
+  })
+
+  it('mutes evidence tags and drops empty ones', () => {
+    const [paragraph] = markdownToPdf('Uses Qdrant [source file=shared/qdrant.py] and more [source file=].')
+    const runs = paragraph.text as Array<Record<string, unknown>>
+
+    expect(runs.find(run => String(run.text).includes('source file=shared/qdrant.py'))).toMatchObject({ color: '#8c959f', fontSize: 8 })
+    expect(JSON.stringify(runs)).not.toContain('source file=]')
+  })
+
+  it('drops a leading heading that repeats the section title only', () => {
+    const repeated = markdownToPdf('# Overview\n\nBody', { dropLeadingHeadingLike: 'Overview' })
+    const different = markdownToPdf('# Other\n\nBody', { dropLeadingHeadingLike: 'Overview' })
+
+    expect(repeated).toHaveLength(1)
+    expect(different).toHaveLength(2)
+  })
+})
+
 describe('docs PDF layout', () => {
   it('starts the table of contents on its own page instead of leaving its heading on the cover', () => {
     const definition = createDocsPdfDefinition({ generatedAt: null, modules: [] }, { repoId: 1, repositoryName: 'Repo' })

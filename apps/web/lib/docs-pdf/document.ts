@@ -38,7 +38,7 @@ export function createDocsPdfDefinition(document: ExportDocsDocument, { repoId, 
 
     docsModule.sections.forEach((section, sectionIndex) => {
       content.push({ id: destination(docsModule.key, section.key), margin: [0, 14, 0, 7], style: 'section', text: `${chapter}.${sectionIndex + 1} ${sanitizePdfText(section.title)}`, tocItem: true })
-      content.push(...markdownToPdf(demoteMarkdownHeadings(section.markdown ?? '', 3)))
+      content.push(...markdownToPdf(demoteMarkdownHeadings(section.markdown ?? '', 3), { dropLeadingHeadingLike: section.title }))
     })
 
     if (docsModule.unavailableSections.length) {

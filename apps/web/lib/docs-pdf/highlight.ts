@@ -9,6 +9,7 @@ export interface PdfTextRun {
   bold?: boolean
   color?: string
   font?: string
+  fontSize?: number
   italics?: boolean
   text: string
 }

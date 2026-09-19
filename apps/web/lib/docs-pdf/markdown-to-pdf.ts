@@ -10,11 +10,30 @@ export type PdfContent = Record<string, unknown>
 
 const parser = unified().use(remarkParse).use(remarkGfm)
 
+const EVIDENCE_TAG = /\s?\[source file=([^\]]*)\]/gi
+
+/** Soft line breaks collapse to spaces (as in HTML); evidence tags become small muted runs, empty tags are dropped. */
+function textRuns(value: string): PdfTextRun[] {
+  const text = value.replace(/\s*\n\s*/g, ' ')
+  const runs: PdfTextRun[] = []
+  let last = 0
+
+  for (const match of text.matchAll(EVIDENCE_TAG)) {
+    if (match.index > last) runs.push({ text: sanitizePdfText(text.slice(last, match.index)) })
+    if (match[1].trim()) runs.push({ color: '#8c959f', fontSize: 8, text: ` [source file=${sanitizePdfText(match[1].trim())}]` })
+    last = match.index + match[0].length
+  }
+
+  if (last < text.length) runs.push({ text: sanitizePdfText(text.slice(last)) })
+
+  return runs
+}
+
 function inline(nodes: MdNode[] = []): Array<PdfContent | PdfTextRun> {
   return nodes.flatMap(node => {
     const children = inline(node.children)
     switch (node.type) {
-      case 'text': return [{ text: sanitizePdfText(node.value ?? '') }]
+      case 'text': return textRuns(node.value ?? '')
       case 'break': return [{ text: '\n' }]
       case 'emphasis': return children.map(child => typeof child === 'object' && 'text' in child ? { ...child, italics: true } : child)
       case 'strong': return children.map(child => typeof child === 'object' && 'text' in child ? { ...child, bold: true } : child)
@@ -50,9 +69,17 @@ function table(node: MdNode): PdfContent {
 function list(node: MdNode): PdfContent {
   const entries = (node.children ?? []).map(item => {
     const prefix = item.checked === true ? '[x] ' : item.checked === false ? '[ ] ' : ''
-    const content = (item.children ?? []).flatMap(child => child.type === 'paragraph' ? inline(child.children) : block(child))
-    return prefix ? [{ text: prefix }, ...content] : content
+    const parts = (item.children ?? []).flatMap((child, index): PdfContent[] => {
+      if (child.type !== 'paragraph') return block(child)
+
+      // An array of runs directly inside a pdfmake list would be laid out as separate stacked lines.
+      const runs = inline(child.children)
+      return [{ text: index === 0 && prefix ? [{ text: prefix }, ...runs] : runs }]
+    })
+
+    return parts.length === 1 ? parts[0] : { stack: parts }
   })
+
   return node.ordered ? { margin: [0, 3, 0, 7], ol: entries, start: node.start ?? 1 } : { margin: [0, 3, 0, 7], ul: entries }
 }
 
@@ -70,6 +97,21 @@ function block(node: MdNode): PdfContent[] {
   }
 }
 
-export function markdownToPdf(markdown: string): PdfContent[] {
-  return (parser.parse(markdown) as unknown as MdNode).children?.flatMap(block) ?? []
+function plainText(node: MdNode): string {
+  return node.value ?? (node.children ?? []).map(plainText).join('')
+}
+
+const normalizeTitle = (value: string) => value.trim().replace(/[:.]\s*$/, '').toLowerCase()
+
+interface MarkdownToPdfOptions {
+  /** Drops a leading heading that only repeats the surrounding section title. */
+  dropLeadingHeadingLike?: string
+}
+
+export function markdownToPdf(markdown: string, { dropLeadingHeadingLike }: MarkdownToPdfOptions = {}): PdfContent[] {
+  const nodes = (parser.parse(markdown) as unknown as MdNode).children ?? []
+  const [first, ...rest] = nodes
+  const isDuplicateHeading = dropLeadingHeadingLike && first?.type === 'heading' && normalizeTitle(plainText(first)) === normalizeTitle(dropLeadingHeadingLike)
+
+  return (isDuplicateHeading ? rest : nodes).flatMap(block)
 }
