@@ -37,7 +37,11 @@ export function createDocsPdfDefinition(document: ExportDocsDocument, { repoId, 
     if (docsModule.summary) content.push(...markdownToPdf(demoteMarkdownHeadings(docsModule.summary, 2)))
 
     docsModule.sections.forEach((section, sectionIndex) => {
-      content.push({ id: destination(docsModule.key, section.key), margin: [0, 14, 0, 7], style: 'section', text: `${chapter}.${sectionIndex + 1} ${sanitizePdfText(section.title)}`, tocItem: true })
+      // Every section starts on a new page; the first one stays under the chapter title when there is no summary,
+      // so the chapter page never holds a heading alone.
+      const startsNewPage = sectionIndex > 0 || Boolean(docsModule.summary)
+
+      content.push({ id: destination(docsModule.key, section.key), margin: [0, startsNewPage ? 0 : 14, 0, 7], ...(startsNewPage ? { pageBreak: 'before' } : {}), style: 'section', text: `${chapter}.${sectionIndex + 1} ${sanitizePdfText(section.title)}`, tocItem: true })
       content.push(...markdownToPdf(demoteMarkdownHeadings(section.markdown ?? '', 3), { dropLeadingHeadingLike: section.title }))
     })
 

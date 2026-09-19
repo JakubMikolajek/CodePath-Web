@@ -103,6 +103,26 @@ describe('docs PDF layout', () => {
   })
 })
 
+describe('docs PDF sections', () => {
+  const section = (key: string, title: string) => ({ generatedAt: null, key, markdown: 'Body', status: RepoDocsStatus.READY, title }) as never
+  const sectionHeadings = (summary: null | string) => {
+    const definition = createDocsPdfDefinition({
+      generatedAt: null,
+      modules: [{ key: 'core', sections: [section('overview', 'Overview'), section('architecture', 'Architecture')], summary, title: 'Core', unavailableSections: [] }]
+    }, { repoId: 1, repositoryName: 'Repo' })
+
+    return (definition.content as Array<Record<string, unknown>>).filter(item => item.style === 'section')
+  }
+
+  it('starts every section on a new page when the module has a summary', () => {
+    expect(sectionHeadings('Summary').map(heading => heading.pageBreak)).toEqual(['before', 'before'])
+  })
+
+  it('keeps the first section under the chapter title when there is no summary', () => {
+    expect(sectionHeadings(null).map(heading => heading.pageBreak)).toEqual([undefined, 'before'])
+  })
+})
+
 describe('docs PDF node smoke test', () => {
   it('builds a multi-page PDF with embedded Polish fonts', async () => {
     const require = createRequire(import.meta.url)
