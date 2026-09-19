@@ -4,6 +4,7 @@ import { ScheduleModule } from '@nestjs/schedule'
 import { ApiExplorerModule } from './modules/api-explorer/api-explorer.module'
 import { AuthModule } from './modules/auth/auth.module'
 import { ChatModule } from './modules/chat/chat.module'
+import { DashboardModule } from './modules/dashboard/dashboard.module'
 import { DbModule } from './modules/db/db.module'
 import { DocsModule } from './modules/docs/docs.module'
 import { EvaluationModule } from './modules/evaluation/evaluation.module'
@@ -26,7 +27,8 @@ import { SystemStatusModule } from './modules/system-status/system-status.module
     DocsModule,
     EvaluationModule,
     MetricsModule,
-    SystemStatusModule
+    SystemStatusModule,
+    DashboardModule
   ]
 })
 export class AppModule { }

@@ -16,6 +16,13 @@ export class QdrantService implements OnModuleInit {
   private client: QdrantClient
   private readonly logger = new Logger(QdrantService.name)
 
+  async count(collectionName: string, filter?: Schemas['Filter']) {
+    return await this.client.count(collectionName, {
+      exact: false,
+      filter
+    })
+  }
+
   async getCollections() {
     return await this.client.getCollections()
   }
