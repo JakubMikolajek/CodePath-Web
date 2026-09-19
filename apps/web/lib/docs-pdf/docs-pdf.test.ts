@@ -68,6 +68,16 @@ describe('docs PDF markdown fidelity', () => {
     expect(JSON.stringify(items[0].text)).toContain('Code')
   })
 
+  it('only turns http, https and mailto links into clickable PDF links', () => {
+    const [paragraph] = markdownToPdf('[web](https://example.com) [mail](mailto:a@b.co) [file](file:///etc/passwd) [js](javascript:alert(1)) [rel](./readme.md)')
+    const runs = paragraph.text as Array<Record<string, unknown>>
+    const linked = runs.filter(run => run.link !== undefined).map(run => run.link)
+
+    expect(linked).toEqual(['https://example.com', 'mailto:a@b.co'])
+    expect(JSON.stringify(runs)).toContain('file')
+    expect(JSON.stringify(runs)).toContain('rel')
+  })
+
   it('collapses soft line breaks to spaces but keeps hard breaks', () => {
     const [soft, hard] = [markdownToPdf('one\ntwo')[0], markdownToPdf('one  \ntwo')[0]]
 
@@ -104,22 +114,36 @@ describe('docs PDF layout', () => {
 })
 
 describe('docs PDF sections', () => {
-  const section = (key: string, title: string) => ({ generatedAt: null, key, markdown: 'Body', status: RepoDocsStatus.READY, title }) as never
-  const sectionHeadings = (summary: null | string) => {
-    const definition = createDocsPdfDefinition({
-      generatedAt: null,
-      modules: [{ key: 'core', sections: [section('overview', 'Overview'), section('architecture', 'Architecture')], summary, title: 'Core', unavailableSections: [] }]
-    }, { repoId: 1, repositoryName: 'Repo' })
+  const section = (key: string, title: string, markdown = 'Body') => ({ generatedAt: null, key, markdown, status: RepoDocsStatus.READY, title }) as never
+  const buildDefinition = (sections: unknown[], summary: null | string = 'Summary') => createDocsPdfDefinition({
+    generatedAt: null,
+    modules: [{ key: 'core', sections: sections as never[], summary, title: 'Core', unavailableSections: [] }]
+  }, { repoId: 1, repositoryName: 'Repo' })
 
-    return (definition.content as Array<Record<string, unknown>>).filter(item => item.style === 'section')
-  }
+  it('lets sections flow instead of forcing a page break per section', () => {
+    const content = buildDefinition([section('overview', 'Overview'), section('architecture', 'Architecture')]).content as Array<Record<string, unknown>>
+    const sectionHeadings = content.filter(item => item.style === 'section')
 
-  it('starts every section on a new page when the module has a summary', () => {
-    expect(sectionHeadings('Summary').map(heading => heading.pageBreak)).toEqual(['before', 'before'])
+    expect(sectionHeadings).toHaveLength(2)
+    expect(sectionHeadings.every(heading => heading.pageBreak === undefined && heading.headlineLevel === 1)).toBe(true)
   })
 
-  it('keeps the first section under the chapter title when there is no summary', () => {
-    expect(sectionHeadings(null).map(heading => heading.pageBreak)).toEqual([undefined, 'before'])
+  it('moves a heading left alone at the bottom of a page to the next page', () => {
+    type Following = Array<{ style?: string }>
+    const pageBreakBefore = buildDefinition([section('overview', 'Overview')]).pageBreakBefore as (node: { headlineLevel?: number }, queries: { getFollowingNodesOnPage: () => Following }) => boolean
+    const queries = (following: Following) => ({ getFollowingNodesOnPage: () => following })
+
+    expect(pageBreakBefore({ headlineLevel: 1 }, queries([]))).toBe(true)
+    // pdfmake lists header and footer as following nodes of the last real node on a page; they do not count.
+    expect(pageBreakBefore({ headlineLevel: 1 }, queries([{ style: 'pageChrome' }, { style: 'pageChrome' }]))).toBe(true)
+    expect(pageBreakBefore({ headlineLevel: 1 }, queries([{ style: 'pageChrome' }, {}]))).toBe(false)
+    expect(pageBreakBefore({}, queries([]))).toBe(false)
+  })
+
+  it('still starts each chapter on a new page', () => {
+    const content = buildDefinition([section('overview', 'Overview')]).content as Array<Record<string, unknown>>
+
+    expect(content.find(item => item.style === 'chapter')).toMatchObject({ pageBreak: 'before' })
   })
 })
 

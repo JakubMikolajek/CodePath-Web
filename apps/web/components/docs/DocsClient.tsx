@@ -3,9 +3,9 @@
 import type { Nullable } from '@workspace/codepath-common'
 import { RepoCloneStatus, RepoDocsStatus, RepoEmbeddingStatus } from '@workspace/codepath-common/repository'
 import { useParams } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { assembleExportDocs, buildDocsMarkdown, getDocsFilename, getDocsFilenameWithExtension } from '@/lib/docs-export'
+import { assembleExportDocs, buildDocsMarkdown, getDocsFilename, getDocsFilenameWithExtension, hasStoredDocumentation } from '@/lib/docs-export'
 import { getFirstRouteParam } from '@/lib/route-params'
 import {
   useGenerateRepoDocsModuleMutation,
@@ -18,11 +18,12 @@ import {
 } from '@/redux/api/docsApi'
 import { useGetReposQuery } from '@/redux/api/reposApi'
 
+import { ConfirmDocsActionDialog } from './ConfirmDocsActionDialog'
 import { DocsContent } from './DocsContent'
 import { DocsHeader } from './DocsHeader'
 import { DocsNavigation } from './DocsNavigation'
 import { DocsStatusPanel } from './DocsStatusPanel'
-import { DOCS_STATUS_POLL_MS, isPipelineWaitingOrRunning, resolveErrorMessage } from './docsUtils'
+import { type ConfirmableDocsAction, getDocsPollInterval, resolveErrorMessage } from './docsUtils'
 
 export function DocsClient() {
   const params = useParams()
@@ -36,20 +37,21 @@ export function DocsClient() {
   const [actionError, setActionError] = useState<Nullable<string>>(null)
   const [generationAction, setGenerationAction] = useState<Nullable<'module' | 'repository' | 'section'>>(null)
   const [isExportingPdf, setIsExportingPdf] = useState(false)
+  const [pendingConfirmation, setPendingConfirmation] = useState<Nullable<ConfirmableDocsAction>>(null)
   const [pipelineAction, setPipelineAction] = useState<Nullable<'clone' | 'ingest'>>(null)
 
   const statusQuery = useGetRepoDocsStatusQuery(repoId, { skip: !validRepoId })
 
-  const shouldPoll = statusQuery.data ? isPipelineWaitingOrRunning(statusQuery.data) : false
+  const pollInterval = getDocsPollInterval(statusQuery.data)
 
   const modulesQuery = useGetRepoDocsModulesQuery(repoId, {
-    pollingInterval: shouldPoll ? DOCS_STATUS_POLL_MS : 0,
+    pollingInterval: pollInterval,
     skip: !validRepoId
   })
   const reposQuery = useGetReposQuery(undefined, { skip: !validRepoId })
 
   const pollingStatusQuery = useGetRepoDocsStatusQuery(repoId, {
-    pollingInterval: shouldPoll ? DOCS_STATUS_POLL_MS : 0,
+    pollingInterval: pollInterval,
     skip: !validRepoId
   })
 
@@ -60,9 +62,22 @@ export function DocsClient() {
   const [retryRepoIngest] = useRetryRepoIngestMutation()
 
   const status = pollingStatusQuery.data ?? statusQuery.data
+
+  // Polling stops as soon as the status leaves `processing`; fetch the modules one last time so the last sections show up.
+  const docsStatus = status?.docsStatus
+  const previousDocsStatus = useRef(docsStatus)
+  const { refetch: refetchModules } = modulesQuery
+
+  useEffect(() => {
+    if (previousDocsStatus.current === RepoDocsStatus.PROCESSING && docsStatus !== RepoDocsStatus.PROCESSING) void refetchModules()
+
+    previousDocsStatus.current = docsStatus
+  }, [docsStatus, refetchModules])
   const modules = modulesQuery.data ?? []
   const exportDocument = assembleExportDocs(modules)
   const hasGeneratedSections = exportDocument.modules.some(module => module.sections.length > 0)
+  // What the destructive actions would delete is broader than what can be exported (e.g. summaries, "unknown" sections).
+  const hasStoredDocs = hasStoredDocumentation(modules)
   const repositoryName = reposQuery.data?.find(repository => repository.id === repoId)?.name ?? null
   const activeModule = modules.find(module => module.key === selectedModuleKey) ?? modules[0] ?? null
   const activeSection = activeModule?.sections.find(section => section.key === selectedSectionKey) ?? activeModule?.sections[0] ?? null
@@ -114,6 +129,17 @@ export function DocsClient() {
       setPipelineAction(null)
     }
   }
+  const requestDestructiveAction = (action: ConfirmableDocsAction) => {
+    // Nothing to lose when no documentation has been generated yet, so the action runs without asking.
+    if (hasStoredDocs) setPendingConfirmation(action)
+    else void runDestructiveAction(action)
+  }
+  const runDestructiveAction = async (action: ConfirmableDocsAction) => {
+    setPendingConfirmation(null)
+
+    if (action === 'generate') await generate('repository')
+    else await retryPipeline(action)
+  }
   const exportMarkdown = () => {
     if (!hasGeneratedSections) return
 
@@ -159,13 +185,19 @@ export function DocsClient() {
         isRefreshing={isRefreshing}
         onExportMarkdown={exportMarkdown}
         onExportPdf={() => void exportPdf()}
-        onGenerate={generate}
+        onGenerate={scope => scope === 'repository' ? requestDestructiveAction('generate') : void generate(scope)}
         onRefresh={refresh}
-        onRetryClone={() => void retryPipeline('clone')}
-        onRetryIngest={() => void retryPipeline('ingest')}
+        onRetryClone={() => requestDestructiveAction('clone')}
+        onRetryIngest={() => requestDestructiveAction('ingest')}
         pipelineAction={pipelineAction}
         repoId={repoId}
         runningGeneration={generationAction}
+      />
+
+      <ConfirmDocsActionDialog
+        action={pendingConfirmation}
+        onCancel={() => setPendingConfirmation(null)}
+        onConfirm={() => pendingConfirmation && void runDestructiveAction(pendingConfirmation)}
       />
 
       <DocsStatusPanel status={status} />

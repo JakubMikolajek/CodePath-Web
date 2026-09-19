@@ -10,6 +10,17 @@ export type PdfContent = Record<string, unknown>
 
 const parser = unified().use(remarkParse).use(remarkGfm)
 
+const SAFE_LINK_PROTOCOLS = new Set(['http:', 'https:', 'mailto:'])
+
+/** Link targets come from LLM output; anything but plain web/mail links is rendered as text, never as a PDF action. */
+function isSafeLink(url: string | undefined): boolean {
+  try {
+    return url !== undefined && SAFE_LINK_PROTOCOLS.has(new URL(url).protocol)
+  } catch {
+    return false
+  }
+}
+
 const EVIDENCE_TAG = /\s?\[source file=([^\]]*)\]/gi
 
 /** Soft line breaks collapse to spaces (as in HTML); evidence tags become small muted runs, empty tags are dropped. */
@@ -39,7 +50,7 @@ function inline(nodes: MdNode[] = []): Array<PdfContent | PdfTextRun> {
       case 'strong': return children.map(child => typeof child === 'object' && 'text' in child ? { ...child, bold: true } : child)
       case 'delete': return children.map(child => typeof child === 'object' && 'text' in child ? { ...child, decoration: 'lineThrough' } : child)
       case 'inlineCode': return [{ background: '#f6f8fa', font: 'Code', text: sanitizePdfText(node.value ?? '') }]
-      case 'link': return children.map(child => typeof child === 'object' && 'text' in child ? { ...child, color: '#0969da', decoration: 'underline', link: node.url } : child)
+      case 'link': return isSafeLink(node.url) ? children.map(child => typeof child === 'object' && 'text' in child ? { ...child, color: '#0969da', decoration: 'underline', link: node.url } : child) : children
       case 'image': return [{ color: '#57606a', italics: true, text: `[image: ${sanitizePdfText(node.children?.[0]?.value ?? '')}]` }]
       default: return children
     }

@@ -7,7 +7,7 @@ import Markdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 
-import { DOCS_STATUS_POLL_MS, formatDateTime, formatStatus, getStatusTone } from './docsUtils'
+import { DOCS_GENERATION_POLL_MS, formatDateTime, formatStatus, getStatusTone } from './docsUtils'
 
 interface DocsContentProps {
   activeModule: Nullable<RepoDocsModule>
@@ -31,7 +31,7 @@ export function DocsContent({ activeModule, activeSection, error, isLoading, sta
 
             {!isLoading && !error && status === RepoDocsStatus.PENDING && <p className="border-b border-white/6 px-4.5 py-3.5 text-[12.5px] text-muted-foreground">Documentation is not generated yet. Start generation when embeddings are ready.</p>}
 
-            {!isLoading && !error && status === RepoDocsStatus.PROCESSING && <p className="border-b border-white/6 px-4.5 py-3.5 text-[12.5px] text-muted-foreground">Documentation generation is in progress. This view refreshes automatically every {DOCS_STATUS_POLL_MS / 1000}s.</p>}
+            {!isLoading && !error && status === RepoDocsStatus.PROCESSING && <p className="border-b border-white/6 px-4.5 py-3.5 text-[12.5px] text-muted-foreground">Documentation generation is in progress. This view refreshes automatically every {DOCS_GENERATION_POLL_MS / 1000}s, so sections appear as soon as they are ready.</p>}
 
             {!isLoading && !error && status === RepoDocsStatus.FAILED && <p className="flex items-center gap-2 text-sm text-red-300" role="alert"><TriangleAlert className="size-4" />Documentation generation failed. Retry after confirming embeddings are ready.</p>}
           </div>

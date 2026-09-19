@@ -2,7 +2,7 @@ import type { RepoDocsModule, RepoDocsSection } from '@workspace/codepath-common
 import { RepoDocsSectionKey, RepoDocsStatus } from '@workspace/codepath-common/repository'
 import { describe, expect, it } from 'vitest'
 
-import { assembleExportDocs, buildDocsMarkdown, demoteMarkdownHeadings, getDocsFilename, getDocsFilenameWithExtension } from './docs-export'
+import { assembleExportDocs, buildDocsMarkdown, demoteMarkdownHeadings, describeUnavailableSection, getDocsFilename, getDocsFilenameWithExtension, hasStoredDocumentation } from './docs-export'
 
 const readySection = (key: RepoDocsSectionKey, title: string, markdown = 'Content'): RepoDocsSection => ({
   generatedAt: '2026-09-19T10:00:00.000Z',
@@ -81,5 +81,39 @@ describe('docs export helpers', () => {
   it('uses the shared slug logic for PDF downloads', () => {
     expect(getDocsFilenameWithExtension('My Repository!', 42, 'pdf')).toBe('my-repository-docs.pdf')
     expect(getDocsFilenameWithExtension('  ', 42, 'pdf')).toBe('repo-42-docs.pdf')
+  })
+
+  it('treats sections that only say the context was unknown as unavailable', () => {
+    const unknown = { generatedAt: null, key: 'testing', markdown: 'Unknown from provided context.', status: RepoDocsStatus.READY, title: 'Testing' } as RepoDocsSection
+    const real = { generatedAt: null, key: 'overview', markdown: 'Real content', status: RepoDocsStatus.READY, title: 'Overview' } as RepoDocsSection
+    const document = assembleExportDocs([{ error: null, generatedAt: null, key: 'core', path: null, sections: [real, unknown], status: RepoDocsStatus.READY, summary: null, title: 'Core' }])
+
+    expect(document.modules[0]?.sections.map(item => item.title)).toEqual(['Overview'])
+    expect(document.modules[0]?.unavailableSections.map(item => item.title)).toEqual(['Testing'])
+    expect(describeUnavailableSection(unknown)).toBe('no evidence in provided context')
+    expect(describeUnavailableSection({ ...unknown, markdown: null, status: RepoDocsStatus.PENDING })).toBe('pending')
+    expect(buildDocsMarkdown(document, 'Repo')).toContain('- Testing (no evidence in provided context)')
+  })
+
+  it('only treats a section as unknown-only when nothing but punctuation surrounds the marker', () => {
+    const section = (markdown: string) => ({ generatedAt: null, key: 'testing', markdown, status: RepoDocsStatus.READY, title: 'Testing' }) as RepoDocsSection
+
+    for (const markdown of ['Unknown from provided context.', '**Unknown from provided context**', '> Unknown from provided context —']) {
+      expect(describeUnavailableSection(section(markdown))).toBe('no evidence in provided context')
+    }
+
+    for (const markdown of ['中文：Unknown from provided context。', 'Żółć — Unknown from provided context — 中文', 'Real text. Unknown from provided context']) {
+      expect(describeUnavailableSection(section(markdown))).toBe('ready')
+    }
+  })
+
+  it('detects stored documentation even when nothing is exportable', () => {
+    const unknownOnly = { generatedAt: null, key: 'testing', markdown: 'Unknown from provided context.', status: RepoDocsStatus.READY, title: 'Testing' } as RepoDocsSection
+    const emptyModule = { error: null, generatedAt: null, key: 'core', path: null, sections: [], status: RepoDocsStatus.PENDING, summary: null, title: 'Core' }
+
+    expect(hasStoredDocumentation([])).toBe(false)
+    expect(hasStoredDocumentation([emptyModule])).toBe(false)
+    expect(hasStoredDocumentation([{ ...emptyModule, summary: 'A summary' }])).toBe(true)
+    expect(hasStoredDocumentation([{ ...emptyModule, sections: [unknownOnly] }])).toBe(true)
   })
 })

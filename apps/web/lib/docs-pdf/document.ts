@@ -1,5 +1,5 @@
 import type { ExportDocsDocument } from '@/lib/docs-export'
-import { demoteMarkdownHeadings } from '@/lib/docs-export'
+import { demoteMarkdownHeadings, describeUnavailableSection } from '@/lib/docs-export'
 
 import { markdownToPdf, type PdfContent } from './markdown-to-pdf'
 import { sanitizePdfText } from './sanitize'
@@ -11,6 +11,22 @@ interface PdfDocumentOptions {
 
 function destination(moduleKey: string, sectionKey?: string): string {
   return sectionKey ? `section-${moduleKey}-${sectionKey}` : `module-${moduleKey}`
+}
+
+// Header and footer are laid out on every page and show up among the "following nodes on the page" of the last
+// real node, so they carry this style and are ignored when checking for orphaned headings.
+const PAGE_CHROME_STYLE = 'pageChrome'
+
+// A heading left alone at the bottom of a page moves to the next page together with its content.
+// pdfmake 0.3 passes lazy node queries (not arrays) as the second argument of `pageBreakBefore`.
+interface PageBreakNodeQueries {
+  getFollowingNodesOnPage: () => Array<{ style?: string | string[] }>
+}
+
+const isPageChrome = (node: { style?: string | string[] }) => node.style === PAGE_CHROME_STYLE
+
+function keepHeadingWithContent(currentNode: { headlineLevel?: number }, nodeQueries: PageBreakNodeQueries): boolean {
+  return currentNode.headlineLevel !== undefined && nodeQueries.getFollowingNodesOnPage().filter(node => !isPageChrome(node)).length === 0
 }
 
 export function createDocsPdfDefinition(document: ExportDocsDocument, { repoId, repositoryName }: PdfDocumentOptions): Record<string, unknown> {
@@ -37,17 +53,14 @@ export function createDocsPdfDefinition(document: ExportDocsDocument, { repoId, 
     if (docsModule.summary) content.push(...markdownToPdf(demoteMarkdownHeadings(docsModule.summary, 2)))
 
     docsModule.sections.forEach((section, sectionIndex) => {
-      // Every section starts on a new page; the first one stays under the chapter title when there is no summary,
-      // so the chapter page never holds a heading alone.
-      const startsNewPage = sectionIndex > 0 || Boolean(docsModule.summary)
-
-      content.push({ id: destination(docsModule.key, section.key), margin: [0, startsNewPage ? 0 : 14, 0, 7], ...(startsNewPage ? { pageBreak: 'before' } : {}), style: 'section', text: `${chapter}.${sectionIndex + 1} ${sanitizePdfText(section.title)}`, tocItem: true })
+      // Sections flow after each other; `headlineLevel` lets pageBreakBefore keep a heading together with its content.
+      content.push({ headlineLevel: 1, id: destination(docsModule.key, section.key), margin: [0, 14, 0, 7], style: 'section', text: `${chapter}.${sectionIndex + 1} ${sanitizePdfText(section.title)}`, tocItem: true })
       content.push(...markdownToPdf(demoteMarkdownHeadings(section.markdown ?? '', 3), { dropLeadingHeadingLike: section.title }))
     })
 
     if (docsModule.unavailableSections.length) {
       content.push({ margin: [0, 14, 0, 6], style: 'section', text: 'Not generated' })
-      content.push({ ul: docsModule.unavailableSections.map(section => `${sanitizePdfText(section.title)} (${section.status.replaceAll('_', ' ')})`) })
+      content.push({ ul: docsModule.unavailableSections.map(section => `${sanitizePdfText(section.title)} (${describeUnavailableSection(section)})`) })
     }
   })
 
@@ -55,11 +68,12 @@ export function createDocsPdfDefinition(document: ExportDocsDocument, { repoId, 
     content,
     defaultStyle: { color: '#24292f', font: 'Roboto', fontSize: 10, lineHeight: 1.25 },
     info: { author: 'CodePath', subject: 'Generated documentation', title: name },
+    pageBreakBefore: keepHeadingWithContent,
     pageMargins: [48, 48, 48, 45],
     pageOrientation: 'portrait',
     pageSize: 'A4',
-    footer: (page: number, pages: number) => ({ alignment: 'center', color: '#57606a', fontSize: 8, margin: [0, 10, 0, 0], text: `Page ${page} of ${pages}` }),
-    header: (page: number) => page === 1 ? null : ({ color: '#57606a', fontSize: 8, margin: [40, 16, 40, 0], text: name }),
+    footer: (page: number, pages: number) => ({ alignment: 'center', color: '#57606a', fontSize: 8, margin: [0, 10, 0, 0], style: PAGE_CHROME_STYLE, text: `Page ${page} of ${pages}` }),
+    header: (page: number) => page === 1 ? null : ({ color: '#57606a', fontSize: 8, margin: [40, 16, 40, 0], style: PAGE_CHROME_STYLE, text: name }),
     styles: {
       chapter: { bold: true, color: '#1f2328', fontSize: 22 },
       code: { font: 'Code', fontSize: 8, lineHeight: 1.15 },
@@ -70,6 +84,7 @@ export function createDocsPdfDefinition(document: ExportDocsDocument, { repoId, 
       h4: { bold: true, fontSize: 11 },
       h5: { bold: true, fontSize: 10 },
       h6: { bold: true, fontSize: 10 },
+      [PAGE_CHROME_STYLE]: {},
       section: { bold: true, color: '#1f2328', fontSize: 15 },
       tocHeading: { bold: true, color: '#1f2328', fontSize: 22 }
     }

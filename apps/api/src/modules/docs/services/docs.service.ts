@@ -32,6 +32,9 @@ const nowIso = () => new Date().toISOString()
 type RepoDocsStatusValue = `${RepoDocsStatus}`
 const REPOSITORY_DOCS_MODULE_KEY = 'repository'
 
+// Mirrors the docs worker's `_module_key`: a differently spelled key must reset the same fragments the worker will read.
+const normalizeModuleKey = (moduleKey: string) => moduleKey.trim().toLowerCase().replaceAll('\\', '/').replaceAll(/[^a-z0-9]+/g, '_').replaceAll(/^_+|_+$/g, '') || REPOSITORY_DOCS_MODULE_KEY
+
 interface GenerateDocumentationTarget {
   moduleKey?: string
   sectionKey?: RepoDocsSectionKey
@@ -338,7 +341,11 @@ export class DocsService {
       byModule.set(fragment.moduleKey, existingModule)
     }
 
-    return [...byModule.values()].map(module => {
+    // The project-level Repository chapter comes first; other modules keep their stored order (Array#sort is stable).
+    const isRepositoryModule = (module: { key: string }) => Number(module.key === REPOSITORY_DOCS_MODULE_KEY)
+    const orderedModules = [...byModule.values()].sort((left, right) => isRepositoryModule(right) - isRepositoryModule(left))
+
+    return orderedModules.map(module => {
       const sectionsByKey = new Map(module.sections.map(section => [section.key, section]))
 
       return {
@@ -369,10 +376,12 @@ export class DocsService {
     // TODO: ADD CUSTOM ERROR HANDLING WITH CODE AND STATUS FROM ENUM
     if (target.moduleKey && target.moduleKey.trim().length === 0) throw new ConflictException('Module key must not be empty')
 
+    const moduleKey = target.moduleKey === undefined ? undefined : normalizeModuleKey(target.moduleKey)
+
     if (target.sectionKey) {
       return {
         forceRegenerateDocs: true,
-        moduleKey: target.moduleKey,
+        moduleKey,
         repoId,
         scope: RepoDocsGenerationScope.SECTION,
         sectionKey: target.sectionKey
@@ -382,7 +391,7 @@ export class DocsService {
     if (target.moduleKey) {
       return {
         forceRegenerateDocs: true,
-        moduleKey: target.moduleKey,
+        moduleKey,
         repoId,
         scope: RepoDocsGenerationScope.MODULE
       }
