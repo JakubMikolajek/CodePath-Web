@@ -5,6 +5,7 @@ import { RepoCloneStatus, RepoDocsStatus, RepoEmbeddingStatus } from '@workspace
 import { useParams } from 'next/navigation'
 import { useMemo, useState } from 'react'
 
+import { assembleExportDocs, buildDocsMarkdown, getDocsFilename } from '@/lib/docs-export'
 import { getFirstRouteParam } from '@/lib/route-params'
 import {
   useGenerateRepoDocsModuleMutation,
@@ -15,6 +16,7 @@ import {
   useRetryRepoCloneMutation,
   useRetryRepoIngestMutation
 } from '@/redux/api/docsApi'
+import { useGetReposQuery } from '@/redux/api/reposApi'
 
 import { DocsContent } from './DocsContent'
 import { DocsHeader } from './DocsHeader'
@@ -43,6 +45,7 @@ export function DocsClient() {
     pollingInterval: shouldPoll ? DOCS_STATUS_POLL_MS : 0,
     skip: !validRepoId
   })
+  const reposQuery = useGetReposQuery(undefined, { skip: !validRepoId })
 
   const pollingStatusQuery = useGetRepoDocsStatusQuery(repoId, {
     pollingInterval: shouldPoll ? DOCS_STATUS_POLL_MS : 0,
@@ -57,6 +60,9 @@ export function DocsClient() {
 
   const status = pollingStatusQuery.data ?? statusQuery.data
   const modules = modulesQuery.data ?? []
+  const exportDocument = assembleExportDocs(modules)
+  const hasGeneratedSections = exportDocument.modules.some(module => module.sections.length > 0)
+  const repositoryName = reposQuery.data?.find(repository => repository.id === repoId)?.name ?? null
   const activeModule = modules.find(module => module.key === selectedModuleKey) ?? modules[0] ?? null
   const activeSection = activeModule?.sections.find(section => section.key === selectedSectionKey) ?? activeModule?.sections[0] ?? null
   const isLoading = statusQuery.isLoading || modulesQuery.isLoading
@@ -107,10 +113,23 @@ export function DocsClient() {
       setPipelineAction(null)
     }
   }
+  const exportMarkdown = () => {
+    if (!hasGeneratedSections) return
+
+    const content = buildDocsMarkdown(exportDocument, repositoryName ?? `Repository ${repoId}`)
+    const url = URL.createObjectURL(new Blob([content], { type: 'text/markdown;charset=utf-8' }))
+    const link = document.createElement('a')
+
+    link.download = getDocsFilename(repositoryName, repoId)
+    link.href = url
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div className="space-y-4.5">
       <DocsHeader
+        canExportDocs={hasGeneratedSections}
         canGenerate={canGenerate}
         canRetryClone={canRetryClone}
         canRetryIngest={canRetryIngest}
@@ -119,6 +138,7 @@ export function DocsClient() {
         isGenerating={generationAction !== null}
         isPipelineActionRunning={pipelineAction !== null}
         isRefreshing={isRefreshing}
+        onExportMarkdown={exportMarkdown}
         onGenerate={generate}
         onRefresh={refresh}
         onRetryClone={() => void retryPipeline('clone')}

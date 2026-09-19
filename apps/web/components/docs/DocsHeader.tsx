@@ -1,9 +1,11 @@
 import { Button } from '@workspace/ui/components/button'
-import { BookOpen, FileText, RefreshCw, RotateCcw, Sparkles } from 'lucide-react'
+import { BookOpen, Download, FileDown, FileText, RefreshCw, RotateCcw, Sparkles } from 'lucide-react'
+import Link from 'next/link'
 
 import { PageHeader } from '@/components/PageHeader'
 
 interface DocsHeaderProps {
+  canExportDocs: boolean;
   canGenerate: boolean;
   canRetryClone: boolean;
   canRetryIngest: boolean;
@@ -12,6 +14,7 @@ interface DocsHeaderProps {
   isGenerating: boolean;
   isPipelineActionRunning: boolean;
   isRefreshing: boolean;
+  onExportMarkdown: () => void;
   onGenerate: (scope: 'module' | 'repository' | 'section') => void;
   onRefresh: () => void;
   onRetryClone: () => void;
@@ -22,6 +25,7 @@ interface DocsHeaderProps {
 }
 
 export function DocsHeader({
+  canExportDocs,
   canGenerate,
   canRetryClone,
   canRetryIngest,
@@ -30,6 +34,7 @@ export function DocsHeader({
   isGenerating,
   isPipelineActionRunning,
   isRefreshing,
+  onExportMarkdown,
   onGenerate,
   onRefresh,
   onRetryClone,
@@ -42,6 +47,35 @@ export function DocsHeader({
     <PageHeader
       actions={(
         <div className="flex flex-wrap items-center justify-end gap-2">
+          {canExportDocs ? (
+            <Button asChild className="rounded-[8px] px-2.75 py-1.5 text-[11.5px]" variant="glass">
+              <Link href={`/${repoId}/docs/print`}>
+                <FileDown className="size-4" />
+
+                Export PDF
+              </Link>
+            </Button>
+          ) : (
+            <Button className="rounded-[8px] px-2.75 py-1.5 text-[11.5px]" disabled title="Generate at least one documentation section before exporting" type="button" variant="glass">
+              <FileDown className="size-4" />
+
+              Export PDF
+            </Button>
+          )}
+
+          <Button
+            className="rounded-[8px] px-2.75 py-1.5 text-[11.5px]"
+            disabled={!canExportDocs}
+            onClick={onExportMarkdown}
+            title={canExportDocs ? 'Download all generated documentation as Markdown' : 'Generate at least one documentation section before exporting'}
+            type="button"
+            variant="glass"
+          >
+            <Download className="size-4" />
+
+            Export Markdown
+          </Button>
+
           <Button
             className="rounded-[8px] px-2.75 py-1.5 text-[11.5px]"
             disabled={!canRetryClone || isPipelineActionRunning || isGenerating}
