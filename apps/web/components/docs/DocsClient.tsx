@@ -5,7 +5,7 @@ import { RepoCloneStatus, RepoDocsStatus, RepoEmbeddingStatus } from '@workspace
 import { useParams } from 'next/navigation'
 import { useMemo, useState } from 'react'
 
-import { assembleExportDocs, buildDocsMarkdown, getDocsFilename } from '@/lib/docs-export'
+import { assembleExportDocs, buildDocsMarkdown, getDocsFilename, getDocsFilenameWithExtension } from '@/lib/docs-export'
 import { getFirstRouteParam } from '@/lib/route-params'
 import {
   useGenerateRepoDocsModuleMutation,
@@ -35,6 +35,7 @@ export function DocsClient() {
   const [selectedSectionKey, setSelectedSectionKey] = useState<Nullable<string>>(null)
   const [actionError, setActionError] = useState<Nullable<string>>(null)
   const [generationAction, setGenerationAction] = useState<Nullable<'module' | 'repository' | 'section'>>(null)
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
   const [pipelineAction, setPipelineAction] = useState<Nullable<'clone' | 'ingest'>>(null)
 
   const statusQuery = useGetRepoDocsStatusQuery(repoId, { skip: !validRepoId })
@@ -125,6 +126,23 @@ export function DocsClient() {
     link.click()
     URL.revokeObjectURL(url)
   }
+  const exportPdf = async () => {
+    if (!hasGeneratedSections) return
+
+    setActionError(null)
+    setIsExportingPdf(true)
+
+    try {
+      const { buildDocsPdf, downloadPdf } = await import('@/lib/docs-pdf')
+      const blob = await buildDocsPdf(exportDocument, { repoId, repositoryName: repositoryName ?? `Repository ${repoId}` })
+
+      downloadPdf(blob, getDocsFilenameWithExtension(repositoryName, repoId, 'pdf'))
+    } catch (nextError) {
+      setActionError(resolveErrorMessage(nextError))
+    } finally {
+      setIsExportingPdf(false)
+    }
+  }
 
   return (
     <div className="space-y-4.5">
@@ -135,10 +153,12 @@ export function DocsClient() {
         canRetryIngest={canRetryIngest}
         hasActiveModule={Boolean(activeModule)}
         hasActiveSection={Boolean(activeSection)}
+        isExportingPdf={isExportingPdf}
         isGenerating={generationAction !== null}
         isPipelineActionRunning={pipelineAction !== null}
         isRefreshing={isRefreshing}
         onExportMarkdown={exportMarkdown}
+        onExportPdf={() => void exportPdf()}
         onGenerate={generate}
         onRefresh={refresh}
         onRetryClone={() => void retryPipeline('clone')}

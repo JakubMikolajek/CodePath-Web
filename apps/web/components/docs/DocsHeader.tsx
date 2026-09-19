@@ -1,6 +1,5 @@
 import { Button } from '@workspace/ui/components/button'
 import { BookOpen, Download, FileDown, FileText, RefreshCw, RotateCcw, Sparkles } from 'lucide-react'
-import Link from 'next/link'
 
 import { PageHeader } from '@/components/PageHeader'
 
@@ -11,10 +10,12 @@ interface DocsHeaderProps {
   canRetryIngest: boolean;
   hasActiveModule: boolean;
   hasActiveSection: boolean;
+  isExportingPdf: boolean;
   isGenerating: boolean;
   isPipelineActionRunning: boolean;
   isRefreshing: boolean;
   onExportMarkdown: () => void;
+  onExportPdf: () => void;
   onGenerate: (scope: 'module' | 'repository' | 'section') => void;
   onRefresh: () => void;
   onRetryClone: () => void;
@@ -31,10 +32,12 @@ export function DocsHeader({
   canRetryIngest,
   hasActiveModule,
   hasActiveSection,
+  isExportingPdf,
   isGenerating,
   isPipelineActionRunning,
   isRefreshing,
   onExportMarkdown,
+  onExportPdf,
   onGenerate,
   onRefresh,
   onRetryClone,
@@ -47,21 +50,11 @@ export function DocsHeader({
     <PageHeader
       actions={(
         <div className="flex flex-wrap items-center justify-end gap-2">
-          {canExportDocs ? (
-            <Button asChild className="rounded-[8px] px-2.75 py-1.5 text-[11.5px]" variant="glass">
-              <Link href={`/${repoId}/docs/print`}>
-                <FileDown className="size-4" />
+          <Button aria-busy={isExportingPdf} className="rounded-[8px] px-2.75 py-1.5 text-[11.5px]" disabled={!canExportDocs || isExportingPdf} onClick={onExportPdf} title={canExportDocs ? 'Download generated documentation as PDF' : 'Generate at least one documentation section before exporting'} type="button" variant="glass">
+            <FileDown className="size-4" />
 
-                Export PDF
-              </Link>
-            </Button>
-          ) : (
-            <Button className="rounded-[8px] px-2.75 py-1.5 text-[11.5px]" disabled title="Generate at least one documentation section before exporting" type="button" variant="glass">
-              <FileDown className="size-4" />
-
-              Export PDF
-            </Button>
-          )}
+            {isExportingPdf ? 'Generating PDF…' : 'Export PDF'}
+          </Button>
 
           <Button
             className="rounded-[8px] px-2.75 py-1.5 text-[11.5px]"

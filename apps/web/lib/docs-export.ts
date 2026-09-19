@@ -84,9 +84,13 @@ export function demoteMarkdownHeadings(markdown: string, levels: number): string
 }
 
 export function getDocsFilename(repositoryName: null | string | undefined, repoId: number): string {
+  return getDocsFilenameWithExtension(repositoryName, repoId, 'md')
+}
+
+export function getDocsFilenameWithExtension(repositoryName: null | string | undefined, repoId: number, extension: string): string {
   const slug = slugify(repositoryName) || `repo-${repoId}`
 
-  return `${slug}-docs.md`
+  return `${slug}-docs.${extension}`
 }
 
 function slugify(value: null | string | undefined): string {

@@ -2,7 +2,7 @@ import type { RepoDocsModule, RepoDocsSection } from '@workspace/codepath-common
 import { RepoDocsSectionKey, RepoDocsStatus } from '@workspace/codepath-common/repository'
 import { describe, expect, it } from 'vitest'
 
-import { assembleExportDocs, buildDocsMarkdown, demoteMarkdownHeadings, getDocsFilename } from './docs-export'
+import { assembleExportDocs, buildDocsMarkdown, demoteMarkdownHeadings, getDocsFilename, getDocsFilenameWithExtension } from './docs-export'
 
 const readySection = (key: RepoDocsSectionKey, title: string, markdown = 'Content'): RepoDocsSection => ({
   generatedAt: '2026-09-19T10:00:00.000Z',
@@ -76,5 +76,10 @@ describe('docs export helpers', () => {
   it('uses a repository slug or repository id fallback for downloads', () => {
     expect(getDocsFilename('My Repository!', 42)).toBe('my-repository-docs.md')
     expect(getDocsFilename('  ', 42)).toBe('repo-42-docs.md')
+  })
+
+  it('uses the shared slug logic for PDF downloads', () => {
+    expect(getDocsFilenameWithExtension('My Repository!', 42, 'pdf')).toBe('my-repository-docs.pdf')
+    expect(getDocsFilenameWithExtension('  ', 42, 'pdf')).toBe('repo-42-docs.pdf')
   })
 })
