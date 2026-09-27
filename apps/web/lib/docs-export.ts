@@ -14,7 +14,15 @@ export interface ExportDocsDocument {
   modules: ExportDocsModule[]
 }
 
-const hasReadyMarkdown = (section: RepoDocsSection) => section.status === RepoDocsStatus.READY && Boolean(section.markdown?.trim())
+const UNKNOWN_ONLY_MARKDOWN = /^[\s\p{P}\p{S}]*unknown from provided context[\s\p{P}\p{S}]*$/iu
+
+const LEADING_HEADINGS = /^(?:#{1,6}[ \t][^\n]*(?:\n|$)\s*)+/
+
+const isUnknownOnly = (section: RepoDocsSection) => UNKNOWN_ONLY_MARKDOWN.test((section.markdown ?? '').trim().replace(LEADING_HEADINGS, '').trim())
+
+const hasReadyMarkdown = (section: RepoDocsSection) => section.status === RepoDocsStatus.READY && Boolean(section.markdown?.trim()) && !isUnknownOnly(section)
+
+export const describeUnavailableSection = (section: RepoDocsSection) => isUnknownOnly(section) ? 'no evidence in provided context' : section.status.replaceAll('_', ' ')
 
 export function assembleExportDocs(modules: RepoDocsModule[]): ExportDocsDocument {
   const generatedAt = modules.reduce<null | string>((latest, docsModule) => {
@@ -54,7 +62,7 @@ export function buildDocsMarkdown(document: ExportDocsDocument, repositoryName: 
 
     if (docsModule.unavailableSections.length) {
       lines.push('', '### Not generated', '')
-      for (const section of docsModule.unavailableSections) lines.push(`- ${section.title} (${section.status.replaceAll('_', ' ')})`)
+      for (const section of docsModule.unavailableSections) lines.push(`- ${section.title} (${describeUnavailableSection(section)})`)
     }
   }
 
@@ -100,3 +108,8 @@ function slugify(value: null | string | undefined): string {
 function toAnchor(value: string): string {
   return slugify(value)
 }
+
+/** True when any module holds real generated content — what the destructive actions would delete. */
+export const hasStoredDocumentation = (modules: RepoDocsModule[]) => modules.some(docsModule => (
+  Boolean(docsModule.summary?.trim()) || docsModule.sections.some(section => Boolean(section.markdown?.trim()))
+))

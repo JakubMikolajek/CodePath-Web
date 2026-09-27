@@ -9,11 +9,11 @@ jest.mock('../telemetry/services/telemetry', () => ({
 
 type RepoState = {
   cloneStatus: 'cloned' | 'cloning' | 'failed' | 'pending'
-  documentation?: string | null
   docsStatus: 'failed' | 'pending' | 'processing' | 'ready'
+  documentation?: null | string
   embeddingStatus: 'embedded' | 'failed' | 'pending' | 'processing'
   id: number
-  pipelineUpdatedAt?: string | null
+  pipelineUpdatedAt?: null | string
 }
 
 function createDbMocks(
@@ -73,14 +73,14 @@ function createDbMocks(
       }
     },
     mocks: {
-      limitMock,
-      returningMock,
       deleteMock,
       deleteWhereMock,
       insertMock,
       insertOnConflictDoUpdateMock,
       insertValuesMock,
+      limitMock,
       orderByMock,
+      returningMock,
       selectMock,
       updateMock,
       updateSetMock,
@@ -215,6 +215,19 @@ describe('DocsService', () => {
       moduleTitle: 'Users',
       status: 'processing'
     }))
+  })
+
+  it('normalizes the module key like the docs worker before resetting and enqueueing', async () => {
+    const repoState: RepoState = { cloneStatus: 'cloned', docsStatus: 'ready', embeddingStatus: 'embedded', id: 32 }
+    const { dbService, mocks } = createDbMocks([[repoState]], [{ id: 32 }])
+    const service = new DocsService(dbService as never, orchestratorClient as never)
+
+    orchestratorClient.enqueueDocsJob.mockResolvedValue(undefined)
+
+    await service.generateDocumentation(3, 32, { moduleKey: ' SRC/Modules-Users ' })
+
+    expect(orchestratorClient.enqueueDocsJob).toHaveBeenCalledWith(expect.objectContaining({ moduleKey: 'src_modules_users', scope: RepoDocsGenerationScope.MODULE }))
+    expect(mocks.insertValuesMock).toHaveBeenCalledWith(expect.objectContaining({ moduleKey: 'src_modules_users' }))
   })
 
   it('publishes scoped docs job for a selected section and creates processing placeholder', async () => {
@@ -413,6 +426,37 @@ describe('DocsService', () => {
     expect(modules[0]).toMatchObject({ key: 'repository', title: 'Repository' })
     expect(modules[0].sections[0]).toMatchObject({ key: 'overview', markdown: '## Overview\nOverview.', status: 'ready' })
     expect(modules[0].sections[1]).toMatchObject({ key: 'architecture', markdown: null, status: 'pending' })
+  })
+
+  it('lists the repository chapter first and keeps the other modules in stored order', async () => {
+    const fragment = (moduleKey: string, moduleTitle: string, id: number) => ({
+      error: null,
+      fragmentKey: 'overview',
+      fragmentType: 'section',
+      generatedAt: '2026-06-12T10:00:00.000Z',
+      id,
+      markdown: `## Overview\n${moduleTitle}.`,
+      moduleKey,
+      modulePath: null,
+      moduleTitle,
+      repoId: 60,
+      sectionKey: 'overview',
+      sectionTitle: 'Overview',
+      status: 'ready'
+    })
+    const { dbService } = createDbMocks([[
+      { docsStatus: 'ready', documentation: null, id: 60, pipelineUpdatedAt: '2026-06-12T10:00:00.000Z' }
+    ]], [{ id: 1 }], [[
+      fragment('benchmarks', 'Benchmarks', 1),
+      fragment('models', 'Models', 2),
+      fragment('repository', 'Repository', 3),
+      fragment('workers', 'Workers', 4)
+    ]])
+    const service = new DocsService(dbService as never, orchestratorClient as never)
+
+    const modules = await service.getDocumentationModules(6, 60)
+
+    expect(modules.map(module => module.key)).toEqual(['repository', 'benchmarks', 'models', 'workers'])
   })
 
   it('derives repository documentation module from legacy markdown when jsonb modules are missing', async () => {

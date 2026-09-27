@@ -84,6 +84,9 @@ function patchRepoPipelineStatus(data: RepoPipelineUpdatedData): void {
   if (docsStatusCache.data) {
     store.dispatch(docsApi.util.updateQueryData('getRepoDocsStatus', data.id, docsStatus => { applyRepoPipelineStatus(docsStatus, data) }))
   }
+
+  // A status change (e.g. docs finished) can come with sections the polling has not fetched yet.
+  store.dispatch(docsApi.util.invalidateTags([{ id: data.id, type: 'RepoDocsModules' }]))
 }
 
 function applyRepoPipelineStatus(
