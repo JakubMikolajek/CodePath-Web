@@ -14,11 +14,11 @@ export interface ExportDocsDocument {
   modules: ExportDocsModule[]
 }
 
-// The docs worker writes this marker when a section has no evidence in its context; such a section carries no information.
-// Only whitespace, punctuation and symbols (markdown emphasis, dashes, CJK full stops) may surround the marker, never letters.
 const UNKNOWN_ONLY_MARKDOWN = /^[\s\p{P}\p{S}]*unknown from provided context[\s\p{P}\p{S}]*$/iu
 
-const isUnknownOnly = (section: RepoDocsSection) => UNKNOWN_ONLY_MARKDOWN.test(section.markdown?.trim() ?? '')
+const LEADING_HEADINGS = /^(?:#{1,6}[ \t][^\n]*(?:\n|$)\s*)+/
+
+const isUnknownOnly = (section: RepoDocsSection) => UNKNOWN_ONLY_MARKDOWN.test((section.markdown ?? '').trim().replace(LEADING_HEADINGS, '').trim())
 
 const hasReadyMarkdown = (section: RepoDocsSection) => section.status === RepoDocsStatus.READY && Boolean(section.markdown?.trim()) && !isUnknownOnly(section)
 

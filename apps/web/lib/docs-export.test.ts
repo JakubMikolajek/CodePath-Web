@@ -107,6 +107,15 @@ describe('docs export helpers', () => {
     }
   })
 
+  it('ignores the stored leading heading when deciding that a section is unknown-only', () => {
+    const section = (markdown: string) => ({ generatedAt: null, key: 'risks_limitations', markdown, status: RepoDocsStatus.READY, title: 'Risks & Limitations' }) as RepoDocsSection
+
+    expect(describeUnavailableSection(section('## Risks & Limitations\n\nUnknown from provided context'))).toBe('no evidence in provided context')
+    expect(describeUnavailableSection(section('## Risks & Limitations\n### Sub\nUnknown from provided context.'))).toBe('no evidence in provided context')
+    expect(describeUnavailableSection(section('## Risks & Limitations\n\nThe cache is bounded. Unknown from provided context'))).toBe('ready')
+    expect(describeUnavailableSection(section('## Risks & Limitations'))).toBe('ready')
+  })
+
   it('detects stored documentation even when nothing is exportable', () => {
     const unknownOnly = { generatedAt: null, key: 'testing', markdown: 'Unknown from provided context.', status: RepoDocsStatus.READY, title: 'Testing' } as RepoDocsSection
     const emptyModule = { error: null, generatedAt: null, key: 'core', path: null, sections: [], status: RepoDocsStatus.PENDING, summary: null, title: 'Core' }
