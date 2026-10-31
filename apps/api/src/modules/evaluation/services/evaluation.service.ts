@@ -40,6 +40,21 @@ export class EvaluationService {
     ).orderBy(evaluationMetrics.createdAt, evaluationMetrics.id)
   }
 
+  async getRunConfig(userId: number, repoId: number, runId: number) {
+    await assertRepoOwnership(this.dbService, userId, repoId)
+    await this.assertRunBelongsToRepo(repoId, runId)
+
+    const [run] = await this.dbService.dbClient.select({
+      config: evaluationRuns.config,
+      id: evaluationRuns.id,
+      label: evaluationRuns.label
+    }).from(evaluationRuns).where(
+      eq(evaluationRuns.id, runId)
+    ).limit(1)
+
+    return run
+  }
+
   async getTrend(userId: number, repoId: number) {
     await assertRepoOwnership(this.dbService, userId, repoId)
 
@@ -66,6 +81,7 @@ export class EvaluationService {
       completedAt: evaluationRuns.completedAt,
       errorMessage: evaluationRuns.errorMessage,
       id: evaluationRuns.id,
+      label: evaluationRuns.label,
       repoId: evaluationRuns.repoId,
       runType: evaluationRuns.runType,
       status: evaluationRuns.status,
