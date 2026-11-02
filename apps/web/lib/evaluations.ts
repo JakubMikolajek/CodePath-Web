@@ -10,6 +10,7 @@ export interface EvaluationRun {
   completedAt: Nullable<string>
   errorMessage: Nullable<string>
   id: number
+  label?: Nullable<string>
   repoId: number
   runType: EvaluationRunType
   status: EvaluationRunStatus

@@ -65,6 +65,7 @@ describe('EvaluationService', () => {
       completedAt: null,
       errorMessage: null,
       id: 11,
+      label: 'S-on_C-hi_seed1',
       repoId: 3,
       runType: 'docs_quality',
       status: 'completed',
@@ -77,6 +78,45 @@ describe('EvaluationService', () => {
     const service = new EvaluationService(dbService as never, orchestratorClient as never)
 
     await expect(service.listRuns(1, 3)).resolves.toEqual(runs)
+  })
+
+  it('returns a run label and config only after the run belongs to the requested repository', async () => {
+    const config = {
+      manifest: ['src/main.ts::bootstrap'],
+      settings: { chunkSize: 500 }
+    }
+    const run = {
+      config,
+      id: 11,
+      label: 'S-on_C-hi_seed1'
+    }
+    const { dbService } = createDbServiceMock([
+      { kind: 'limit', result: [{ id: 3, name: 'repo' }] },
+      { kind: 'limit', result: [{ id: 11 }] },
+      { kind: 'limit', result: [run] }
+    ])
+    const service = new EvaluationService(dbService as never, orchestratorClient as never)
+
+    await expect(service.getRunConfig(1, 3, 11)).resolves.toEqual(run)
+  })
+
+  it('hides configuration when the run does not belong to the requested repository', async () => {
+    const { dbService } = createDbServiceMock([
+      { kind: 'limit', result: [{ id: 3, name: 'repo' }] },
+      { kind: 'limit', result: [] }
+    ])
+    const service = new EvaluationService(dbService as never, orchestratorClient as never)
+
+    await expect(service.getRunConfig(1, 3, 99)).rejects.toBeInstanceOf(NotFoundException)
+  })
+
+  it('hides configuration when the repository is not owned by the user', async () => {
+    const { dbService } = createDbServiceMock([
+      { kind: 'limit', result: [] }
+    ])
+    const service = new EvaluationService(dbService as never, orchestratorClient as never)
+
+    await expect(service.getRunConfig(1, 3, 11)).rejects.toBeInstanceOf(NotFoundException)
   })
 
   it('rejects invalid run limits', async () => {

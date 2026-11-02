@@ -22,6 +22,16 @@ export class EvaluationController {
     return await this.evaluationService.getRunMetrics(req.user.id, repoId, runId)
   }
 
+  @Get(':repoId/runs/:runId/config')
+  @UseGuards(SessionAuthGuard)
+  async getRunConfig(
+    @Req() req: { user: SelectUser },
+    @Param('repoId', ParseIntPipe) repoId: number,
+    @Param('runId', ParseIntPipe) runId: number
+  ) {
+    return await this.evaluationService.getRunConfig(req.user.id, repoId, runId)
+  }
+
   @Get(':repoId/trend')
   @UseGuards(SessionAuthGuard)
   async getTrend(

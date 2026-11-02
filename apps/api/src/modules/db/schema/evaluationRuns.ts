@@ -1,6 +1,6 @@
 import type { InferInsertModel, InferSelectModel } from 'drizzle-orm'
 import { relations } from 'drizzle-orm'
-import { foreignKey, index, integer, pgEnum, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core'
+import { foreignKey, index, integer, jsonb, pgEnum, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core'
 
 import { evaluationMetrics, repos } from './index'
 
@@ -9,8 +9,10 @@ export const evaluationRunStatusEnum = pgEnum('evaluation_run_status', ['pending
 
 export const evaluationRuns = pgTable('evaluation_runs', {
   completedAt: timestamp('completed_at', { mode: 'string' }),
+  config: jsonb('config').$type<Record<string, unknown>>(),
   errorMessage: text('error_message'),
   id: serial().primaryKey().notNull(),
+  label: text('label'),
   repoId: integer('repo_id').notNull(),
   runType: evaluationRunTypeEnum('run_type').notNull(),
   status: evaluationRunStatusEnum('status').default('pending').notNull(),
