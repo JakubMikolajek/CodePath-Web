@@ -1,4 +1,4 @@
-FROM oven/bun:1.3.13 AS base
+FROM oven/bun:1.4.4 AS base
 
 WORKDIR /app
 
@@ -32,7 +32,7 @@ FROM builder AS api-build
 
 FROM builder AS web-build
 
-FROM oven/bun:1.3.13 AS api-runtime
+FROM oven/bun:1.4.4 AS api-runtime
 
 WORKDIR /app
 
@@ -48,7 +48,7 @@ EXPOSE 3001
 
 CMD ["bun", "apps/api/dist/main.js"]
 
-FROM oven/bun:1.3.13 AS web-runtime
+FROM oven/bun:1.4.4 AS web-runtime
 
 WORKDIR /app
 
